@@ -7,7 +7,7 @@
 - Add evidence-bound prospective V2 promotion contracts that freeze the
   target inventory and metric semantics, derive acceptance, exact fallback,
   and harmful-update status from validated decision traces and raw scores,
-  and require independent confirmation after candidate selection.
+  and require a fresh independent confirmation panel after candidate selection.
 - Add source-only task-projected functional-support certification over frozen
   linear readouts, including posterior-mixture covariance, optional
   component-specific low-rank uncertainty modes, exact Gaussian-mixture
