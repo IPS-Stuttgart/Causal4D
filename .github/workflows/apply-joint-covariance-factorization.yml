@@ -1,0 +1,117 @@
+name: Apply joint covariance factorization reuse
+
+on:
+  push:
+    branches:
+      - agent/reuse-joint-covariance-factorization
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-joint-covariance-factorization-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: >-
+      github.repository == 'IPS-Stuttgart/Causal4D' &&
+      github.ref == 'refs/heads/agent/reuse-joint-covariance-factorization'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out the exact branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: agent/reuse-joint-covariance-factorization
+
+      - name: Verify the bounded transport scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=3b26d1b23718ac879b6d59c5c5d83e16d5b52fb2
+          git merge-base --is-ancestor "$base" HEAD
+          mapfile -t actual < <(git diff --name-only "$base"...HEAD | sort)
+          expected=(
+            .github/workflows/apply-joint-covariance-factorization.yml
+            scripts/ci/apply_joint_covariance_factorization.py
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          diff -u \
+            <(printf '%s\n' "${expected_sorted[@]}") \
+            <(printf '%s\n' "${actual[@]}")
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Apply the exact source transformation
+        run: python scripts/ci/apply_joint_covariance_factorization.py
+
+      - name: Install development tools
+        run: python -m pip install -e ".[dev]"
+
+      - name: Format and lint the final source
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            src/causal4d/joint_observation.py
+            tests/test_joint_observation_shared_solver.py
+          )
+          python -m ruff check --fix "${files[@]}"
+          python -m ruff format "${files[@]}"
+          python -m ruff check "${files[@]}"
+          python -m ruff format --check "${files[@]}"
+
+      - name: Compile changed Python modules
+        run: |
+          python -m py_compile \
+            src/causal4d/joint_observation.py \
+            tests/test_joint_observation_shared_solver.py
+
+      - name: Run focused regressions
+        run: |
+          python -m pytest -q \
+            tests/test_joint_observation.py \
+            tests/test_joint_observation_shared_solver.py \
+            tests/test_prob4d_joint_observation.py
+
+      - name: Run the complete core suite
+        run: python -m pytest -q
+
+      - name: Build the wheel
+        run: python -m build --wheel --outdir "$RUNNER_TEMP/dist"
+
+      - name: Verify the final reviewable scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=3b26d1b23718ac879b6d59c5c5d83e16d5b52fb2
+          test ! -e .github/workflows/apply-joint-covariance-factorization.yml
+          test ! -e scripts/ci/apply_joint_covariance_factorization.py
+          mapfile -t actual < <(git diff --name-only "$base" | sort)
+          expected=(
+            CHANGELOG.md
+            docs/structured-joint-observation.md
+            src/causal4d/joint_observation.py
+            tests/test_joint_observation_shared_solver.py
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          diff -u \
+            <(printf '%s\n' "${expected_sorted[@]}") \
+            <(printf '%s\n' "${actual[@]}")
+          git diff --check
+
+      - name: Publish the ordinary source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Reuse joint covariance base factorizations"
+          git push origin HEAD:refs/heads/agent/reuse-joint-covariance-factorization
