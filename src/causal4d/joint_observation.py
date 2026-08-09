@@ -222,8 +222,7 @@ class LinearJointObservationEvidence:
             )
         else:
             raise ValueError(
-                "base_covariance_m2 must be dense (D, D) or block diagonal "
-                "(B, C, C)"
+                "base_covariance_m2 must be dense (D, D) or block diagonal (B, C, C)"
             )
         covariance = readonly_array(covariance, dtype=float)
 
@@ -311,16 +310,10 @@ class LinearJointObservationEvidence:
                 "row_indices_sha256": array_sha256(self.row_indices),
                 "frame_indices_sha256": array_sha256(self.frame_indices),
                 "node_indices_sha256": array_sha256(self.node_indices),
-                "coordinate_indices_sha256": array_sha256(
-                    self.coordinate_indices
-                ),
+                "coordinate_indices_sha256": array_sha256(self.coordinate_indices),
                 "coefficients_sha256": array_sha256(self.coefficients),
-                "base_covariance_representation": (
-                    self.base_covariance_representation
-                ),
-                "base_covariance_sha256": array_sha256(
-                    self.base_covariance_m2
-                ),
+                "base_covariance_representation": (self.base_covariance_representation),
+                "base_covariance_sha256": array_sha256(self.base_covariance_m2),
                 "shared_covariance_factor_sha256": (
                     None if factor is None else array_sha256(factor)
                 ),
@@ -356,9 +349,7 @@ class LinearJointObservationEvidence:
         if np.any(self.node_indices >= node_count):
             raise ValueError("joint observation references an unavailable node")
         if np.any(self.coordinate_indices >= coordinate_count):
-            raise ValueError(
-                "joint observation references an unavailable coordinate"
-            )
+            raise ValueError("joint observation references an unavailable coordinate")
 
     def apply(self, trajectories_m: np.ndarray) -> np.ndarray:
         trajectories = np.asarray(trajectories_m, dtype=float)
@@ -492,6 +483,7 @@ class JointGaussianLikelihoodDiagnostics:
     used_component_independent_covariance: bool
     used_component_covariance: bool
     used_low_rank_path: bool
+    used_shared_base_factorization: bool = False
 
 
 def block_diagonalize_covariance(
@@ -560,9 +552,7 @@ def _low_rank_terms(
         np.log(np.diagonal(low_rank_cholesky, axis1=-2, axis2=-1)),
         axis=-1,
     )
-    if not np.all(np.isfinite(correction)) or not np.all(
-        np.isfinite(log_determinant)
-    ):
+    if not np.all(np.isfinite(correction)) or not np.all(np.isfinite(log_determinant)):
         raise ValueError("low-rank likelihood correction must be finite")
     return correction, log_determinant
 
@@ -613,9 +603,7 @@ def _joint_gaussian_log_density_dense(
         )
         quadratic = np.maximum(quadratic - correction, 0.0)
         log_determinant += low_rank_log_determinant
-    result = -0.5 * (
-        dimension * np.log(2.0 * np.pi) + log_determinant + quadratic
-    )
+    result = -0.5 * (dimension * np.log(2.0 * np.pi) + log_determinant + quadratic)
     if not np.all(np.isfinite(result)):
         raise ValueError("joint Gaussian log likelihood must be finite")
     return result
@@ -689,12 +677,253 @@ def _joint_gaussian_log_density_blocks(
         )
         quadratic = np.maximum(quadratic - correction, 0.0)
         log_determinant += low_rank_log_determinant
-    result = -0.5 * (
-        dimension * np.log(2.0 * np.pi) + log_determinant + quadratic
-    )
+    result = -0.5 * (dimension * np.log(2.0 * np.pi) + log_determinant + quadratic)
     if not np.all(np.isfinite(result)):
         raise ValueError("joint Gaussian log likelihood must be finite")
     return result
+
+
+@dataclass(frozen=True)
+class _PreparedJointGaussianBaseSolver:
+    """One reusable factorization of component-invariant joint covariance."""
+
+    representation: CovarianceRepresentation
+    observation_count: int
+    base_cholesky: np.ndarray
+    base_log_determinant: float
+    shared_whitened_factor: np.ndarray | None
+    shared_low_rank_cholesky: np.ndarray | None
+    shared_low_rank_log_determinant: float
+
+    def _whiten_vectors(self, values: np.ndarray) -> np.ndarray:
+        flat = np.asarray(values, dtype=float)
+        if flat.ndim != 2 or flat.shape[1] != self.observation_count:
+            raise ValueError("joint residual batch has the wrong dimension")
+        if self.representation == "dense":
+            return np.linalg.solve(self.base_cholesky, flat.T).T
+        block_count = self.base_cholesky.shape[0]
+        block_size = self.base_cholesky.shape[-1]
+        blocks = flat.reshape(-1, block_count, block_size)
+        right_hand_side = np.transpose(blocks, (1, 2, 0))
+        whitened = np.linalg.solve(self.base_cholesky, right_hand_side)
+        return np.transpose(whitened, (2, 0, 1)).reshape(
+            -1,
+            self.observation_count,
+        )
+
+    def _whiten_factors(self, values: np.ndarray) -> np.ndarray:
+        factors = np.asarray(values, dtype=float)
+        if factors.ndim != 3 or factors.shape[1] != self.observation_count:
+            raise ValueError("joint covariance factors have the wrong dimension")
+        component_count, _, rank = factors.shape
+        if rank < 1:
+            raise ValueError("joint covariance factor rank must be positive")
+        if self.representation == "dense":
+            right_hand_side = np.transpose(factors, (1, 0, 2)).reshape(
+                self.observation_count,
+                component_count * rank,
+            )
+            whitened = np.linalg.solve(self.base_cholesky, right_hand_side)
+            return np.transpose(
+                whitened.reshape(
+                    self.observation_count,
+                    component_count,
+                    rank,
+                ),
+                (1, 0, 2),
+            )
+        block_count = self.base_cholesky.shape[0]
+        block_size = self.base_cholesky.shape[-1]
+        blocks = factors.reshape(
+            component_count,
+            block_count,
+            block_size,
+            rank,
+        )
+        right_hand_side = np.transpose(blocks, (1, 2, 0, 3)).reshape(
+            block_count,
+            block_size,
+            component_count * rank,
+        )
+        whitened = np.linalg.solve(self.base_cholesky, right_hand_side)
+        return np.transpose(
+            whitened.reshape(
+                block_count,
+                block_size,
+                component_count,
+                rank,
+            ),
+            (2, 0, 1, 3),
+        ).reshape(component_count, self.observation_count, rank)
+
+    def log_density(
+        self,
+        residual: np.ndarray,
+        *,
+        component_covariance_factor_m: np.ndarray | None = None,
+    ) -> np.ndarray:
+        values = np.asarray(residual, dtype=float)
+        if values.ndim < 1 or values.shape[-1] != self.observation_count:
+            raise ValueError("residual has the wrong joint observation dimension")
+        if not np.all(np.isfinite(values)):
+            raise ValueError("residual must be finite")
+        leading_shape = values.shape[:-1]
+        flat = values.reshape(-1, self.observation_count)
+        whitened_residual = self._whiten_vectors(flat)
+        quadratic = np.einsum(
+            "...i,...i->...",
+            whitened_residual,
+            whitened_residual,
+        )
+        log_determinant = np.full(
+            len(flat),
+            self.base_log_determinant,
+            dtype=float,
+        )
+
+        if component_covariance_factor_m is not None:
+            component_factor = np.asarray(
+                component_covariance_factor_m,
+                dtype=float,
+            )
+            if (
+                component_factor.ndim < 2
+                or component_factor.shape[:-2] != leading_shape
+                or component_factor.shape[-2] != self.observation_count
+                or component_factor.shape[-1] < 1
+            ):
+                raise ValueError(
+                    "component covariance factor must match residual leading dimensions"
+                )
+            if not np.all(np.isfinite(component_factor)):
+                raise ValueError("component covariance factor must be finite")
+            component_rank = component_factor.shape[-1]
+            whitened_component = self._whiten_factors(
+                component_factor.reshape(
+                    -1,
+                    self.observation_count,
+                    component_rank,
+                )
+            )
+            if self.shared_whitened_factor is None:
+                combined_factor = whitened_component
+            else:
+                shared = np.broadcast_to(
+                    self.shared_whitened_factor,
+                    (
+                        len(flat),
+                        self.observation_count,
+                        self.shared_whitened_factor.shape[-1],
+                    ),
+                )
+                combined_factor = np.concatenate(
+                    (shared, whitened_component),
+                    axis=-1,
+                )
+            correction, low_rank_log_determinant = _low_rank_terms(
+                whitened_residual,
+                combined_factor,
+            )
+            quadratic = np.maximum(quadratic - correction, 0.0)
+            log_determinant += low_rank_log_determinant
+        elif self.shared_whitened_factor is not None:
+            low_rank_cholesky = self.shared_low_rank_cholesky
+            if low_rank_cholesky is None:
+                raise RuntimeError("shared low-rank factorization was not prepared")
+            projection = whitened_residual @ self.shared_whitened_factor
+            whitened_projection = np.linalg.solve(
+                low_rank_cholesky,
+                projection.T,
+            ).T
+            correction = np.einsum(
+                "...r,...r->...",
+                whitened_projection,
+                whitened_projection,
+            )
+            quadratic = np.maximum(quadratic - correction, 0.0)
+            log_determinant += self.shared_low_rank_log_determinant
+
+        result = -0.5 * (
+            self.observation_count * np.log(2.0 * np.pi) + log_determinant + quadratic
+        )
+        if not np.all(np.isfinite(result)):
+            raise ValueError("joint Gaussian log likelihood must be finite")
+        return result.reshape(leading_shape)
+
+
+def _prepare_joint_gaussian_base_solver(
+    evidence: LinearJointObservationEvidence,
+    *,
+    precompute_shared_low_rank: bool,
+) -> _PreparedJointGaussianBaseSolver:
+    base = np.asarray(evidence.base_covariance_m2, dtype=float)
+    try:
+        base_cholesky = np.linalg.cholesky(base)
+    except np.linalg.LinAlgError as error:
+        raise ValueError("base covariance must be positive definite") from error
+    base_log_determinant = float(
+        2.0
+        * np.sum(
+            np.log(
+                np.diagonal(
+                    base_cholesky,
+                    axis1=-2,
+                    axis2=-1,
+                )
+            )
+        )
+    )
+    shared_factor = evidence.shared_covariance_factor_m
+    shared_whitened_factor = None
+    shared_low_rank_cholesky = None
+    shared_low_rank_log_determinant = 0.0
+    if shared_factor is not None:
+        if evidence.base_covariance_representation == "dense":
+            shared_whitened_factor = np.linalg.solve(
+                base_cholesky,
+                shared_factor,
+            )
+        else:
+            shared_whitened_factor = np.linalg.solve(
+                base_cholesky,
+                shared_factor.reshape(
+                    evidence.base_block_count,
+                    evidence.base_block_size,
+                    evidence.shared_rank,
+                ),
+            ).reshape(evidence.observation_count, evidence.shared_rank)
+        if precompute_shared_low_rank:
+            low_rank_system = (
+                np.eye(evidence.shared_rank)
+                + shared_whitened_factor.T @ shared_whitened_factor
+            )
+            try:
+                shared_low_rank_cholesky = np.linalg.cholesky(low_rank_system)
+            except np.linalg.LinAlgError as error:
+                raise ValueError(
+                    "low-rank covariance system must be positive definite"
+                ) from error
+            shared_low_rank_log_determinant = float(
+                2.0 * np.sum(np.log(np.diagonal(shared_low_rank_cholesky)))
+            )
+    if (
+        not np.isfinite(base_log_determinant)
+        or not np.isfinite(shared_low_rank_log_determinant)
+        or (
+            shared_whitened_factor is not None
+            and not np.all(np.isfinite(shared_whitened_factor))
+        )
+    ):
+        raise ValueError("prepared joint covariance factorization must be finite")
+    return _PreparedJointGaussianBaseSolver(
+        representation=evidence.base_covariance_representation,
+        observation_count=evidence.observation_count,
+        base_cholesky=base_cholesky,
+        base_log_determinant=base_log_determinant,
+        shared_whitened_factor=shared_whitened_factor,
+        shared_low_rank_cholesky=shared_low_rank_cholesky,
+        shared_low_rank_log_determinant=shared_low_rank_log_determinant,
+    )
 
 
 def joint_component_log_likelihoods(
@@ -710,9 +939,7 @@ def joint_component_log_likelihoods(
 
     components = np.asarray(predicted_components_m, dtype=float)
     if components.ndim < 4:
-        raise ValueError(
-            "predicted_components_m must end in (frame, node, coordinate)"
-        )
+        raise ValueError("predicted_components_m must end in (frame, node, coordinate)")
     if not np.all(np.isfinite(components)):
         raise ValueError("predicted components must be finite")
     evidence.validate_prefix(
@@ -732,56 +959,7 @@ def joint_component_log_likelihoods(
             components.shape,
         )
 
-    if evidence.base_covariance_representation == "dense":
-        base = np.broadcast_to(
-            evidence.base_covariance_m2,
-            (
-                *leading_shape,
-                evidence.observation_count,
-                evidence.observation_count,
-            ),
-        ).copy()
-        if variance is not None:
-            base += evidence.apply_independent_covariance(variance)
-        if component_joint_covariance_m2 is not None:
-            base += _validated_covariance(
-                component_joint_covariance_m2,
-                dimension=evidence.observation_count,
-                name="component_joint_covariance_m2",
-                leading_shape=leading_shape,
-            )
-    else:
-        base = np.broadcast_to(
-            evidence.base_covariance_m2,
-            (
-                *leading_shape,
-                evidence.base_block_count,
-                evidence.base_block_size,
-                evidence.base_block_size,
-            ),
-        ).copy()
-        if variance is not None:
-            base += evidence.apply_independent_covariance_blocks(variance)
-        if component_joint_covariance_m2 is not None:
-            base += _validated_covariance_blocks(
-                component_joint_covariance_m2,
-                observation_count=evidence.observation_count,
-                name="component_joint_covariance_m2",
-                leading_shape=leading_shape,
-            )
-
-    factors = []
-    if evidence.shared_covariance_factor_m is not None:
-        factors.append(
-            np.broadcast_to(
-                evidence.shared_covariance_factor_m,
-                (
-                    *leading_shape,
-                    evidence.observation_count,
-                    evidence.shared_rank,
-                ),
-            )
-        )
+    component_factor = None
     component_rank = 0
     if component_joint_covariance_factor_m is not None:
         component_factor = _validated_factor(
@@ -791,12 +969,79 @@ def joint_component_log_likelihoods(
             leading_shape=leading_shape,
         )
         component_rank = component_factor.shape[-1]
-        factors.append(component_factor)
-    factor = None if not factors else np.concatenate(factors, axis=-1)
-    if evidence.base_covariance_representation == "dense":
-        score = _joint_gaussian_log_density_dense(residual, base, factor)
+    used_low_rank_path = (
+        evidence.shared_covariance_factor_m is not None or component_factor is not None
+    )
+    use_shared_base_factorization = (
+        variance is None and component_joint_covariance_m2 is None
+    )
+    if use_shared_base_factorization:
+        solver = _prepare_joint_gaussian_base_solver(
+            evidence,
+            precompute_shared_low_rank=component_factor is None,
+        )
+        score = solver.log_density(
+            residual,
+            component_covariance_factor_m=component_factor,
+        )
     else:
-        score = _joint_gaussian_log_density_blocks(residual, base, factor)
+        if evidence.base_covariance_representation == "dense":
+            base = np.broadcast_to(
+                evidence.base_covariance_m2,
+                (
+                    *leading_shape,
+                    evidence.observation_count,
+                    evidence.observation_count,
+                ),
+            ).copy()
+            if variance is not None:
+                base += evidence.apply_independent_covariance(variance)
+            if component_joint_covariance_m2 is not None:
+                base += _validated_covariance(
+                    component_joint_covariance_m2,
+                    dimension=evidence.observation_count,
+                    name="component_joint_covariance_m2",
+                    leading_shape=leading_shape,
+                )
+        else:
+            base = np.broadcast_to(
+                evidence.base_covariance_m2,
+                (
+                    *leading_shape,
+                    evidence.base_block_count,
+                    evidence.base_block_size,
+                    evidence.base_block_size,
+                ),
+            ).copy()
+            if variance is not None:
+                base += evidence.apply_independent_covariance_blocks(variance)
+            if component_joint_covariance_m2 is not None:
+                base += _validated_covariance_blocks(
+                    component_joint_covariance_m2,
+                    observation_count=evidence.observation_count,
+                    name="component_joint_covariance_m2",
+                    leading_shape=leading_shape,
+                )
+
+        factors = []
+        if evidence.shared_covariance_factor_m is not None:
+            factors.append(
+                np.broadcast_to(
+                    evidence.shared_covariance_factor_m,
+                    (
+                        *leading_shape,
+                        evidence.observation_count,
+                        evidence.shared_rank,
+                    ),
+                )
+            )
+        if component_factor is not None:
+            factors.append(component_factor)
+        factor = None if not factors else np.concatenate(factors, axis=-1)
+        if evidence.base_covariance_representation == "dense":
+            score = _joint_gaussian_log_density_dense(residual, base, factor)
+        else:
+            score = _joint_gaussian_log_density_blocks(residual, base, factor)
     diagnostics = JointGaussianLikelihoodDiagnostics(
         observation_count=evidence.observation_count,
         base_covariance_representation=evidence.base_covariance_representation,
@@ -806,7 +1051,8 @@ def joint_component_log_likelihoods(
         component_shared_rank=component_rank,
         used_component_independent_covariance=used_independent,
         used_component_covariance=used_component_covariance,
-        used_low_rank_path=factor is not None,
+        used_low_rank_path=used_low_rank_path,
+        used_shared_base_factorization=(use_shared_base_factorization),
     )
     return score, diagnostics
 
@@ -837,10 +1083,13 @@ def posterior_weights_from_joint_observation(
         component_joint_covariance_m2=component_joint_covariance_m2,
         component_joint_covariance_factor_m=component_joint_covariance_factor_m,
     )
-    log_posterior = log_weights_from_probabilities(
-        prior,
-        name="prior_weights",
-    ) + score
+    log_posterior = (
+        log_weights_from_probabilities(
+            prior,
+            name="prior_weights",
+        )
+        + score
+    )
     finite_support = prior > 0.0
     if not np.all(np.isfinite(log_posterior[finite_support])):
         raise ValueError("joint posterior log likelihood must be finite on support")
