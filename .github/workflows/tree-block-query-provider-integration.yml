@@ -1,0 +1,68 @@
+name: Tree-block query provider integration
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/tree-block-query-provider-integration.yml"
+      - "ci/bayesian_phystwin_provider_registry.json"
+      - "requirements/ci/bayesian-phystwin-tree-block-query-v1.sha"
+      - "src/causal4d/tree_block_belief_query.py"
+      - "src/causal4d/tree_block_query_provider_contract.py"
+      - "tests/test_bpt_tree_block_query_provider_integration.py"
+      - "tests/test_tree_block_belief_query.py"
+      - "tests/test_tree_block_query_provider_contract.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installed-provider:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact reviewed Causal4D head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          clean: true
+
+      - name: Check out pinned BayesianPhysTwin provider
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: IPS-Stuttgart/BayesianPhysTwin
+          ref: d3b60dc306635a629f0a7c58c4ceea1d0cd61353
+          path: _bpt
+          persist-credentials: false
+          clean: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Build and install reviewed wheels
+        run: |
+          python -m pip install build
+          mkdir wheelhouse
+          python -m build --wheel --outdir wheelhouse .
+          python -m build --wheel --outdir wheelhouse ./_bpt
+          python -m venv integration-venv
+          integration-venv/bin/python -m pip install wheelhouse/*.whl pytest
+          integration-venv/bin/python -m pip check
+
+      - name: Validate the installed provider boundary
+        env:
+          BAYESIAN_PHYSTWIN_REVISION: d3b60dc306635a629f0a7c58c4ceea1d0cd61353
+          CAUSAL4D_REQUIRE_TREE_BLOCK_QUERY_PROVIDER: "1"
+        run: |
+          integration-venv/bin/python -m pytest -q \
+            tests/test_tree_block_query_provider_contract.py \
+            tests/test_tree_block_belief_query.py \
+            tests/test_bpt_tree_block_query_provider_integration.py \
+            tests/test_bpt_provider_registry.py \
+            tests/test_bpt_provider_import_boundary.py
