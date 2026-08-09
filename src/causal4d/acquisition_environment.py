@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path, PurePosixPath
 from typing import Any
-from urllib.parse import unquote, urlparse
+from urllib.parse import urlparse
 from urllib.request import url2pathname
 from zipfile import BadZipFile, ZipFile
 
@@ -256,6 +256,7 @@ def _opencv_version() -> str | None:
     return ";".join(installed) if installed else None
 
 
+
 def _pep610_sha256_values(archive_info: Any, *, name: str) -> tuple[str, ...]:
     _require(isinstance(archive_info, Mapping), f"{name} archive_info is missing")
     values: list[str] = []
@@ -415,7 +416,13 @@ def _installed_wheel_binding(
         and not parsed.fragment,
         f"{distribution_name} must be installed from a local wheel file",
     )
-    wheel_path = Path(url2pathname(unquote(parsed.path)))
+    # url2pathname performs the percent decoding. Decoding first would decode
+    # percent escapes twice and could resolve a different archive path.
+    wheel_path = Path(url2pathname(parsed.path))
+    _require(
+        wheel_path.is_absolute(),
+        f"{distribution_name} local wheel URL must contain an absolute path",
+    )
     snapshot = read_regular_file(
         wheel_path,
         name=f"installed {distribution_name} wheel archive",
