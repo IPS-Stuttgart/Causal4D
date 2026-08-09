@@ -68,9 +68,7 @@ def _direct_score(residual: np.ndarray, covariance: np.ndarray) -> np.ndarray:
 
 
 def test_prepared_dense_scores_and_posterior_match_legacy() -> None:
-    evidence = _dense_evidence(
-        factor=np.array([[0.05], [0.02], [-0.01]])
-    )
+    evidence = _dense_evidence(factor=np.array([[0.05], [0.02], [-0.01]]))
     prepared = prepare_joint_observation(evidence)
     components = _components()
     prior = np.array([0.1, 0.2, 0.3, 0.4])
@@ -114,9 +112,7 @@ def test_prepared_dense_scores_and_posterior_match_legacy() -> None:
 
 
 def test_prepared_block_scores_match_legacy() -> None:
-    dense = _dense_evidence(
-        factor=np.array([[0.05], [0.02], [-0.01]])
-    )
+    dense = _dense_evidence(factor=np.array([[0.05], [0.02], [-0.01]]))
     blocks = np.stack(
         (
             dense.base_covariance_m2[:1, :1],
@@ -145,9 +141,7 @@ def test_prepared_block_scores_match_legacy() -> None:
 
 
 def test_rank_deficient_additive_covariance_is_valid() -> None:
-    evidence = _dense_evidence(
-        factor=np.array([[0.05], [0.02], [-0.01]])
-    )
+    evidence = _dense_evidence(factor=np.array([[0.05], [0.02], [-0.01]]))
     prepared = prepare_joint_observation(evidence)
     direction = np.array([0.02, -0.01, 0.03])
     additive = np.outer(direction, direction)
@@ -218,9 +212,7 @@ def test_prepared_operator_combines_duplicate_selectors() -> None:
 
 
 def test_component_low_rank_factor_uses_cached_base() -> None:
-    evidence = _dense_evidence(
-        factor=np.array([[0.05], [0.02], [-0.01]])
-    )
+    evidence = _dense_evidence(factor=np.array([[0.05], [0.02], [-0.01]]))
     prepared = prepare_joint_observation(evidence)
     component_factor = np.broadcast_to(
         np.array([[0.01], [-0.02], [0.015]]),
