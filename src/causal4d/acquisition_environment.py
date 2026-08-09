@@ -256,7 +256,6 @@ def _opencv_version() -> str | None:
     return ";".join(installed) if installed else None
 
 
-
 def _pep610_sha256_values(archive_info: Any, *, name: str) -> tuple[str, ...]:
     _require(isinstance(archive_info, Mapping), f"{name} archive_info is missing")
     values: list[str] = []
