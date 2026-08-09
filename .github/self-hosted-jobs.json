@@ -3,6 +3,9 @@
   "authorization_models": {
     "main-only": {
       "description": "Manual dispatch from refs/heads/main before runner allocation, exact GITHUB_SHA checkout, clean-tree verification, read-only token, and no secrets."
+    },
+    "maintainer-issue-main": {
+      "description": "Exact registered-maintainer issue trigger on reviewed refs/heads/main, exact GITHUB_SHA checkout, clean-tree verification, read-only self-hosted token, no issue text execution, and no secrets."
     }
   },
   "jobs": [
@@ -129,6 +132,20 @@
         "nvidia-smi"
       ],
       "purpose": "Optional CUDA/Warp integration smoke",
+      "dataset_access": "none",
+      "secrets_allowed": false
+    },
+    {
+      "workflow": "prepared-joint-observation-self-hosted.yml",
+      "job": "validate",
+      "authorization_model": "maintainer-issue-main",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi"
+      ],
+      "purpose": "Installed-wheel prepared joint-observation parity and scale validation",
       "dataset_access": "none",
       "secrets_allowed": false
     },

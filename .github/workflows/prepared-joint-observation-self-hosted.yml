@@ -1,0 +1,184 @@
+name: Prepared joint-observation self-hosted validation
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prepared-joint-observation-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate prepared joint observations on workstation2
+    if: >-
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.issue.user.login == 'FlorianPfaff' &&
+      github.event.issue.user.id == 6773539 &&
+      github.event.issue.title ==
+        '[self-hosted] validate prepared joint observation'
+    runs-on: [self-hosted, Linux, X64, nvidia-smi]
+    timeout-minutes: 90
+    steps:
+      - name: Check out exact reviewed main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          clean: true
+
+      - name: Verify reviewed main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Build and install the exact wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p outputs/prepared-joint-observation/wheels
+          python -m venv .prepared-joint-venv
+          .prepared-joint-venv/bin/python -m pip install \
+            --upgrade pip "build>=1.2"
+          .prepared-joint-venv/bin/python -m build --wheel \
+            --outdir outputs/prepared-joint-observation/wheels .
+          wheel="$(
+            find outputs/prepared-joint-observation/wheels -maxdepth 1 \
+              -name 'causal4d-*.whl' -print -quit
+          )"
+          test -n "${wheel}"
+          sha256sum "${wheel}" \
+            | tee outputs/prepared-joint-observation/wheel-sha256.txt
+          .prepared-joint-venv/bin/python -m pip install \
+            "${wheel}" "pytest>=8"
+          .prepared-joint-venv/bin/python -m pip check
+          .prepared-joint-venv/bin/python - <<'PY'
+          from pathlib import Path
+
+          import causal4d
+          import causal4d.prepared_joint_observation
+
+          source_root = (Path.cwd() / "src").resolve()
+          origins = (
+              Path(causal4d.__file__).resolve(),
+              Path(causal4d.prepared_joint_observation.__file__).resolve(),
+          )
+          for origin in origins:
+              print("installed import", origin)
+              if origin.is_relative_to(source_root):
+                  raise SystemExit(
+                      "Causal4D resolved from the checkout instead of the wheel"
+                  )
+          PY
+          .prepared-joint-venv/bin/python -m pip freeze --all \
+            > outputs/prepared-joint-observation/pip-freeze.txt
+
+      - name: Run focused numerical and contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="" .prepared-joint-venv/bin/python -m pytest -q \
+            --import-mode=importlib \
+            tests/test_joint_observation.py \
+            tests/test_joint_observation_adversarial.py \
+            tests/test_joint_observation_metamorphic.py \
+            tests/test_prepared_joint_observation.py \
+            | tee outputs/prepared-joint-observation/pytest.txt
+
+      - name: Run parity and 2048-row rank-7 scale benchmarks
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="" .prepared-joint-venv/bin/python \
+            scripts/ci/benchmark_prepared_joint_observation.py \
+            --output \
+              outputs/prepared-joint-observation/benchmark.json \
+            --parity-rows 512 \
+            --parity-components 16 \
+            --scale-rows 2048 \
+            --scale-components 16 \
+            --rank 7 \
+            --chunk-size 8 \
+            | tee outputs/prepared-joint-observation/benchmark.txt
+
+      - name: Record runner identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "commit=${GITHUB_SHA}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            uname -a
+          } | tee outputs/prepared-joint-observation/runner.txt
+          nvidia-smi -L \
+            | tee outputs/prepared-joint-observation/nvidia-smi-L.txt
+
+      - name: Upload self-hosted validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: prepared-joint-observation-self-hosted
+          path: outputs/prepared-joint-observation/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove isolated environment
+        if: always()
+        run: rm -rf .prepared-joint-venv
+
+  report:
+    name: Report self-hosted result to the trigger issue
+    if: >-
+      always() &&
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.issue.user.login == 'FlorianPfaff' &&
+      github.event.issue.user.id == 6773539 &&
+      github.event.issue.title ==
+        '[self-hosted] validate prepared joint observation'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      VALIDATION_RESULT: ${{ needs.validate.result }}
+    steps:
+      - name: Comment with the exact run result
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/"
+          run_url+="${GITHUB_RUN_ID}"
+          body="$(cat <<EOF
+          Prepared joint-observation self-hosted validation: **${VALIDATION_RESULT}**
+
+          - Exact reviewed main commit: \`${GITHUB_SHA}\`
+          - Workflow run: ${run_url}
+          - Artifact: \`prepared-joint-observation-self-hosted\`
+          - Physical evidence increment: \`0\`
+          EOF
+          )"
+          gh issue comment "${ISSUE_NUMBER}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --body "${body}"

@@ -71,26 +71,37 @@ def _discover_self_hosted_jobs() -> dict[tuple[str, str], tuple[str, str]]:
     return discovered
 
 
-def _dispatch_only_workflow(text: str) -> bool:
+def _single_event_workflow(text: str, event: str) -> bool:
     prefix = text.split("permissions:", maxsplit=1)[0]
-    if re.search(r"^  workflow_dispatch:\s*$", prefix, re.MULTILINE) is None:
+    if re.search(rf"^  {event}:\s*$", prefix, re.MULTILINE) is None:
         return False
-    other_events = ("pull_request", "push", "schedule", "workflow_call")
+    other_events = (
+        "issues",
+        "pull_request",
+        "push",
+        "schedule",
+        "workflow_call",
+        "workflow_dispatch",
+    )
     return all(
-        re.search(rf"^  {event}:\s*$", prefix, re.MULTILINE) is None
-        for event in other_events
+        candidate == event
+        or re.search(rf"^  {candidate}:\s*$", prefix, re.MULTILINE) is None
+        for candidate in other_events
     )
 
 
-def _main_only_errors(workflow_text: str, block: str) -> list[str]:
+def _dispatch_only_workflow(text: str) -> bool:
+    return _single_event_workflow(text, "workflow_dispatch")
+
+
+def _issue_only_workflow(text: str) -> bool:
+    return _single_event_workflow(text, "issues")
+
+
+def _common_self_hosted_errors(block: str) -> list[str]:
     errors: list[str] = []
     if "github.ref == 'refs/heads/main'" not in block:
         errors.append("missing job-level main guard")
-    if (
-        "github.event_name == 'workflow_dispatch'" not in block
-        and not _dispatch_only_workflow(workflow_text)
-    ):
-        errors.append("missing dispatch-only authorization")
     if "ref: ${{ github.sha }}" not in block:
         errors.append("checkout is not bound to github.sha")
     if "git rev-parse HEAD" not in block or "GITHUB_SHA" not in block:
@@ -118,13 +129,76 @@ def _main_only_errors(workflow_text: str, block: str) -> list[str]:
 
     if "${{ secrets." in block:
         errors.append("self-hosted job references a GitHub secret")
+    permissions = _job_property(block, "permissions")
+    for forbidden in ("contents: write", "issues: write", "pull-requests: write"):
+        if forbidden in permissions:
+            errors.append(f"self-hosted job requests {forbidden}")
     return errors
+
+
+def _main_only_errors(workflow_text: str, block: str) -> list[str]:
+    errors = _common_self_hosted_errors(block)
+    if (
+        "github.event_name == 'workflow_dispatch'" not in block
+        and not _dispatch_only_workflow(workflow_text)
+    ):
+        errors.append("missing dispatch-only authorization")
+    return errors
+
+
+def _maintainer_issue_main_errors(workflow_text: str, block: str) -> list[str]:
+    errors = _common_self_hosted_errors(block)
+    required = {
+        "github.event_name == 'issues'": "missing issue-event authorization",
+        "github.event.action == 'opened'": "missing issue-open authorization",
+        (
+            "github.event.issue.user.login == 'FlorianPfaff'"
+        ): "missing exact maintainer-login authorization",
+        (
+            "github.event.issue.user.id == 6773539"
+        ): "missing exact maintainer-ID authorization",
+        (
+            "'[self-hosted] validate prepared joint observation'"
+        ): "missing exact trigger-title authorization",
+    }
+    for fragment, message in required.items():
+        if fragment not in block:
+            errors.append(message)
+    if block.count("github.event.issue.title") != 1:
+        errors.append("issue title must be used only by the exact guard")
+    for forbidden in (
+        "github.event.issue.body",
+        "github.event.issue.labels",
+        "github.event.comment",
+    ):
+        if forbidden in block:
+            errors.append(
+                f"untrusted issue payload reaches self-hosted job: {forbidden}"
+            )
+    if not _issue_only_workflow(workflow_text):
+        errors.append("workflow is not issue-only")
+    return errors
+
+
+def _authorization_errors(
+    authorization_model: str,
+    workflow_text: str,
+    block: str,
+) -> list[str]:
+    if authorization_model == "main-only":
+        return _main_only_errors(workflow_text, block)
+    if authorization_model == "maintainer-issue-main":
+        return _maintainer_issue_main_errors(workflow_text, block)
+    return [f"unsupported authorization model: {authorization_model}"]
 
 
 def test_self_hosted_job_registry_is_complete_and_unique() -> None:
     payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
     assert payload["schema_version"] == 1
-    assert set(payload["authorization_models"]) == {"main-only"}
+    assert set(payload["authorization_models"]) == {
+        "main-only",
+        "maintainer-issue-main",
+    }
 
     entries = payload["jobs"]
     keys = [(entry["workflow"], entry["job"]) for entry in entries]
@@ -133,22 +207,29 @@ def test_self_hosted_job_registry_is_complete_and_unique() -> None:
     assert set(keys) == set(_discover_self_hosted_jobs())
 
 
-def test_every_self_hosted_job_is_main_only_exact_sha_and_secret_free() -> None:
+def test_every_self_hosted_job_is_exact_sha_and_secret_free() -> None:
     payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
     discovered = _discover_self_hosted_jobs()
 
     for entry in payload["jobs"]:
         key = (entry["workflow"], entry["job"])
         workflow_text, block = discovered[key]
-        assert entry["authorization_model"] == "main-only"
+        assert entry["authorization_model"] in payload["authorization_models"]
         assert entry["secrets_allowed"] is False
         assert "permissions:\n  contents: read\n" in workflow_text
-        assert "contents: write" not in workflow_text
-        assert "issues: write" not in workflow_text
-        assert "pull-requests: write" not in workflow_text
+        assert "contents: write" not in block
+        assert "issues: write" not in block
+        assert "pull-requests: write" not in block
         for label in entry["runner_labels"]:
             assert label in block
-        assert _main_only_errors(workflow_text, block) == [], key
+        assert (
+            _authorization_errors(
+                entry["authorization_model"],
+                workflow_text,
+                block,
+            )
+            == []
+        ), key
 
 
 def test_runner_discovery_ignores_hosted_jobs_that_only_mention_self_hosted() -> None:
@@ -183,6 +264,35 @@ permissions:
     assert _main_only_errors(workflow, block) == []
 
 
+def test_maintainer_issue_validator_accepts_exact_trigger() -> None:
+    workflow = """on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+"""
+    block = """  validate:
+    if: >-
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.issue.user.login == 'FlorianPfaff' &&
+      github.event.issue.user.id == 6773539 &&
+      github.event.issue.title ==
+        '[self-hosted] validate prepared joint observation'
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - run: |
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+"""
+    assert _maintainer_issue_main_errors(workflow, block) == []
+
+
 def test_main_only_validator_rejects_an_unauthorized_or_stale_fixture() -> None:
     workflow = """on:
   workflow_dispatch:
@@ -204,3 +314,41 @@ permissions:
     assert "clean checkout is not verified" in errors
     assert "one or more checkouts retain credentials" in errors
     assert any(error.startswith("action is not pinned") for error in errors)
+
+
+def test_maintainer_issue_validator_rejects_broad_issue_execution() -> None:
+    workflow = """on:
+  issues:
+permissions:
+  contents: read
+"""
+    block = """  validate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - run: |
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+"""
+    errors = _maintainer_issue_main_errors(workflow, block)
+    assert "missing issue-event authorization" in errors
+    assert "missing issue-open authorization" in errors
+    assert "missing exact maintainer-login authorization" in errors
+    assert "missing exact maintainer-ID authorization" in errors
+    assert "missing exact trigger-title authorization" in errors
+
+
+def test_maintainer_issue_reporter_is_hosted_and_has_no_checkout() -> None:
+    path = WORKFLOW_DIR / "prepared-joint-observation-self-hosted.yml"
+    text = path.read_text(encoding="utf-8")
+    report = _job_blocks(text)["report"]
+
+    assert "runs-on: ubuntu-latest" in report
+    assert "needs: validate" in report
+    assert "issues: write" in report
+    assert "uses: actions/checkout@" not in report
+    assert "runs-on: [self-hosted" not in report

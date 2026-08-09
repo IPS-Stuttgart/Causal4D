@@ -15,12 +15,16 @@ repository-wide policy test discovers self-hosted jobs directly from
 `.github/workflows/` and fails when a job is missing from the registry, a stale
 entry remains, or a registered job violates its authorization contract.
 
-The current repository uses one authorization model only: `main-only`.
-Introducing a protected exact-PR-head model requires a new registry schema,
-independent approval through a protected environment, hosted authorization of
-the exact PR/head pair, and separate positive and stale-head negative controls.
-Until that model is implemented, no pull-request source may be allocated a
-self-hosted runner.
+The repository has two reviewed-main authorization models:
+
+- `main-only` for manual `workflow_dispatch` from `refs/heads/main`; and
+- `maintainer-issue-main` for one exact registered-maintainer issue trigger
+  whose workflow is itself already present on reviewed `main`.
+
+Neither model permits pull-request source on a self-hosted runner. Introducing a
+protected exact-PR-head model still requires a new registry schema, independent
+approval through a protected environment, hosted authorization of the exact
+PR/head pair, and separate positive and stale-head negative controls.
 
 ## Main-only authorization
 
@@ -35,13 +39,37 @@ conditions hold:
    action;
 5. the job verifies `git rev-parse HEAD == GITHUB_SHA` and a clean work tree
    before installing or executing repository code;
-6. workflow permissions remain `contents: read`; and
-7. the job references no GitHub secret.
+6. workflow permissions default to `contents: read`; and
+7. the self-hosted job references no GitHub secret or write permission.
 
 Hybrid hosted/self-hosted jobs may continue to validate pull requests on hosted
 runners, but their job-level expression must make self-hosted selection imply a
 manual dispatch from `main`. The runtime preflight repeats that implication so a
 future expression regression fails before substantive work.
+
+## Exact maintainer-issue authorization
+
+`maintainer-issue-main` exists for connector-driven executions when the
+client cannot call GitHub's workflow-dispatch endpoint. It is deliberately
+narrower than a general issue-triggered job. The self-hosted job must require all
+of the following before runner allocation:
+
+1. the workflow listens only for newly opened issues;
+2. `github.ref == 'refs/heads/main'`;
+3. the issue login is exactly `FlorianPfaff`;
+4. the issue account ID is exactly `6773539`;
+5. the issue title equals the one registered literal trigger;
+6. no issue title, body, label, comment, or attachment enters a shell command,
+   path, package argument, test selector, or executable configuration;
+7. checkout, action pinning, exact-SHA verification, clean-tree verification,
+   permissions, and secret rules are identical to `main-only`; and
+8. the executed revision is the default-branch `GITHUB_SHA` selected by the
+   issue event, never a value supplied by the issue.
+
+A separate GitHub-hosted reporting job may receive `issues: write` solely to
+post the fixed workflow result, exact main SHA, run URL, and artifact name to the
+trigger issue. It does not check out or execute repository code. The
+self-hosted job remains read-only and secret-free.
 
 ## Runner-account isolation
 
@@ -91,10 +119,10 @@ and output hashes. Failed jobs retain their partial status artifacts when the
 workflow supports them. Temporary virtual environments and provider checkouts
 are removed in `always()` cleanup steps where practical.
 
-The policy test includes an accepted reviewed-main fixture and an unauthorized,
-stale-checkout fixture. The latter must fail the main guard, dispatch boundary,
-full action pin, credential persistence, exact-SHA checkout, and clean-tree
-checks.
+The policy test includes accepted fixtures for both authorization models and
+negative fixtures for unauthorized dispatch, broad issue execution, stale
+checkout, missing registered maintainer identity, missing exact title, unpinned
+actions, credential persistence, and absent clean-tree verification.
 
 ## Incident response
 
