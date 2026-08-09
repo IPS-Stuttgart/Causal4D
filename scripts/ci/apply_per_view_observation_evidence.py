@@ -21,6 +21,20 @@ EXPECTED_PATHS = {
 }
 
 
+def _changed_paths(root: Path) -> set[str]:
+    tracked = subprocess.check_output(
+        ["git", "diff", "--name-only", "HEAD"],
+        cwd=root,
+        text=True,
+    ).splitlines()
+    untracked = subprocess.check_output(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        cwd=root,
+        text=True,
+    ).splitlines()
+    return set(tracked) | set(untracked)
+
+
 def main() -> int:
     root = Path(__file__).resolve().parents[2]
     encoded = (root / ".github/per-view-observation.patch.b64").read_text(
@@ -40,13 +54,7 @@ def main() -> int:
         check=True,
     )
     subprocess.run(["git", "apply", str(patch_path)], cwd=root, check=True)
-    changed = set(
-        subprocess.check_output(
-            ["git", "diff", "--name-only", "HEAD"],
-            cwd=root,
-            text=True,
-        ).splitlines()
-    )
+    changed = _changed_paths(root)
     if changed != EXPECTED_PATHS:
         raise SystemExit(f"unexpected patch scope: {sorted(changed)}")
     return 0
