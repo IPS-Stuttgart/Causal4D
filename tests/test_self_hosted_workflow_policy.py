@@ -173,8 +173,7 @@ def _maintainer_issue_main_errors(workflow_text: str, block: str) -> list[str]:
     ):
         if forbidden in block:
             errors.append(
-                "untrusted issue payload reaches self-hosted job: "
-                f"{forbidden}"
+                f"untrusted issue payload reaches self-hosted job: {forbidden}"
             )
     if not _issue_only_workflow(workflow_text):
         errors.append("workflow is not issue-only")
@@ -223,11 +222,14 @@ def test_every_self_hosted_job_is_exact_sha_and_secret_free() -> None:
         assert "pull-requests: write" not in block
         for label in entry["runner_labels"]:
             assert label in block
-        assert _authorization_errors(
-            entry["authorization_model"],
-            workflow_text,
-            block,
-        ) == [], key
+        assert (
+            _authorization_errors(
+                entry["authorization_model"],
+                workflow_text,
+                block,
+            )
+            == []
+        ), key
 
 
 def test_runner_discovery_ignores_hosted_jobs_that_only_mention_self_hosted() -> None:
