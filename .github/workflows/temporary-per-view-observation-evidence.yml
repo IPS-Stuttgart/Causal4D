@@ -1,10 +1,12 @@
 name: Publish per-view observation evidence
 
-# Connector-authored retrigger after the pull-request transport check.
 on:
   push:
     branches:
       - agent/per-view-observation-evidence
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
@@ -13,13 +15,22 @@ jobs:
   publish:
     if: >-
       github.repository == 'IPS-Stuttgart/Causal4D' &&
-      github.ref == 'refs/heads/agent/per-view-observation-evidence'
+      (
+        (github.event_name == 'push' &&
+         github.ref == 'refs/heads/agent/per-view-observation-evidence') ||
+        (github.event_name == 'pull_request' &&
+         github.event.pull_request.number == 270 &&
+         github.event.pull_request.head.repo.full_name == github.repository &&
+         github.event.pull_request.head.ref == 'agent/per-view-observation-evidence')
+      )
     runs-on: ubuntu-latest
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - name: Check out the exact pushed revision
+      - name: Check out the exact pull-request head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
           fetch-depth: 0
           persist-credentials: true
 
@@ -33,7 +44,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
           python scripts/ci/apply_per_view_observation_evidence.py
 
