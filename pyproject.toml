@@ -43,6 +43,7 @@ Citation = "https://github.com/IPS-Stuttgart/Causal4D/blob/main/CITATION.cff"
 dev = [
   "build>=1.2",
   "mypy>=1.11",
+  "pre-commit>=3.7,<5",
   "pytest>=8",
   "ruff>=0.15.22,<0.17",
   "twine>=5",
