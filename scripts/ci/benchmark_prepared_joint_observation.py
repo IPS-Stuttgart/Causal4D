@@ -104,9 +104,7 @@ def _diagnostics_payload(diagnostics: Any) -> dict[str, Any]:
         "operator_nonzero_count": diagnostics.operator_nonzero_count,
         "base_factorization_reused": diagnostics.base_factorization_reused,
         "maximum_working_bytes": diagnostics.maximum_working_bytes,
-        "estimated_peak_working_bytes": (
-            diagnostics.estimated_peak_working_bytes
-        ),
+        "estimated_peak_working_bytes": (diagnostics.estimated_peak_working_bytes),
     }
 
 
@@ -220,9 +218,7 @@ def main() -> None:
             "legacy_seconds": legacy_seconds,
             "prepared_seconds": prepared_seconds,
             "reported_speedup": (
-                None
-                if prepared_seconds == 0.0
-                else legacy_seconds / prepared_seconds
+                None if prepared_seconds == 0.0 else legacy_seconds / prepared_seconds
             ),
             "score_parity": parity,
             "maximum_absolute_score_difference": maximum_difference,
