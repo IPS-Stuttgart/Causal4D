@@ -55,9 +55,7 @@ class FactualAbductionConfig:
             not np.isfinite(self.dynamic_likelihood_weight)
             or self.dynamic_likelihood_weight < 0.0
         ):
-            raise ValueError(
-                "dynamic_likelihood_weight must be finite and nonnegative"
-            )
+            raise ValueError("dynamic_likelihood_weight must be finite and nonnegative")
         if self.likelihood_semantics not in {"legacy_v1", "normalized_v2"}:
             raise ValueError("unsupported dense likelihood semantics")
         if not np.isfinite(self.difference_correlation) or not (
@@ -150,17 +148,14 @@ def _update_joint_weights(
     base_weights: np.ndarray | None = None,
     grouped_evidence: GroupedObservationEvidence | None = None,
 ) -> tuple[np.ndarray, GroupLikelihoodDiagnostics | None]:
-    if (
-        grouped_evidence is not None
-        and settings.likelihood_semantics != "legacy_v1"
-    ):
+    if grouped_evidence is not None and settings.likelihood_semantics != "legacy_v1":
         raise ValueError(
             "normalized_v2 cannot be combined with grouped observation evidence"
         )
     discrepancy, discrepancy_variance = _belief_readout(bank, belief)
     if grouped_evidence is None:
         if settings.likelihood_semantics == "legacy_v1":
-            joint_weights = bank.update_from_observations(
+            joint_weights = bank.update_from_observations_legacy_v1(
                 observations_from_endpoint_m,
                 prefix_frame_count=prefix_frame_count,
                 scale_m=settings.observation_scale_m,
