@@ -17,7 +17,7 @@ import numpy as np
 from scipy.sparse import csc_matrix
 
 import causal4d.joint_observation as _joint
-from causal4d.immutable_array import readonly_integer_array
+from causal4d.immutable_array import readonly_array, readonly_integer_array
 from causal4d.joint_observation import (
     JointGaussianLikelihoodDiagnostics,
     LinearJointObservationEvidence,
@@ -38,9 +38,9 @@ def _readonly_sparse(matrix: csc_matrix) -> csc_matrix:
     result = matrix.copy()
     result.sum_duplicates()
     result.sort_indices()
-    result.data.flags.writeable = False
-    result.indices.flags.writeable = False
-    result.indptr.flags.writeable = False
+    result.data = readonly_array(result.data, dtype=float)
+    result.indices = readonly_array(result.indices, dtype=result.indices.dtype)
+    result.indptr = readonly_array(result.indptr, dtype=result.indptr.dtype)
     return result
 
 
