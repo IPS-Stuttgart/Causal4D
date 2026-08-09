@@ -1,0 +1,79 @@
+name: Stale agent branch report
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      minimum_age_days:
+        description: Minimum age of a branch tip before reporting it.
+        required: true
+        default: "30"
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: stale-agent-branch-report
+  cancel-in-progress: false
+
+env:
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  report:
+    name: Report stale agent branches
+    if: >-
+      ${{
+        github.event_name == 'schedule' ||
+        (
+          github.event_name == 'workflow_dispatch' &&
+          github.ref == 'refs/heads/main'
+        )
+      }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out the reviewed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Verify the scheduled or reviewed-main source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain)"
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            test "$GITHUB_REF" = "refs/heads/main"
+          fi
+      - name: Inventory manual cleanup candidates
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MINIMUM_AGE_DAYS: ${{ inputs.minimum_age_days || '30' }}
+        run: |
+          python scripts/ci/stale_agent_branches.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --allowlist .github/stale-agent-branch-allowlist.json \
+            --minimum-age-days "$MINIMUM_AGE_DAYS" \
+            --output-json stale-agent-branches.json \
+            --output-markdown stale-agent-branches.md
+          cat stale-agent-branches.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: stale-agent-branch-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            stale-agent-branches.json
+            stale-agent-branches.md
+          if-no-files-found: warn
+          retention-days: 30
