@@ -20,34 +20,59 @@ from causal4d._prospective_v2_promotion_io_common import (
 
 _METRIC_CONTRACT_FIELDS = frozenset(
     {
-        "schema_version", "artifact_kind", "scoring_implementation_artifact_id",
-        "metric_semantics", "nominal_coverage", "harmful_regret_threshold_m",
-        "selection_panel_role", "unbiased_post_selection_performance_claimed",
-        "independent_confirmation_required", "target_outcomes_used", "metadata",
+        "schema_version",
+        "artifact_kind",
+        "scoring_implementation_artifact_id",
+        "metric_semantics",
+        "nominal_coverage",
+        "harmful_regret_threshold_m",
+        "selection_panel_role",
+        "unbiased_post_selection_performance_claimed",
+        "independent_confirmation_required",
+        "target_outcomes_used",
+        "metadata",
         "metric_contract_id",
     }
 )
 _POLICY_FIELDS = frozenset(
     {
-        "minimum_units_per_endpoint", "minimum_mean_log_score_gain",
-        "maximum_mean_brier_change", "maximum_mean_trajectory_regret_m",
-        "maximum_mean_coverage_error", "maximum_mean_interval_width_ratio",
-        "minimum_accepted_update_rate", "maximum_harmful_accepted_update_rate",
-        "maximum_fallback_rate", "interval_width_floor_m", "policy_id",
+        "minimum_units_per_endpoint",
+        "minimum_mean_log_score_gain",
+        "maximum_mean_brier_change",
+        "maximum_mean_trajectory_regret_m",
+        "maximum_mean_coverage_error",
+        "maximum_mean_interval_width_ratio",
+        "minimum_accepted_update_rate",
+        "maximum_harmful_accepted_update_rate",
+        "maximum_fallback_rate",
+        "interval_width_floor_m",
+        "policy_id",
     }
 )
 _CANDIDATE_FIELDS = frozenset(
     {
-        "candidate_id", "candidate_kind", "configuration_artifact_id",
-        "target_outcomes_used", "metadata", "candidate_binding_id",
+        "candidate_id",
+        "candidate_kind",
+        "configuration_artifact_id",
+        "target_outcomes_used",
+        "metadata",
+        "candidate_binding_id",
     }
 )
 _UNIT_FIELDS = frozenset(
     {
-        "unit_id", "endpoint", "protocol_id", "case_id", "session_id",
-        "independent_group_id", "target_artifact_id",
-        "factual_context_artifact_id", "counterfactual_query_artifact_id",
-        "target_access_seal_id", "target_outcomes_used", "metadata",
+        "unit_id",
+        "endpoint",
+        "protocol_id",
+        "case_id",
+        "session_id",
+        "independent_group_id",
+        "target_artifact_id",
+        "factual_context_artifact_id",
+        "counterfactual_query_artifact_id",
+        "target_access_seal_id",
+        "target_outcomes_used",
+        "metadata",
         "unit_binding_id",
     }
 )
@@ -75,9 +100,7 @@ def parse_metric_contract(values: Any) -> ProspectiveV2MetricContractV1:
     if fields["target_outcomes_used"] is not False:
         raise ValueError("prospective V2 metric contract is not target-free")
     result = ProspectiveV2MetricContractV1(
-        scoring_implementation_artifact_id=fields[
-            "scoring_implementation_artifact_id"
-        ],
+        scoring_implementation_artifact_id=fields["scoring_implementation_artifact_id"],
         nominal_coverage=fields["nominal_coverage"],
         harmful_regret_threshold_m=fields["harmful_regret_threshold_m"],
         target_outcomes_used=fields["target_outcomes_used"],
@@ -98,13 +121,9 @@ def parse_policy(values: Any) -> ProspectiveV2PromotionPolicyV1:
         minimum_units_per_endpoint=fields["minimum_units_per_endpoint"],
         minimum_mean_log_score_gain=fields["minimum_mean_log_score_gain"],
         maximum_mean_brier_change=fields["maximum_mean_brier_change"],
-        maximum_mean_trajectory_regret_m=fields[
-            "maximum_mean_trajectory_regret_m"
-        ],
+        maximum_mean_trajectory_regret_m=fields["maximum_mean_trajectory_regret_m"],
         maximum_mean_coverage_error=fields["maximum_mean_coverage_error"],
-        maximum_mean_interval_width_ratio=fields[
-            "maximum_mean_interval_width_ratio"
-        ],
+        maximum_mean_interval_width_ratio=fields["maximum_mean_interval_width_ratio"],
         minimum_accepted_update_rate=fields["minimum_accepted_update_rate"],
         maximum_harmful_accepted_update_rate=fields[
             "maximum_harmful_accepted_update_rate"
@@ -150,9 +169,7 @@ def parse_unit(values: Any) -> ProspectiveV2EvaluationUnitV1:
         independent_group_id=fields["independent_group_id"],
         target_artifact_id=fields["target_artifact_id"],
         factual_context_artifact_id=fields["factual_context_artifact_id"],
-        counterfactual_query_artifact_id=fields[
-            "counterfactual_query_artifact_id"
-        ],
+        counterfactual_query_artifact_id=fields["counterfactual_query_artifact_id"],
         target_access_seal_id=fields["target_access_seal_id"],
         target_outcomes_used=fields["target_outcomes_used"],
         metadata=require_mapping(fields["metadata"], name="unit metadata"),
