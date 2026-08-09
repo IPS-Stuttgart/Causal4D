@@ -78,7 +78,10 @@ def _problem(
             "benchmark_only": True,
         },
     )
-    components = np.zeros((component_count, 3, row_count, 3), dtype=float)
+    components: np.ndarray = np.zeros(
+        (component_count, 3, row_count, 3),
+        dtype=float,
+    )
     components[:, 1] = values + rng.normal(
         scale=1.5e-3,
         size=(component_count, row_count, 3),
