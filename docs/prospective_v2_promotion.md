@@ -148,3 +148,23 @@ This infrastructure creates no physical execution, observation, accuracy result,
 calibration result, or evidence count by itself. It cannot admit Prob4D into the
 frozen acquisition, change the six-frame information boundary, revise the
 registered method, or rescue a failed 36-execution primary result.
+
+## Independent confirmation after selection
+
+A candidate selected on the one-opening panel is not yet a confirmed
+deployment result. `causal4d.prospective_v2_confirmation` freezes a fresh
+independent panel before its target outcomes are accessed, fixes exactly
+one previously selected non-baseline candidate, and preserves the original
+stack lock, metric contract, promotion policy, and endpoint thresholds.
+
+The confirmation contract rejects overlap with the selection panel by unit,
+target artifact, endpoint-specific independence group, protocol/session
+pair, target-access seal, decision trace, metric-value artifact, and scoring
+run. Confirmation traces must bind the confirmation freeze, the original
+selection result, and the `independent_confirmation` panel role.
+
+Confirmation never reopens the candidate ladder. All registered endpoints
+must pass for the fixed candidate to remain deployed; otherwise the result
+preserves the exact registered baseline configuration. The confirmation
+artifact records that no candidate selection occurred on the confirmation
+panel and that selection-panel performance was not reused.
