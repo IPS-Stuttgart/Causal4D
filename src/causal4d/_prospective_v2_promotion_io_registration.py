@@ -26,19 +26,36 @@ from causal4d._prospective_v2_promotion_io_contracts import (
 
 _FREEZE_FIELDS = frozenset(
     {
-        "schema_version", "artifact_kind", "experiment_id", "stack_lock_id",
-        "target_access_seal_id", "candidates", "evaluation_units",
-        "metric_contract", "policy", "source_artifact_ids",
-        "selection_panel_role", "unbiased_post_selection_performance_claimed",
-        "independent_confirmation_required", "target_outcomes_used", "metadata",
+        "schema_version",
+        "artifact_kind",
+        "experiment_id",
+        "stack_lock_id",
+        "target_access_seal_id",
+        "candidates",
+        "evaluation_units",
+        "metric_contract",
+        "policy",
+        "source_artifact_ids",
+        "selection_panel_role",
+        "unbiased_post_selection_performance_claimed",
+        "independent_confirmation_required",
+        "target_outcomes_used",
+        "metadata",
         "freeze_id",
     }
 )
 _OPENING_FIELDS = frozenset(
     {
-        "schema_version", "artifact_kind", "freeze_id", "target_access_seal_id",
-        "target_artifact_ids", "opened_at_utc", "opened_by",
-        "target_outcomes_used", "metadata", "opening_id",
+        "schema_version",
+        "artifact_kind",
+        "freeze_id",
+        "target_access_seal_id",
+        "target_artifact_ids",
+        "opened_at_utc",
+        "opened_by",
+        "target_outcomes_used",
+        "metadata",
+        "opening_id",
     }
 )
 
