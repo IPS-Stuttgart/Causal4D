@@ -37,6 +37,21 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
+          fixture = Path('tests/test_tree_block_belief_query.py')
+          text = fixture.read_text(encoding='utf-8')
+          old = '        replace(valid, covariance=np.asarray([[1.0 + 0.0j]]))\n'
+          new = (
+              '        replace(\n'
+              '            valid,\n'
+              '            covariance=np.asarray([[1.0 + 0.0j]]),\n'
+              '            row_labels=("x",),\n'
+              '            output_units=("m",),\n'
+              '        )\n'
+          )
+          if text.count(old) != 1:
+              raise SystemExit('complex covariance fixture target changed')
+          fixture.write_text(text.replace(old, new), encoding='utf-8')
+
           integration = Path(
               'tests/test_bpt_tree_block_query_provider_integration.py'
           )
