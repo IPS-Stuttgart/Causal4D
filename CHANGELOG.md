@@ -82,6 +82,12 @@ evidence. Source-panel executions remain source-only and cannot increment the
 
 ### Fixed
 
+- Advance the acquisition-environment capsule to schema version 2 and bind the
+  active Causal4D and BayesianPhysTwin installation provenance to the exact
+  supplied wheel bytes through strict PEP 610 metadata, a second archive
+  SHA-256/size check, and byte verification of every installed wheel member
+  except the installer-rewritten `RECORD`. Same-version wheel substitution or
+  post-installation member drift is rejected before staging or sealing.
 - Bind every strict independent-sensor update to any consumed-evidence ledger
   already embedded in its factual posterior, rejecting stale-ledger rollback and
   duplicate factor multiplication while preserving valid sequential updates.

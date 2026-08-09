@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import io
 import json
 import platform
 import re
@@ -13,8 +14,11 @@ from collections.abc import Mapping
 from copy import deepcopy
 from datetime import datetime, timezone
 from importlib import metadata
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
+from urllib.parse import unquote, urlparse
+from urllib.request import url2pathname
+from zipfile import BadZipFile, ZipFile
 
 from causal4d.artifact_io import load_strict_json_object, read_regular_file
 from causal4d.atomic_io import atomic_write_binary
@@ -32,7 +36,7 @@ from causal4d.real_experiment_freeze import ACQUISITION_CANDIDATE_PATH
 from causal4d.stack_lock import WheelIdentity, inspect_wheel
 
 CAPSULE_SCHEMA_NAME = "causal4d.acquisition-environment-capsule"
-CAPSULE_SCHEMA_VERSION = 1
+CAPSULE_SCHEMA_VERSION = 2
 CAPSULE_ARTIFACT_KIND = "Causal4DAcquisitionEnvironmentCapsule"
 CAPSULE_GENERATOR = "causal4d protocol readiness software-environment-stage"
 CAPSULE_ROOT = Path("preacquisition/software_environment")
@@ -252,11 +256,209 @@ def _opencv_version() -> str | None:
     return ";".join(installed) if installed else None
 
 
+def _pep610_sha256_values(archive_info: Any, *, name: str) -> tuple[str, ...]:
+    _require(isinstance(archive_info, Mapping), f"{name} archive_info is missing")
+    values: list[str] = []
+    hash_value = archive_info.get("hash")
+    if hash_value is not None:
+        _require(isinstance(hash_value, str), f"{name} archive hash is invalid")
+        algorithm, separator, digest = hash_value.partition("=")
+        if algorithm.casefold() == "sha256":
+            _require(separator == "=", f"{name} archive hash is invalid")
+            values.append(digest.casefold())
+    hashes = archive_info.get("hashes")
+    if hashes is not None:
+        _require(
+            isinstance(hashes, Mapping) and all(isinstance(key, str) for key in hashes),
+            f"{name} archive hashes are invalid",
+        )
+        sha256_value = hashes.get("sha256")
+        if sha256_value is not None:
+            _require(
+                isinstance(sha256_value, str),
+                f"{name} SHA-256 metadata is invalid",
+            )
+            values.append(sha256_value.casefold())
+    _require(values, f"{name} direct URL omits a SHA-256 archive hash")
+    for value in values:
+        _require(
+            _HEX64.fullmatch(value) is not None,
+            f"{name} direct URL contains an invalid SHA-256 archive hash",
+        )
+    _require(len(set(values)) == 1, f"{name} direct URL SHA-256 values disagree")
+    return tuple(values)
+
+
+def _installed_wheel_members(
+    distribution: metadata.Distribution,
+    expected_wheel: WheelIdentity,
+    *,
+    name: str,
+) -> dict[str, Any]:
+    wheel_snapshot = read_regular_file(
+        expected_wheel.path,
+        name=f"supplied {name} wheel archive",
+    )
+    _require(
+        wheel_snapshot.sha256 == expected_wheel.sha256
+        and wheel_snapshot.byte_count == expected_wheel.size_bytes,
+        f"supplied {name} wheel changed during environment inspection",
+    )
+    try:
+        with ZipFile(io.BytesIO(wheel_snapshot.payload)) as archive:
+            members = archive.infolist()
+            names = [member.filename for member in members]
+            _require(
+                len(names) == len(set(names)),
+                f"supplied {name} wheel contains duplicate members",
+            )
+            record_names = [
+                value for value in names if value.endswith(".dist-info/RECORD")
+            ]
+            _require(
+                len(record_names) == 1,
+                f"supplied {name} wheel must contain exactly one RECORD",
+            )
+            expected_members: list[tuple[str, bytes]] = []
+            for member in members:
+                if member.is_dir() or member.filename in record_names:
+                    continue
+                relative = PurePosixPath(member.filename)
+                _require(
+                    not relative.is_absolute()
+                    and ".." not in relative.parts
+                    and "\\" not in member.filename,
+                    f"supplied {name} wheel contains an unsafe member",
+                )
+                _require(
+                    not any(part.endswith(".data") for part in relative.parts),
+                    f"supplied {name} wheel uses unsupported .data relocation",
+                )
+                expected_members.append((member.filename, archive.read(member)))
+    except (BadZipFile, KeyError, OSError) as error:
+        raise ValueError(f"cannot inspect supplied {name} wheel members") from error
+    _require(expected_members, f"supplied {name} wheel has no verifiable members")
+
+    distribution_root = Path(distribution.locate_file("")).resolve(strict=True)
+    python_prefix = Path(sys.prefix).resolve(strict=True)
+    _require(
+        distribution_root.is_relative_to(python_prefix),
+        f"{name} distribution root is outside the active Python prefix",
+    )
+    inventory = hashlib.sha256()
+    for member_name, expected_payload in sorted(expected_members):
+        installed_path = Path(distribution.locate_file(member_name)).resolve(
+            strict=True
+        )
+        _require(
+            installed_path.is_relative_to(distribution_root),
+            f"installed {name} wheel member escapes its distribution root",
+        )
+        installed = read_regular_file(
+            installed_path,
+            name=f"installed {name} wheel member {member_name}",
+        )
+        expected_sha256 = hashlib.sha256(expected_payload).hexdigest()
+        _require(
+            installed.sha256 == expected_sha256
+            and installed.byte_count == len(expected_payload),
+            f"installed {name} member differs from the supplied wheel: {member_name}",
+        )
+        inventory.update(member_name.encode("utf-8"))
+        inventory.update(b"\0")
+        inventory.update(bytes.fromhex(expected_sha256))
+    return {
+        "wheel_members_verified": True,
+        "wheel_member_count": len(expected_members),
+        "wheel_member_inventory_sha256": inventory.hexdigest(),
+    }
+
+
+def _installed_wheel_binding(
+    distribution_name: str,
+    expected_wheel: WheelIdentity,
+) -> dict[str, Any]:
+    try:
+        distribution = metadata.distribution(distribution_name)
+    except metadata.PackageNotFoundError as error:
+        raise ValueError(
+            f"required distribution is not installed: {distribution_name}"
+        ) from error
+    direct_url_text = distribution.read_text("direct_url.json")
+    _require(
+        isinstance(direct_url_text, str) and bool(direct_url_text.strip()),
+        f"{distribution_name} installation lacks PEP 610 direct_url.json",
+    )
+    direct_url = load_strict_json_object(
+        direct_url_text.encode("utf-8"),
+        name=f"{distribution_name} direct_url.json",
+    )
+    _require(
+        set(direct_url).issubset({"url", "archive_info", "subdirectory"}),
+        f"{distribution_name} direct URL contains unexpected fields",
+    )
+    _require(
+        "url" in direct_url and "archive_info" in direct_url,
+        f"{distribution_name} was not installed from an archive",
+    )
+    _require(
+        "subdirectory" not in direct_url,
+        f"{distribution_name} wheel installation cannot use a subdirectory",
+    )
+    url = direct_url["url"]
+    _require(isinstance(url, str) and bool(url), f"{distribution_name} URL is invalid")
+    parsed = urlparse(url)
+    _require(
+        parsed.scheme == "file"
+        and parsed.netloc in {"", "localhost"}
+        and not parsed.query
+        and not parsed.fragment,
+        f"{distribution_name} must be installed from a local wheel file",
+    )
+    wheel_path = Path(url2pathname(unquote(parsed.path)))
+    snapshot = read_regular_file(
+        wheel_path,
+        name=f"installed {distribution_name} wheel archive",
+    )
+    metadata_sha256 = _pep610_sha256_values(
+        direct_url["archive_info"],
+        name=distribution_name,
+    )[0]
+    _require(
+        metadata_sha256 == expected_wheel.sha256,
+        f"{distribution_name} PEP 610 hash differs from the supplied wheel",
+    )
+    _require(
+        snapshot.sha256 == expected_wheel.sha256
+        and snapshot.byte_count == expected_wheel.size_bytes,
+        f"{distribution_name} installed archive bytes differ from the supplied wheel",
+    )
+    _require(
+        wheel_path.name == expected_wheel.filename,
+        f"{distribution_name} installed wheel filename differs from the supplied wheel",
+    )
+    member_binding = _installed_wheel_members(
+        distribution,
+        expected_wheel,
+        name=distribution_name,
+    )
+    return {
+        "filename": expected_wheel.filename,
+        "sha256": expected_wheel.sha256,
+        "bytes": expected_wheel.size_bytes,
+        "direct_url_scheme": "file",
+        "pep610_archive_sha256_verified": True,
+        "archive_bytes_verified": True,
+        **member_binding,
+    }
+
+
 def _module_origin(
     module_name: str,
     *,
     distribution_name: str,
     source_roots: tuple[Path, ...],
+    expected_wheel: WheelIdentity,
 ) -> dict[str, Any]:
     version = _installed_version(distribution_name, required=True)
     specification = importlib.util.find_spec(module_name)
@@ -279,6 +481,10 @@ def _module_origin(
         "version": version,
         "origin_relative_to_python_prefix": origin.relative_to(prefix).as_posix(),
         "source_checkout_resolved": False,
+        "installation_source": _installed_wheel_binding(
+            distribution_name,
+            expected_wheel,
+        ),
     }
 
 
@@ -319,6 +525,8 @@ def _capture_runtime_environment(
     container_image_digest: str | None,
     causal4d_root: Path,
     bayesian_phystwin_root: Path,
+    causal4d_wheel_identity: WheelIdentity,
+    bayesian_phystwin_wheel_identity: WheelIdentity,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     _require(
         execution_backend in _BACKENDS,
@@ -335,11 +543,13 @@ def _capture_runtime_environment(
             "causal4d",
             distribution_name="causal4d",
             source_roots=source_roots,
+            expected_wheel=causal4d_wheel_identity,
         ),
         "bayesian_phystwin": _module_origin(
             "bayesian_phystwin",
             distribution_name="bayesian-phystwin",
             source_roots=source_roots,
+            expected_wheel=bayesian_phystwin_wheel_identity,
         ),
     }
     python = {
@@ -590,6 +800,8 @@ def stage_software_environment_capsule(
         container_image_digest=container_image_digest,
         causal4d_root=repository,
         bayesian_phystwin_root=bpt_repository,
+        causal4d_wheel_identity=causal4d_identity,
+        bayesian_phystwin_wheel_identity=bpt_identity,
     )
     _require(
         installed["causal4d"]["version"] == causal4d_identity.version,
