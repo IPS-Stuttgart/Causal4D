@@ -91,12 +91,15 @@ jobs:
           python - <<'PY'
           import subprocess
 
-          changed = set(
-              subprocess.check_output(
-                  ["git", "diff", "--name-only", "HEAD"],
-                  text=True,
-              ).splitlines()
-          )
+          tracked = subprocess.check_output(
+              ["git", "diff", "--name-only", "HEAD"],
+              text=True,
+          ).splitlines()
+          untracked = subprocess.check_output(
+              ["git", "ls-files", "--others", "--exclude-standard"],
+              text=True,
+          ).splitlines()
+          changed = set(tracked) | set(untracked)
           expected = {
               ".github/per-view-observation.patch.b64",
               ".github/workflows/temporary-per-view-observation-evidence.yml",
