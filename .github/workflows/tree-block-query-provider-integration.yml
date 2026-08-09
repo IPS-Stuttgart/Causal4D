@@ -6,16 +6,24 @@ on:
     paths:
       - ".github/workflows/tree-block-query-provider-integration.yml"
       - "ci/bayesian_phystwin_provider_registry.json"
+      - "docs/bayesian_phystwin_provider.md"
       - "requirements/ci/bayesian-phystwin-tree-block-query-v1.sha"
       - "src/causal4d/tree_block_belief_query.py"
       - "src/causal4d/tree_block_query_provider_contract.py"
+      - "tests/test_bpt_provider_import_boundary.py"
+      - "tests/test_bpt_provider_registry.py"
       - "tests/test_bpt_tree_block_query_provider_integration.py"
       - "tests/test_tree_block_belief_query.py"
       - "tests/test_tree_block_query_provider_contract.py"
+      - "tests/test_tree_block_query_provider_workflow_policy.py"
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: tree-block-query-provider-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   installed-provider:
@@ -29,6 +37,12 @@ jobs:
           persist-credentials: false
           clean: true
 
+      - name: Verify exact reviewed Causal4D head
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD_SHA}"
+
       - name: Check out pinned BayesianPhysTwin provider
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,6 +52,14 @@ jobs:
           persist-credentials: false
           clean: true
 
+      - name: Verify pinned BayesianPhysTwin revision
+        run: |
+          set -euo pipefail
+          expected=$(tr -d '[:space:]' \
+            < requirements/ci/bayesian-phystwin-tree-block-query-v1.sha)
+          test "$expected" = "d3b60dc306635a629f0a7c58c4ceea1d0cd61353"
+          test "$(git -C _bpt rev-parse HEAD)" = "$expected"
+
       - name: Set up Python 3.12
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -45,22 +67,53 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
+      - name: Validate focused Causal4D quality and contracts
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --no-cache-dir -e ".[dev]"
+          files=(
+            src/causal4d/tree_block_query_provider_contract.py
+            src/causal4d/tree_block_belief_query.py
+            tests/test_tree_block_query_provider_contract.py
+            tests/test_tree_block_belief_query.py
+            tests/test_bpt_tree_block_query_provider_integration.py
+            tests/test_tree_block_query_provider_workflow_policy.py
+            tests/test_bpt_provider_registry.py
+          )
+          python -m ruff format --check --diff "${files[@]}"
+          python -m ruff check "${files[@]}"
+          python -m mypy --python-version 3.12 \
+            src/causal4d/tree_block_query_provider_contract.py \
+            src/causal4d/tree_block_belief_query.py
+          python -m pytest -q \
+            tests/test_tree_block_query_provider_contract.py \
+            tests/test_tree_block_belief_query.py \
+            tests/test_bpt_provider_registry.py \
+            tests/test_bpt_provider_import_boundary.py \
+            tests/test_tree_block_query_provider_workflow_policy.py
+
       - name: Build and install reviewed wheels
         run: |
-          python -m pip install build
-          mkdir wheelhouse
-          python -m build --wheel --outdir wheelhouse .
-          python -m build --wheel --outdir wheelhouse ./_bpt
-          python -m venv integration-venv
-          integration-venv/bin/python -m pip install wheelhouse/*.whl pytest
-          integration-venv/bin/python -m pip check
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --no-cache-dir build
+          wheelhouse="$RUNNER_TEMP/tree-block-query-wheelhouse"
+          mkdir -p "$wheelhouse"
+          python -m build --wheel --outdir "$wheelhouse" .
+          python -m build --wheel --outdir "$wheelhouse" ./_bpt
+          test "$(find "$wheelhouse" -maxdepth 1 -name '*.whl' | wc -l)" -eq 2
+          python -m venv "$RUNNER_TEMP/tree-block-query-venv"
+          "$RUNNER_TEMP/tree-block-query-venv/bin/python" -m pip install \
+            "$wheelhouse"/*.whl pytest
+          "$RUNNER_TEMP/tree-block-query-venv/bin/python" -m pip check
 
       - name: Validate the installed provider boundary
         env:
           BAYESIAN_PHYSTWIN_REVISION: d3b60dc306635a629f0a7c58c4ceea1d0cd61353
           CAUSAL4D_REQUIRE_TREE_BLOCK_QUERY_PROVIDER: "1"
         run: |
-          integration-venv/bin/python -m pytest -q \
+          set -euo pipefail
+          python="$RUNNER_TEMP/tree-block-query-venv/bin/python"
+          "$python" -m pytest -q \
             tests/test_tree_block_query_provider_contract.py \
             tests/test_tree_block_belief_query.py \
             tests/test_bpt_tree_block_query_provider_integration.py \
