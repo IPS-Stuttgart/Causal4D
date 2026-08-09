@@ -43,7 +43,11 @@ from causal4d._phystwin_validation import (
     require_nonempty_string,
     require_nonempty_tuple,
 )
-from causal4d.immutable_array import readonly_array as _readonly_array
+from causal4d.immutable_array import (
+    readonly_array as _readonly_array,
+    readonly_integer_array as _readonly_integer_array,
+)
+from causal4d.numpy_archive import load_numpy_archive
 from causal4d.parameter_support import SupportMethod, reduce_parameter_support
 from causal4d.provider_contract import require_bayesian_phystwin_provider
 from causal4d.replay_provider_contract import (
@@ -99,7 +103,10 @@ class BayesianPhysTwinParticles:
     def __post_init__(self) -> None:
         particles = _readonly_array(self.log_scales, dtype=float)
         weights = _readonly_array(self.weights, dtype=float)
-        indices = _readonly_array(self.grid_indices, dtype=int)
+        indices = _readonly_integer_array(
+            self.grid_indices,
+            name="grid_indices",
+        )
         if particles.ndim != 2 or particles.shape[1] != 2:
             raise ValueError("log_scales must have shape (P, 2)")
         if weights.shape != (len(particles),) or indices.shape != (len(particles), 2):
@@ -259,44 +266,46 @@ def load_bayesian_phystwin_particles(
     maximum_count: int,
     weight_key: str | None = None,
     support_method: SupportMethod = "top_mass",
+    expected_sha256: str | None = None,
 ) -> BayesianPhysTwinParticles:
     """Load a deterministic reduction of a Bayesian-PhysTwin grid."""
 
     if maximum_count < 1:
         raise ValueError("maximum_count must be positive")
-    with np.load(profile_path, allow_pickle=False) as archive:
-        required = {"object_log_scales", "controller_log_scales"}
-        missing = required - set(archive.files)
-        if missing:
-            raise ValueError(
-                "parameter profile is missing: " + ", ".join(sorted(missing))
-            )
-        object_grid = np.asarray(archive["object_log_scales"], dtype=float)
-        controller_grid = np.asarray(archive["controller_log_scales"], dtype=float)
-        if weight_key is None:
-            available = [
-                key
-                for key in ("prediction_weights", "posterior_weights")
-                if key in archive.files
-            ]
-            if not available:
-                raise ValueError("parameter profile has no posterior weight grid")
-            selected_weight_key = available[0]
-        else:
-            selected_weight_key = weight_key
-            if selected_weight_key not in archive.files:
-                raise ValueError(f"parameter profile has no {selected_weight_key!r}")
-        weight_grid = np.asarray(archive[selected_weight_key], dtype=float)
-        source_prediction_grid = (
-            np.asarray(archive["source_prediction_weights"], dtype=float)
-            if "source_prediction_weights" in archive.files
-            else None
-        )
-        posterior_grid = (
-            np.asarray(archive["posterior_weights"], dtype=float)
-            if "posterior_weights" in archive.files
-            else None
-        )
+    profile = load_numpy_archive(
+        profile_path,
+        expected_sha256=expected_sha256,
+        name="Bayesian-PhysTwin parameter profile",
+    )
+    archive = profile.arrays
+    required = {"object_log_scales", "controller_log_scales"}
+    missing = required - set(archive)
+    if missing:
+        raise ValueError("parameter profile is missing: " + ", ".join(sorted(missing)))
+    object_grid = np.asarray(archive["object_log_scales"], dtype=float)
+    controller_grid = np.asarray(archive["controller_log_scales"], dtype=float)
+    if weight_key is None:
+        available = [
+            key for key in ("prediction_weights", "posterior_weights") if key in archive
+        ]
+        if not available:
+            raise ValueError("parameter profile has no posterior weight grid")
+        selected_weight_key = available[0]
+    else:
+        selected_weight_key = weight_key
+        if selected_weight_key not in archive:
+            raise ValueError(f"parameter profile has no {selected_weight_key!r}")
+    weight_grid = np.asarray(archive[selected_weight_key], dtype=float)
+    source_prediction_grid = (
+        np.asarray(archive["source_prediction_weights"], dtype=float)
+        if "source_prediction_weights" in archive
+        else None
+    )
+    posterior_grid = (
+        np.asarray(archive["posterior_weights"], dtype=float)
+        if "posterior_weights" in archive
+        else None
+    )
 
     expected = (len(object_grid), len(controller_grid))
     normalized = _normalized_profile_weight_grid(

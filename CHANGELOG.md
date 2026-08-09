@@ -88,6 +88,9 @@ evidence. Source-panel executions remain source-only and cannot increment the
 
 ### Fixed
 
+- Read trusted pickle and Bayesian-PhysTwin NumPy archives from one descriptor-bound, symlink-free snapshot; reject duplicate, unsafe, oversized, object-dtype, or digest-mismatched NPZ inputs before use.
+- Reject lossy Boolean, string, and floating-point coercion at sparse trajectory, observed-node, and Bayesian-PhysTwin grid-index boundaries.
+- Name the registered dense factual update explicitly as `update_from_observations_legacy_v1` while retaining the historical method as an exact compatibility alias.
 - Advance the acquisition-environment capsule to schema version 2 and bind the
   active Causal4D and BayesianPhysTwin installation provenance to the exact
   supplied wheel bytes through strict PEP 610 metadata, a second archive

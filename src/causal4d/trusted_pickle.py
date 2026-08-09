@@ -75,8 +75,7 @@ def load_trusted_pickle(
     snapshot = _snapshot_pickle(path)
     if expected is not None and snapshot.sha256 != expected:
         raise ValueError(
-            "trusted pickle SHA-256 mismatch: "
-            f"{snapshot.sha256} != {expected}"
+            f"trusted pickle SHA-256 mismatch: {snapshot.sha256} != {expected}"
         )
     return pickle.loads(snapshot.payload)
 

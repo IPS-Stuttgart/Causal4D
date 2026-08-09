@@ -62,7 +62,9 @@ def _member_keys(payload: bytes, *, max_expanded_bytes: int) -> tuple[str, ...]:
         with zipfile.ZipFile(io.BytesIO(payload), mode="r") as archive:
             members = archive.infolist()
     except (OSError, zipfile.BadZipFile, zipfile.LargeZipFile) as error:
-        raise ArtifactValidationError("NumPy archive must be a valid ZIP file") from error
+        raise ArtifactValidationError(
+            "NumPy archive must be a valid ZIP file"
+        ) from error
     if not members:
         raise ArtifactValidationError("NumPy archive must contain at least one array")
 

@@ -7,6 +7,7 @@ from typing import Sequence
 
 import numpy as np
 
+from causal4d.immutable_array import readonly_integer_array
 from causal4d.weighting import log_weights_from_probabilities
 
 from causal4d.rollout_bank import JointRolloutBank
@@ -147,12 +148,12 @@ def prefix_component_log_likelihood(
         raise ValueError(f"observations must have shape {expected}")
     if not 2 <= prefix_frame_count < bank.frame_count:
         raise ValueError("prefix_frame_count must leave at least one future frame")
-    nodes = np.asarray(
+    raw_nodes = (
         tuple(range(bank.node_count))
         if observed_nodes is None
-        else tuple(observed_nodes),
-        dtype=int,
+        else tuple(observed_nodes)
     )
+    nodes = readonly_integer_array(raw_nodes, name="observed_nodes")
     if (
         nodes.ndim != 1
         or not len(nodes)

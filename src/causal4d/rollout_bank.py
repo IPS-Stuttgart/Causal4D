@@ -11,7 +11,10 @@ from typing import Any, Sequence
 
 import numpy as np
 
-from causal4d.immutable_array import readonly_array as _readonly_array
+from causal4d.immutable_array import (
+    readonly_array as _readonly_array,
+    readonly_integer_array as _readonly_integer_array,
+)
 from causal4d.immutable_json import plain_json, validated_json_mapping
 from causal4d.weighting import log_weights_from_probabilities
 
@@ -197,7 +200,10 @@ class SparseTrajectoryEvidence:
 
     def __post_init__(self) -> None:
         positions = _readonly_array(self.positions_m, dtype=float)
-        nodes = _readonly_array(self.node_indices, dtype=int)
+        nodes = _readonly_integer_array(
+            self.node_indices,
+            name="node_indices",
+        )
         frames = _readonly_array(self.rollout_frame_indices, dtype=float)
         if positions.ndim != 3 or positions.shape[2] not in {2, 3}:
             raise ValueError("evidence positions must have shape (F, Q, 2|3)")
@@ -380,7 +386,7 @@ class JointRolloutBank:
             name="base_weights",
         )
 
-    def update_from_observations(
+    def update_from_observations_legacy_v1(
         self,
         observations_m: np.ndarray,
         *,
@@ -395,7 +401,7 @@ class JointRolloutBank:
         particle_discrepancy_m: np.ndarray | None = None,
         particle_discrepancy_variance_m2: np.ndarray | None = None,
     ) -> np.ndarray:
-        """Update only from frames before ``prefix_frame_count``."""
+        """Run the registered legacy-v1 dense prefix update."""
 
         observations = np.asarray(observations_m, dtype=float)
         expected = self.trajectories.shape[2:]
@@ -417,19 +423,22 @@ class JointRolloutBank:
             or dynamic_likelihood_weight < 0.0
         ):
             raise ValueError("dynamic_likelihood_weight must be finite and nonnegative")
-        nodes = np.asarray(
+        raw_nodes = (
             tuple(range(self.node_count))
             if observed_nodes is None
-            else tuple(observed_nodes),
-            dtype=int,
+            else tuple(observed_nodes)
         )
+        nodes = _readonly_integer_array(raw_nodes, name="observed_nodes")
         if (
             nodes.ndim != 1
             or not len(nodes)
             or np.any(nodes < 0)
             or np.any(nodes >= self.node_count)
+            or len(np.unique(nodes)) != len(nodes)
         ):
-            raise ValueError("observed_nodes must identify available rollout nodes")
+            raise ValueError(
+                "observed_nodes must uniquely identify available rollout nodes"
+            )
         coordinate_valid = _coordinate_mask(observations, mask)
         selected_observed = observations[1:prefix_frame_count, nodes]
         selected_valid = coordinate_valid[1:prefix_frame_count, nodes]
@@ -493,6 +502,37 @@ class JointRolloutBank:
             score += dynamic_likelihood_weight * dynamic_score
         return _normalize_joint_log_weights(
             self._base_log_weights(base_weights) + likelihood_power * score
+        )
+
+    def update_from_observations(
+        self,
+        observations_m: np.ndarray,
+        *,
+        prefix_frame_count: int,
+        scale_m: float,
+        likelihood_power: float = 1.0,
+        dynamic_likelihood_weight: float = 0.0,
+        degrees_of_freedom: float = 4.0,
+        mask: np.ndarray | None = None,
+        observed_nodes: Sequence[int] | None = None,
+        base_weights: np.ndarray | None = None,
+        particle_discrepancy_m: np.ndarray | None = None,
+        particle_discrepancy_variance_m2: np.ndarray | None = None,
+    ) -> np.ndarray:
+        """Backward-compatible alias for the registered legacy-v1 update."""
+
+        return self.update_from_observations_legacy_v1(
+            observations_m,
+            prefix_frame_count=prefix_frame_count,
+            scale_m=scale_m,
+            likelihood_power=likelihood_power,
+            dynamic_likelihood_weight=dynamic_likelihood_weight,
+            degrees_of_freedom=degrees_of_freedom,
+            mask=mask,
+            observed_nodes=observed_nodes,
+            base_weights=base_weights,
+            particle_discrepancy_m=particle_discrepancy_m,
+            particle_discrepancy_variance_m2=(particle_discrepancy_variance_m2),
         )
 
     def _interpolated_nodes(self, evidence: SparseTrajectoryEvidence) -> np.ndarray:
