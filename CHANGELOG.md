@@ -4,6 +4,12 @@
 
 ### Added
 
+- Add an optional, content-addressed per-view observation-evidence contract
+  that retains ordered camera streams, material identities, confidence,
+  calibration, object-frame transforms, shared sensor context, and the derived
+  fused observation. Execution manifests bind it to the registered clock,
+  frame count, and six-frame causal prefix without changing the required frozen
+  artifact inventory.
 - Add a fixed-candidate independent-confirmation contract for prospective V2
   selections. It revalidates the selection evidence, rejects unit, target,
   independence-group, session, seal, trace, metric, and scoring-run reuse, keeps
