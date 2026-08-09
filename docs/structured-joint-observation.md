@@ -12,6 +12,13 @@ without materializing a dense covariance. Shared and component-specific low-rank
 terms retain the same Woodbury correction and determinant lemma as the original
 implementation.
 
+For `K` rollout components and `D` joint observations, the shared dense-base path
+therefore replaces `K` base Cholesky factorizations and a `K x D x D` covariance
+copy with one `D x D` factorization plus batched triangular solves. A genuinely
+component-specific covariance still requires the general path. Component-specific
+low-rank factors reuse the common base factorization but retain their required
+small per-component low-rank systems.
+
 The optimization is selected only when neither propagated independent trajectory
 variance nor an explicit component-specific joint covariance changes the base.
 Those cases continue to use the previous general path. The evidence schema,
