@@ -114,6 +114,7 @@ def test_registry_contains_current_additive_provider_boundaries() -> None:
     modules = {entry["module"] for entry in _registry()["modules"]}
     assert "bayesian_phystwin.causal4d_artifacts_v2" in modules
     assert "bayesian_phystwin.causal4d_belief_provider_v2" in modules
+    assert "bayesian_phystwin.causal4d_tree_block_provider_v1" in modules
 
 
 @pytest.mark.parametrize(
