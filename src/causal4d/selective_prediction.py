@@ -24,12 +24,8 @@ from causal4d.immutable_json import plain_json, validated_json_mapping
 
 
 SESSION_RISK_COVERAGE_SCHEMA_VERSION: Final = 1
-SESSION_RISK_COVERAGE_ARTIFACT_KIND: Final = (
-    "Causal4DSessionRiskCoverageDiagnostic"
-)
-SESSION_RISK_COVERAGE_RANKING_KIND: Final = (
-    "Causal4DSessionRiskCoverageRankingContract"
-)
+SESSION_RISK_COVERAGE_ARTIFACT_KIND: Final = "Causal4DSessionRiskCoverageDiagnostic"
+SESSION_RISK_COVERAGE_RANKING_KIND: Final = "Causal4DSessionRiskCoverageRankingContract"
 
 
 def _require_nonempty_string(value: Any, *, name: str) -> str:
@@ -304,9 +300,7 @@ def _curve_points(
                 "retained_unit_count": int(
                     sum(int(row["unit_count"]) for row in retained)
                 ),
-                "eligible_session_coverage": float(
-                    len(retained) / len(ordered)
-                ),
+                "eligible_session_coverage": float(len(retained) / len(ordered)),
                 "registered_session_coverage": float(
                     len(retained) / registered_session_count
                 ),
@@ -351,9 +345,7 @@ def build_session_risk_coverage_diagnostic(
     if not eligible_sessions:
         raise ValueError("risk-coverage diagnostic has no complete eligible session")
 
-    registered_session_count = len(
-        {record.session_id for record in canonical_records}
-    )
+    registered_session_count = len({record.session_id for record in canonical_records})
     curve = _curve_points(
         eligible_sessions,
         registered_session_count=registered_session_count,
@@ -394,12 +386,8 @@ def build_session_risk_coverage_diagnostic(
         },
         "curve": curve,
         "full_eligible_coverage": {
-            "eligible_session_coverage": full_point[
-                "eligible_session_coverage"
-            ],
-            "registered_session_coverage": full_point[
-                "registered_session_coverage"
-            ],
+            "eligible_session_coverage": full_point["eligible_session_coverage"],
+            "registered_session_coverage": full_point["registered_session_coverage"],
             "mean_session_risk": full_point["mean_session_risk"],
             "median_session_risk": full_point["median_session_risk"],
             "maximum_session_risk": full_point["maximum_session_risk"],
