@@ -92,6 +92,56 @@ independent_confirmation_required = true
 A fresh independent panel is required before reporting post-selection predictive
 performance for the selected candidate.
 
+## Strict persistence and independent replay
+
+`causal4d.prospective_v2_promotion_io` provides the file boundary used by an
+independent evaluator. Its readers snapshot one ordinary non-symlink file, reject
+duplicate keys, non-finite JSON, coercible schema drift, and unknown fields, and
+recompute every embedded content identity.
+
+The supported replay sequence is:
+
+```python
+from causal4d.decision_trace import load_decision_trace
+from causal4d.prospective_v2_promotion_io import (
+    load_prospective_v2_promotion_freeze,
+    load_prospective_v2_promotion_result,
+    load_prospective_v2_target_opening,
+    load_prospective_v2_unit_evaluation,
+    load_prospective_v2_unit_metric_values,
+)
+
+freeze = load_prospective_v2_promotion_freeze(
+    "promotion-freeze.json",
+    expected_freeze_id=registered_freeze_id,
+)
+opening = load_prospective_v2_target_opening(
+    "target-opening.json",
+    expected_freeze_id=freeze.freeze_id,
+)
+trace = load_decision_trace("unit-candidate-trace.json")
+metrics = load_prospective_v2_unit_metric_values("unit-candidate-metrics.json")
+evaluation = load_prospective_v2_unit_evaluation(
+    "unit-candidate-evaluation.json",
+    freeze,
+    opening,
+    trace,
+    metrics,
+)
+result = load_prospective_v2_promotion_result(
+    "promotion-result.json",
+    freeze,
+    opening,
+    complete_evaluations,
+)
+```
+
+Unit metric records and derived evaluations have atomic no-overwrite writers.
+Evaluation loading reconstructs the artifact from the exact freeze, opening,
+decision trace, and metric values; result loading reconstructs the complete
+selection from all registered evaluations. A valid-looking JSON file that does
+not equal the recomputed artifact is rejected.
+
 ## Scientific boundary
 
 This infrastructure creates no physical execution, observation, accuracy result,
