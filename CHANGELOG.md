@@ -4,6 +4,7 @@
 
 ### Added
 
+- Reuse one exact dense or block-diagonal base-covariance factorization across all finite joint-observation components. Shared and component-specific low-rank factors retain the exact Woodbury update, component-specific base covariance keeps the existing general path, and diagnostics expose the selected solver.
 - Add an optional, content-addressed per-view observation-evidence contract
   that retains ordered camera streams, material identities, confidence,
   calibration, object-frame transforms, shared sensor context, and the derived
