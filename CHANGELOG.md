@@ -4,6 +4,11 @@
 
 ### Added
 
+- Add a fixed-candidate independent-confirmation contract for prospective V2
+  selections. It revalidates the selection evidence, rejects unit, target,
+  independence-group, session, seal, trace, metric, and scoring-run reuse, keeps
+  the metric contract and thresholds fixed, prohibits candidate re-selection,
+  and preserves the exact registered baseline when confirmation fails.
 - Add evidence-bound prospective V2 promotion contracts that freeze the
   target inventory and metric semantics, derive acceptance, exact fallback,
   and harmful-update status from validated decision traces and raw scores,
