@@ -90,7 +90,9 @@ independent_confirmation_required = true
 ```
 
 A fresh independent panel is required before reporting post-selection predictive
-performance for the selected candidate.
+performance for the selected candidate. The executable fixed-candidate protocol,
+panel-disjointness checks, and exact-baseline fallback are documented in
+`docs/prospective_v2_confirmation.md`.
 
 ## Strict persistence and independent replay
 
