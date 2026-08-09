@@ -391,8 +391,7 @@ def _resolved_chunk_size(
     )
     if estimated_per_component_bytes > budget:
         raise MemoryError(
-            "one prepared joint-observation component exceeds "
-            "maximum_working_bytes"
+            "one prepared joint-observation component exceeds maximum_working_bytes"
         )
     budget_chunk = max(1, budget // estimated_per_component_bytes)
     if component_chunk_size is None:
@@ -637,10 +636,13 @@ def posterior_weights_from_prepared_joint_observation(
         component_chunk_size=component_chunk_size,
         maximum_working_bytes=maximum_working_bytes,
     )
-    log_posterior = log_weights_from_probabilities(
-        prior,
-        name="prior_weights",
-    ) + score
+    log_posterior = (
+        log_weights_from_probabilities(
+            prior,
+            name="prior_weights",
+        )
+        + score
+    )
     finite_support = prior > 0.0
     if not np.all(np.isfinite(log_posterior[finite_support])):
         raise ValueError("prepared posterior log likelihood must be finite on support")
@@ -648,9 +650,7 @@ def posterior_weights_from_prepared_joint_observation(
     posterior = np.exp(log_posterior - maximum)
     normalizer = float(np.sum(posterior))
     if not np.isfinite(normalizer) or normalizer <= 0.0:
-        raise ValueError(
-            "prepared posterior normalizer must be finite and positive"
-        )
+        raise ValueError("prepared posterior normalizer must be finite and positive")
     posterior /= normalizer
     if not np.all(np.isfinite(posterior)):
         raise ValueError("prepared posterior weights must be finite")
