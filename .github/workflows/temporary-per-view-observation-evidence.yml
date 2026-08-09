@@ -1,5 +1,6 @@
 name: Publish per-view observation evidence
 
+# Connector-authored retrigger after the pull-request transport check.
 on:
   push:
     branches:
