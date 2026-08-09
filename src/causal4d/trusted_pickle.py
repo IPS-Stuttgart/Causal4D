@@ -1,17 +1,17 @@
 """Explicit, content-verified loading for trusted pickle inputs.
 
-Pickle is executable code, not a data-only interchange format.  This module
+Pickle is executable code, not a data-only interchange format. This module
 therefore requires an explicit opt-in and verifies the exact bytes before
 handing them to :mod:`pickle`.
 """
 
 from __future__ import annotations
 
-import hashlib
 import pickle
-import stat
 from pathlib import Path
 from typing import Any
+
+from causal4d.artifact_io import ArtifactValidationError, read_regular_file_beneath
 
 _LOWER_HEX = frozenset("0123456789abcdef")
 
@@ -28,13 +28,26 @@ def _validated_sha256(value: str | None) -> str | None:
     return value
 
 
-def _reject_symlink_components(path: Path) -> None:
-    absolute = path.absolute()
-    current = Path(absolute.anchor)
-    for component in absolute.parts[1:]:
-        current /= component
-        if current.is_symlink():
-            raise ValueError(f"pickle path contains a symlink: {current}")
+def _snapshot_pickle(path: str | Path):
+    supplied = Path(path)
+    absolute = supplied.absolute()
+    root = Path(absolute.anchor)
+    relative = "/".join(absolute.parts[1:])
+    try:
+        return read_regular_file_beneath(
+            root,
+            relative,
+            name="trusted pickle",
+        )
+    except ArtifactValidationError as error:
+        if isinstance(error.__cause__, FileNotFoundError):
+            raise FileNotFoundError(
+                f"trusted pickle does not exist: {supplied}"
+            ) from None
+        raise ValueError(
+            "pickle path contains a symlink or is not an ordinary readable file: "
+            f"{supplied}"
+        ) from error
 
 
 def load_trusted_pickle(
@@ -43,11 +56,12 @@ def load_trusted_pickle(
     allow_unsafe_pickle: bool = False,
     expected_sha256: str | None = None,
 ) -> Any:
-    """Load one explicitly trusted pickle after exact byte verification.
+    """Load one explicitly trusted pickle from one verified file snapshot.
 
     ``allow_unsafe_pickle`` is deliberately false by default because unpickling
-    can execute arbitrary code.  A digest establishes byte identity; it does
-    not make an untrusted pickle safe.
+    can execute arbitrary code. A digest establishes byte identity; it does not
+    make an untrusted pickle safe. The path is opened once through the ordinary-
+    file boundary, and the exact snapshotted bytes are both hashed and unpickled.
     """
 
     if type(allow_unsafe_pickle) is not bool:
@@ -58,20 +72,13 @@ def load_trusted_pickle(
             "for explicitly trusted, content-addressed inputs"
         )
     expected = _validated_sha256(expected_sha256)
-    supplied = Path(path)
-    _reject_symlink_components(supplied)
-    try:
-        metadata = supplied.stat()
-    except FileNotFoundError:
-        raise FileNotFoundError(f"trusted pickle does not exist: {supplied}") from None
-    if not stat.S_ISREG(metadata.st_mode):
-        raise ValueError(f"trusted pickle must be an ordinary file: {supplied}")
-
-    payload = supplied.read_bytes()
-    actual = hashlib.sha256(payload).hexdigest()
-    if expected is not None and actual != expected:
-        raise ValueError(f"trusted pickle SHA-256 mismatch: {actual} != {expected}")
-    return pickle.loads(payload)
+    snapshot = _snapshot_pickle(path)
+    if expected is not None and snapshot.sha256 != expected:
+        raise ValueError(
+            "trusted pickle SHA-256 mismatch: "
+            f"{snapshot.sha256} != {expected}"
+        )
+    return pickle.loads(snapshot.payload)
 
 
 __all__ = ["load_trusted_pickle"]
