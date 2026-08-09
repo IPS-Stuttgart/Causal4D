@@ -172,9 +172,15 @@ The released `final_data.pkl` normally stores fused 3D object tracks. Without
 per-view material identities, continuous confidence, object-frame transforms,
 or matched surface normals, cross-camera transfer, confidence regression,
 object-frame consistency, and point-to-plane tests are not identifiable. The
-audit records those tests as unavailable. If future artifacts provide per-view
-3D tracks in a common calibrated frame, the same code fits each view and runs
-leave-one-view-out correction transfer.
+audit records those tests as unavailable.
+
+Future physical acquisitions can retain those inputs through the optional
+[`causal4d.per-view-observation-evidence/v1`](per_view_observation_evidence.md)
+contract. It binds ordered camera views, confidence, calibration, object-frame
+transforms, shared sensor context, and the derived fused observation without
+changing the frozen estimator or allowing the held-out future into inference.
+The localization tests remain unavailable for historical artifacts that do not
+contain this evidence.
 
 ## Commands
 

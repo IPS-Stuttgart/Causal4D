@@ -935,7 +935,13 @@ def execution_manifest_template(
         if value["id"] == execution["realization_condition_id"]
     )
     artifact_names = list(protocol["recording_contract"]["required_artifacts"])
-    artifact_names.extend(("force_torque", "gripper_normal_force"))
+    artifact_names.extend(
+        (
+            "force_torque",
+            "gripper_normal_force",
+            "per_view_observation_evidence",
+        )
+    )
     return {
         "schema_version": EXECUTION_MANIFEST_SCHEMA_VERSION,
         "protocol_id": protocol["protocol_id"],
@@ -1216,6 +1222,61 @@ def validate_execution_manifest(
             execution_root=root,
             verify_files=verify_files,
         )
+
+    per_view_retained = False
+    per_view_descriptor = artifacts.get("per_view_observation_evidence")
+    if per_view_descriptor is not None:
+        _require(
+            isinstance(per_view_descriptor, Mapping),
+            "per-view observation evidence descriptor must be a mapping",
+        )
+        if per_view_descriptor.get("path"):
+            _require(
+                set(per_view_descriptor) == {"path", "sha256", "bytes"},
+                "per-view observation evidence descriptor fields changed",
+            )
+            _require(
+                root is not None,
+                "execution root is required for per-view observation evidence",
+            )
+            _validate_artifact_descriptor(
+                "per_view_observation_evidence",
+                per_view_descriptor,
+                execution_root=root,
+                verify_files=verify_files,
+            )
+            from causal4d.per_view_observation_evidence import (
+                load_per_view_observation_evidence,
+            )
+
+            synchronized_rgbd = artifacts["synchronized_rgbd_manifest"]
+            load_per_view_observation_evidence(
+                per_view_descriptor["path"],
+                artifact_root=root,
+                verify_files=verify_files,
+                expected_file_sha256=per_view_descriptor["sha256"],
+                expected_file_bytes=per_view_descriptor["bytes"],
+                expected_protocol_id=protocol["protocol_id"],
+                expected_protocol_design_sha256=protocol["design_sha256"],
+                expected_execution_id=execution_id,
+                expected_session_id=expected["session_id"],
+                expected_clock_domain_id=synchronized_rgbd["clock_id"],
+                expected_frame_count=frame_count,
+                expected_causal_prefix_frame_stop=(
+                    intervention_frame + timing["o_plus_prefix_frames"]
+                ),
+            )
+            per_view_retained = True
+        else:
+            _require(
+                set(per_view_descriptor) == {"path", "sha256", "bytes"}
+                and all(
+                    per_view_descriptor[field] is None
+                    for field in ("path", "sha256", "bytes")
+                ),
+                "per-view observation evidence descriptor is partially populated",
+            )
+
     quality = manifest.get("quality", {})
     gates = protocol["quality_gates"]
     exclusion = manifest.get("exclusion", {})
@@ -1300,6 +1361,7 @@ def validate_execution_manifest(
         "execution_id": execution_id,
         "quality_gate_failures": gate_failures,
         "included": exclusion["status"] == "included",
+        "per_view_observation_evidence_retained": per_view_retained,
         "passed": True,
     }
 
