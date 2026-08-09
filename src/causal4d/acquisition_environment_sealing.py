@@ -376,9 +376,36 @@ def validate_staged_software_environment_capsule(
             == installed.get("version"),
             f"{name} version differs across capsule records",
         )
+        descriptor = distribution.get("descriptor")
         _require(
-            distribution.get("descriptor") == package.get("distribution"),
+            descriptor == package.get("distribution"),
             f"{name} wheel descriptor differs across capsule records",
+        )
+        _require(isinstance(descriptor, Mapping), f"{name} wheel descriptor is missing")
+        installation_source = installed.get("installation_source")
+        _require(
+            isinstance(installation_source, Mapping),
+            f"{name} exact installed-wheel binding is missing",
+        )
+        _require(
+            installation_source.get("filename") == Path(str(descriptor["path"])).name
+            and installation_source.get("sha256") == descriptor.get("sha256")
+            and installation_source.get("bytes") == descriptor.get("bytes"),
+            f"{name} installed wheel differs from the bound distribution bytes",
+        )
+        member_count = installation_source.get("wheel_member_count")
+        member_inventory = installation_source.get("wheel_member_inventory_sha256")
+        _require(
+            installation_source.get("direct_url_scheme") == "file"
+            and installation_source.get("pep610_archive_sha256_verified") is True
+            and installation_source.get("archive_bytes_verified") is True
+            and installation_source.get("wheel_members_verified") is True
+            and type(member_count) is int
+            and member_count > 0
+            and isinstance(member_inventory, str)
+            and len(member_inventory) == 64
+            and all(character in "0123456789abcdef" for character in member_inventory),
+            f"{name} installed wheel provenance is not fully verified",
         )
 
     _require(

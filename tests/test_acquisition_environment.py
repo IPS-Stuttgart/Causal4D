@@ -47,6 +47,7 @@ def _write_wheel(tmp_path: Path, name: str, version: str) -> Path:
             f"{dist_info}/WHEEL",
             "Wheel-Version: 1.0\nTag: py3-none-any\n",
         )
+        archive.writestr(f"{dist_info}/RECORD", "")
     return path
 
 
@@ -95,7 +96,47 @@ def _write_candidate(repository: Path) -> str:
     return str(candidate["candidate_sha256"])
 
 
-def _runtime(causal4d_version: str = "0.5.0") -> tuple[dict, dict, dict]:
+def _member_inventory(wheel: Path) -> tuple[int, str]:
+    inventory = hashlib.sha256()
+    with ZipFile(wheel) as archive:
+        members = sorted(
+            (
+                member
+                for member in archive.infolist()
+                if not member.is_dir()
+                and not member.filename.endswith(".dist-info/RECORD")
+            ),
+            key=lambda member: member.filename,
+        )
+        for member in members:
+            payload = archive.read(member)
+            inventory.update(member.filename.encode("utf-8"))
+            inventory.update(b"\0")
+            inventory.update(hashlib.sha256(payload).digest())
+    return len(members), inventory.hexdigest()
+
+
+def _installation_source(identity) -> dict[str, object]:
+    member_count, member_inventory = _member_inventory(identity.path)
+    return {
+        "filename": identity.filename,
+        "sha256": identity.sha256,
+        "bytes": identity.size_bytes,
+        "direct_url_scheme": "file",
+        "pep610_archive_sha256_verified": True,
+        "archive_bytes_verified": True,
+        "wheel_members_verified": True,
+        "wheel_member_count": member_count,
+        "wheel_member_inventory_sha256": member_inventory,
+    }
+
+
+def _runtime(
+    causal4d_identity,
+    bayesian_phystwin_identity,
+    *,
+    causal4d_version: str = "0.5.0",
+) -> tuple[dict, dict, dict]:
     return (
         {
             "version": "3.12.4",
@@ -121,6 +162,7 @@ def _runtime(causal4d_version: str = "0.5.0") -> tuple[dict, dict, dict]:
                     "lib/python3.12/site-packages/causal4d/__init__.py"
                 ),
                 "source_checkout_resolved": False,
+                "installation_source": _installation_source(causal4d_identity),
             },
             "bayesian_phystwin": {
                 "version": "0.4.0",
@@ -128,6 +170,7 @@ def _runtime(causal4d_version: str = "0.5.0") -> tuple[dict, dict, dict]:
                     "lib/python3.12/site-packages/bayesian_phystwin/__init__.py"
                 ),
                 "source_checkout_resolved": False,
+                "installation_source": _installation_source(bayesian_phystwin_identity),
             },
         },
     )
@@ -202,7 +245,10 @@ def _prepare_case(tmp_path: Path, monkeypatch) -> SimpleNamespace:
     monkeypatch.setattr(
         environment,
         "_capture_runtime_environment",
-        lambda **_keywords: _runtime(),
+        lambda **keywords: _runtime(
+            keywords["causal4d_wheel_identity"],
+            keywords["bayesian_phystwin_wheel_identity"],
+        ),
     )
     return SimpleNamespace(
         repository=repository,
@@ -229,6 +275,191 @@ def _stage(case: SimpleNamespace) -> dict[str, object]:
         execution_backend="numpy_cpu",
         completed_at_utc="2026-08-08T01:10:00+00:00",
     )
+
+
+def _direct_url_payload(wheel: Path, *, sha256: str | None = None) -> str:
+    digest = sha256 or hashlib.sha256(wheel.read_bytes()).hexdigest()
+    return json.dumps(
+        {
+            "archive_info": {
+                "hash": f"sha256={digest}",
+                "hashes": {"sha256": digest},
+            },
+            "url": wheel.resolve().as_uri(),
+        }
+    )
+
+
+def _fake_installed_distribution(
+    wheel: Path,
+    root: Path,
+    *,
+    direct_url: str | None = None,
+) -> SimpleNamespace:
+    root.mkdir()
+    with ZipFile(wheel) as archive:
+        archive.extractall(root)
+    return SimpleNamespace(
+        read_text=lambda name: direct_url if name == "direct_url.json" else None,
+        locate_file=lambda name: root / str(name),
+    )
+
+
+def test_installed_wheel_binding_verifies_pep610_and_archive_bytes(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    wheel = _write_wheel(tmp_path, "causal4d", "0.5.0")
+    identity = environment.inspect_wheel(wheel)
+    monkeypatch.setattr(environment.sys, "prefix", str(tmp_path))
+    distribution = _fake_installed_distribution(
+        wheel,
+        tmp_path / "site-packages",
+        direct_url=_direct_url_payload(wheel),
+    )
+    monkeypatch.setattr(
+        environment.metadata,
+        "distribution",
+        lambda name: distribution,
+    )
+
+    binding = environment._installed_wheel_binding("causal4d", identity)
+
+    assert binding == _installation_source(identity)
+
+
+def test_installed_wheel_binding_rejects_same_version_different_bytes(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    expected_root = tmp_path / "expected"
+    installed_root = tmp_path / "installed"
+    expected_root.mkdir()
+    installed_root.mkdir()
+    expected = _write_wheel(expected_root, "causal4d", "0.5.0")
+    installed = _write_wheel(installed_root, "causal4d", "0.5.0")
+    with installed.open("ab") as handle:
+        handle.write(b"different wheel bytes")
+    identity = environment.inspect_wheel(expected)
+    monkeypatch.setattr(environment.sys, "prefix", str(tmp_path))
+    distribution = _fake_installed_distribution(
+        installed,
+        tmp_path / "site-packages",
+        direct_url=_direct_url_payload(installed),
+    )
+    monkeypatch.setattr(
+        environment.metadata,
+        "distribution",
+        lambda name: distribution,
+    )
+
+    with pytest.raises(ValueError, match="PEP 610 hash differs"):
+        environment._installed_wheel_binding("causal4d", identity)
+
+
+def test_installed_wheel_binding_rejects_modified_installed_member(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    wheel = _write_wheel(tmp_path, "causal4d", "0.5.0")
+    identity = environment.inspect_wheel(wheel)
+    monkeypatch.setattr(environment.sys, "prefix", str(tmp_path))
+    distribution = _fake_installed_distribution(
+        wheel,
+        tmp_path / "site-packages",
+        direct_url=_direct_url_payload(wheel),
+    )
+    metadata_path = next((tmp_path / "site-packages").glob("*.dist-info/METADATA"))
+    metadata_path.write_text("tampered installed metadata", encoding="utf-8")
+    monkeypatch.setattr(
+        environment.metadata,
+        "distribution",
+        lambda name: distribution,
+    )
+
+    with pytest.raises(ValueError, match="installed causal4d member differs"):
+        environment._installed_wheel_binding("causal4d", identity)
+
+
+def test_installed_wheel_binding_rejects_missing_or_forged_direct_url(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    wheel = _write_wheel(tmp_path, "causal4d", "0.5.0")
+    identity = environment.inspect_wheel(wheel)
+    monkeypatch.setattr(environment.sys, "prefix", str(tmp_path))
+    distribution = _fake_installed_distribution(
+        wheel,
+        tmp_path / "site-packages",
+    )
+    monkeypatch.setattr(
+        environment.metadata,
+        "distribution",
+        lambda name: distribution,
+    )
+    with pytest.raises(ValueError, match="lacks PEP 610"):
+        environment._installed_wheel_binding("causal4d", identity)
+
+    distribution.read_text = lambda name: _direct_url_payload(
+        wheel,
+        sha256="f" * 64,
+    )
+    with pytest.raises(ValueError, match="PEP 610 hash differs"):
+        environment._installed_wheel_binding("causal4d", identity)
+
+
+def test_sealing_rejects_removed_exact_installed_wheel_binding(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    case = _prepare_case(tmp_path, monkeypatch)
+    _stage(case)
+    gate = json.loads(case.gate_path.read_text(encoding="utf-8"))
+    capsule_path = case.dataset / environment.CAPSULE_MANIFEST_PATH
+    runtime_path = case.dataset / environment.RUNTIME_REPORT_PATH
+    capsule = json.loads(capsule_path.read_text(encoding="utf-8"))
+    runtime = json.loads(runtime_path.read_text(encoding="utf-8"))
+    del capsule["installed_distributions"]["causal4d"]["installation_source"]
+    del runtime["installed_distributions"]["causal4d"]["installation_source"]
+
+    runtime["runtime_id"] = _canonical_sha256(runtime, omitted="runtime_id")
+    runtime_payload = (
+        json.dumps(runtime, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    ).encode("utf-8")
+    runtime_path.write_bytes(runtime_payload)
+    runtime_descriptor = next(
+        value
+        for value in gate["evidence"]
+        if value["path"] == environment.RUNTIME_REPORT_PATH.as_posix()
+    )
+    runtime_descriptor["sha256"] = hashlib.sha256(runtime_payload).hexdigest()
+    runtime_descriptor["bytes"] = len(runtime_payload)
+    capsule_runtime_descriptor = next(
+        value
+        for value in capsule["artifacts"]
+        if value["path"] == environment.RUNTIME_REPORT_PATH.as_posix()
+    )
+    capsule_runtime_descriptor.update(runtime_descriptor)
+
+    capsule["capsule_id"] = _canonical_sha256(capsule, omitted="capsule_id")
+    capsule_payload = (
+        json.dumps(capsule, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    ).encode("utf-8")
+    capsule_path.write_bytes(capsule_payload)
+    capsule_descriptor = next(
+        value
+        for value in gate["evidence"]
+        if value["path"] == environment.CAPSULE_MANIFEST_PATH.as_posix()
+    )
+    capsule_descriptor["sha256"] = hashlib.sha256(capsule_payload).hexdigest()
+    capsule_descriptor["bytes"] = len(capsule_payload)
+    case.gate_path.write_text(json.dumps(gate), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="exact installed-wheel binding is missing"):
+        sealing.validate_staged_software_environment_capsule(
+            case.repository,
+            case.dataset,
+        )
 
 
 def test_stage_capsule_populates_unapproved_hash_verified_gate(
@@ -263,6 +494,20 @@ def test_stage_capsule_populates_unapproved_hash_verified_gate(
     assert capsule["capsule_id"] == result["capsule_id"]
     assert capsule["target_outcomes_used"] is False
     assert capsule["confirmatory_collection_started"] is False
+    for name in ("causal4d", "bayesian_phystwin"):
+        source = capsule["installed_distributions"][name]["installation_source"]
+        descriptor = next(
+            value
+            for value in capsule["artifacts"]
+            if Path(value["path"]).name == source["filename"]
+        )
+        assert source["sha256"] == descriptor["sha256"]
+        assert source["bytes"] == descriptor["bytes"]
+        assert source["pep610_archive_sha256_verified"] is True
+        assert source["archive_bytes_verified"] is True
+        assert source["wheel_members_verified"] is True
+        assert source["wheel_member_count"] > 0
+        assert len(source["wheel_member_inventory_sha256"]) == 64
 
     validation = sealing.validate_staged_software_environment_capsule(
         case.repository,
@@ -292,7 +537,11 @@ def test_stage_capsule_rejects_installed_wheel_version_drift_before_publication(
     monkeypatch.setattr(
         environment,
         "_capture_runtime_environment",
-        lambda **_keywords: _runtime("0.5.1"),
+        lambda **keywords: _runtime(
+            keywords["causal4d_wheel_identity"],
+            keywords["bayesian_phystwin_wheel_identity"],
+            causal4d_version="0.5.1",
+        ),
     )
 
     with pytest.raises(ValueError, match="installed Causal4D version differs"):

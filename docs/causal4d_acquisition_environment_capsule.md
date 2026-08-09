@@ -41,12 +41,16 @@ Run the staging command only when all of the following hold:
 - no confirmatory manifest, acquired execution, or validated execution exists;
 - the software-environment gate is still the pristine scaffold template; and
 - the command is executed from the intended deployment Python environment, with
-  Causal4D and BayesianPhysTwin installed from the exact supplied wheel versions.
+  Causal4D and BayesianPhysTwin installed from the exact supplied wheel bytes.
 
 The selected physical-acquisition candidate keeps Prob4D unused. The staged
 software declaration copies the registered reason from
 `configs/causal4d/sloth_acquisition_candidate_v1.json`; package compatibility is
 not treated as method admission.
+
+Capsule schema version 2 requires exact installation-source and installed-member
+verification for both project wheels. A schema-v1 capsule must be restaged before
+independent sealing; it is not upgraded in place.
 
 ## Recommended operator helper
 
@@ -105,10 +109,14 @@ When the exact wheels and dependency report already exist, stage them directly:
 ```
 
 The command fails closed when an installed project version differs from its
-supplied wheel, either import resolves into a source checkout, a checkout is
-dirty, a revision differs from the freeze, the candidate identity changes, the
-dependency report contains an editable project installation, the backend lacks
-its required runtime, or confirmatory collection has started.
+supplied wheel, either import resolves into a source checkout, the installation
+lacks PEP 610 `direct_url.json` metadata for a local wheel archive, the recorded
+archive SHA-256 or the still-present archive bytes differ from the supplied
+wheel, a checkout is dirty, a revision differs from the freeze, the candidate
+identity changes, the dependency report contains an editable project
+installation, the backend lacks its required runtime, or confirmatory
+collection has started. A different wheel with the same project name and
+version is therefore inadmissible.
 
 ## Published evidence
 
@@ -132,6 +140,8 @@ The capsule records:
 - exact wheel SHA-256 values and byte counts;
 - clean source revisions;
 - installed versions and import locations relative to the active Python prefix;
+- exact installed-wheel provenance, including the PEP 610 archive SHA-256 and a
+  second byte-for-byte check of the local wheel used by the active environment;
 - Python implementation, version, and platform;
 - NumPy, SciPy, and applicable Torch, Warp, OpenCV, CUDA-runtime, and
   CUDA-driver versions;
