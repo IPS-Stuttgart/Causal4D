@@ -29,6 +29,20 @@ Install the project and development tools with:
 python -m pip install -e ".[dev]"
 ```
 
+Enable the repository hooks once per checkout:
+
+```bash
+python -m pre_commit install
+```
+
+The hooks run Ruff lint fixes and Ruff formatting on staged Python files using the
+same tool range as CI. Run them over the complete checkout after changing tooling or
+before opening a pull request:
+
+```bash
+python -m pre_commit run --all-files
+```
+
 Bayesian-PhysTwin integrations require the optional provider environment:
 
 ```bash
@@ -108,6 +122,7 @@ available suite. At minimum, a pull request should include:
 Useful local checks include:
 
 ```bash
+python -m pre_commit run --all-files
 python -m pytest -q
 python -m compileall -q src tests
 python -m ruff check .
