@@ -60,9 +60,7 @@ def test_curve_clusters_units_by_session_and_keeps_score_ties() -> None:
         "s2",
         "s3",
     ]
-    by_session = {
-        row["session_id"]: row for row in result["session_summaries"]
-    }
+    by_session = {row["session_id"]: row for row in result["session_summaries"]}
     assert by_session["s1"]["session_risk"] == pytest.approx(2.0)
     assert by_session["s1"]["session_abstention_score"] == pytest.approx(0.2)
 
