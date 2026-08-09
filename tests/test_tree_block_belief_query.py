@@ -351,7 +351,12 @@ def test_validated_result_rejects_invalid_fields() -> None:
     with pytest.raises(ValueError, match="nonempty square"):
         replace(valid, covariance=np.zeros((1, 2)))
     with pytest.raises(ValueError, match="real numeric"):
-        replace(valid, covariance=np.asarray([[1.0 + 0.0j]]))
+        replace(
+            valid,
+            covariance=np.asarray([[1.0 + 0.0j]]),
+            row_labels=("x",),
+            output_units=("m",),
+        )
     with pytest.raises(ValueError, match="symmetric"):
         replace(valid, covariance=np.asarray([[1.0, 1.0], [0.0, 1.0]]))
     with pytest.raises(ValueError, match="positive semidefinite"):

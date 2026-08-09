@@ -56,9 +56,7 @@ def _manifest(
 
 
 def test_valid_manifest_is_compatible() -> None:
-    result = contract.validate_bayesian_phystwin_tree_block_query_provider(
-        _manifest()
-    )
+    result = contract.validate_bayesian_phystwin_tree_block_query_provider(_manifest())
     assert result.compatible
     assert result.missing_capabilities == ()
     assert result.artifact_version_mismatches == ()
@@ -165,7 +163,9 @@ def test_validate_uses_loader_when_manifest_is_omitted(
     manifest = _manifest()
     calls: list[str | None] = []
 
-    def loader(*, provider_revision: str | None = None) -> PhysicalBeliefProviderManifest:
+    def loader(
+        *, provider_revision: str | None = None
+    ) -> PhysicalBeliefProviderManifest:
         calls.append(provider_revision)
         return manifest
 

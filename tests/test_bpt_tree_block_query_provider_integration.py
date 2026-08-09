@@ -18,11 +18,16 @@ _REQUIRE_ENV = "CAUSAL4D_REQUIRE_TREE_BLOCK_QUERY_PROVIDER"
 
 
 def _require_provider_installation() -> None:
-    if importlib.util.find_spec("bayesian_phystwin") is not None:
+    module = "bayesian_phystwin.causal4d_tree_block_provider_v1"
+    try:
+        available = importlib.util.find_spec(module) is not None
+    except ModuleNotFoundError:
+        available = False
+    if available:
         return
     if os.environ.get(_REQUIRE_ENV) == "1":
         pytest.fail("the required BayesianPhysTwin provider is not installed")
-    pytest.skip("BayesianPhysTwin is not installed in the core-only environment")
+    pytest.skip("the tree-block query provider is not installed")
 
 
 def _claim_bearing_update() -> object:

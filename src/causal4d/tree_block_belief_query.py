@@ -159,7 +159,9 @@ class RegisteredTreeBlockQueryV1:
         object.__setattr__(self, "description", description)
         object.__setattr__(self, "row_labels", row_labels)
         object.__setattr__(self, "output_units", output_units)
-        object.__setattr__(self, "query_matrix", readonly_array(query, dtype=np.float64))
+        object.__setattr__(
+            self, "query_matrix", readonly_array(query, dtype=np.float64)
+        )
         object.__setattr__(self, "metadata", metadata)
         object.__setattr__(self, "_query_id", _canonical_id(self.descriptor()))
 
@@ -359,9 +361,7 @@ def evaluate_registered_tree_block_query(
         query_id=query.query_id,
     )
     if not isinstance(provider_result, Causal4DTreeBlockQueryCovarianceV1):
-        raise TypeError(
-            "provider result must be a Causal4DTreeBlockQueryCovarianceV1"
-        )
+        raise TypeError("provider result must be a Causal4DTreeBlockQueryCovarianceV1")
     rebuilt = Causal4DTreeBlockQueryCovarianceV1(
         update_id=provider_result.update_id,
         tree_block_result_id=provider_result.tree_block_result_id,
@@ -376,7 +376,9 @@ def evaluate_registered_tree_block_query(
         rebuilt.result_id == provider_result.result_id,
         "provider query result identity changed",
     )
-    _require(provider_result.update_id == update.update_id, "provider update ID changed")
+    _require(
+        provider_result.update_id == update.update_id, "provider update ID changed"
+    )
     _require(
         provider_result.tree_block_result_id == update.tree_block_result_id,
         "provider tree-block result ID changed",

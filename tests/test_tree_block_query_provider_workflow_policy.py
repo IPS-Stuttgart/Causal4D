@@ -18,10 +18,7 @@ _QUERY_PIN = (
     / "bayesian-phystwin-tree-block-query-v1.sha"
 )
 _HISTORICAL_PIN = (
-    _REPOSITORY_ROOT
-    / "requirements"
-    / "ci"
-    / "bayesian-phystwin-provider-v1.sha"
+    _REPOSITORY_ROOT / "requirements" / "ci" / "bayesian-phystwin-provider-v1.sha"
 )
 
 
@@ -39,7 +36,7 @@ def test_tree_block_query_workflow_uses_exact_dedicated_provider_pin() -> None:
     assert f"BAYESIAN_PHYSTWIN_REVISION: {query_pin}" in workflow
     assert "repository: IPS-Stuttgart/BayesianPhysTwin" in workflow
     assert "persist-credentials: false" in workflow
-    assert "CAUSAL4D_REQUIRE_TREE_BLOCK_QUERY_PROVIDER: \"1\"" in workflow
+    assert 'CAUSAL4D_REQUIRE_TREE_BLOCK_QUERY_PROVIDER: "1"' in workflow
     assert "tests/test_bpt_tree_block_query_provider_integration.py" in workflow
 
 

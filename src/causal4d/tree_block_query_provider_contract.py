@@ -63,9 +63,7 @@ def load_bayesian_phystwin_tree_block_query_provider_manifest(
         causal4d_tree_block_provider_manifest,
     )
 
-    values = causal4d_tree_block_provider_manifest(
-        provider_revision=provider_revision
-    )
+    values = causal4d_tree_block_provider_manifest(provider_revision=provider_revision)
     manifest = PhysicalBeliefProviderManifest.from_provider_descriptor(values)
     if (
         provider_revision is not None
@@ -111,11 +109,8 @@ def validate_bayesian_phystwin_tree_block_query_provider(
 ) -> ProviderCompatibilityResult:
     """Validate the additive strict tree-block covariance-query provider."""
 
-    candidate = (
-        manifest
-        or load_bayesian_phystwin_tree_block_query_provider_manifest(
-            provider_revision=provider_revision
-        )
+    candidate = manifest or load_bayesian_phystwin_tree_block_query_provider_manifest(
+        provider_revision=provider_revision
     )
     if candidate.provider_name != "bayesian-phystwin":
         raise ValueError("expected the bayesian-phystwin tree-block query provider")
