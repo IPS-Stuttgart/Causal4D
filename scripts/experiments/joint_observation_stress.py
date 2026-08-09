@@ -71,9 +71,7 @@ def _direct_log_density(residual: np.ndarray, covariance: np.ndarray) -> np.ndar
         axis=-1,
     )
     dimension = values.shape[-1]
-    result = -0.5 * (
-        dimension * np.log(2.0 * np.pi) + log_determinant + quadratic
-    )
+    result = -0.5 * (dimension * np.log(2.0 * np.pi) + log_determinant + quadratic)
     if not np.all(np.isfinite(result)):
         raise ValueError("direct Gaussian reference must be finite")
     return result
@@ -235,7 +233,9 @@ def _run_seed(
     )
     shared_seconds = time.perf_counter() - shared_start
     if not shared_diagnostics.used_shared_base_factorization:
-        raise AssertionError("component-invariant evidence did not use the shared solver")
+        raise AssertionError(
+            "component-invariant evidence did not use the shared solver"
+        )
 
     direct_start = time.perf_counter()
     direct_shared_score = _direct_log_density(residual, shared_covariance)
@@ -341,9 +341,7 @@ def _run_seed(
         "exact_zero_support_preserved": bool(np.all(posterior[prior == 0.0] == 0.0)),
         "path_decisions": {
             "shared_evidence": shared_diagnostics.used_shared_base_factorization,
-            "component_low_rank": (
-                factor_diagnostics.used_shared_base_factorization
-            ),
+            "component_low_rank": (factor_diagnostics.used_shared_base_factorization),
             "component_covariance_general_fallback": (
                 not covariance_diagnostics.used_shared_base_factorization
             ),
@@ -356,9 +354,7 @@ def _run_seed(
         },
         "storage_bytes": {
             "materialized_shared_covariance": shared_covariance.nbytes,
-            "block_plus_factor": (
-                evidence.base_covariance_m2.nbytes + shared.nbytes
-            ),
+            "block_plus_factor": (evidence.base_covariance_m2.nbytes + shared.nbytes),
         },
     }
 
