@@ -212,24 +212,92 @@ def finite_response_sensitivity(
     return matrix
 
 
-def _whiten(matrix: np.ndarray, covariance: np.ndarray | None) -> np.ndarray:
-    values = np.asarray(matrix, dtype=float)
-    if values.ndim != 2 or values.shape[0] == 0 or values.shape[1] == 0:
-        raise ValueError("sensitivity matrices must be nonempty two-dimensional arrays")
-    if not np.all(np.isfinite(values)):
-        raise ValueError("sensitivity matrices must be finite")
+def _whiten_sensitivities(
+    matrices: tuple[np.ndarray, ...],
+    covariance: np.ndarray | None,
+    covariance_factor: np.ndarray | None,
+) -> tuple[np.ndarray, ...]:
+    """Whiten aligned sensitivities under ``B + U U.T`` response covariance."""
+
+    if not matrices:
+        raise ValueError("at least one sensitivity matrix is required")
+    values = tuple(np.asarray(matrix, dtype=float) for matrix in matrices)
+    response_count = values[0].shape[0] if values[0].ndim == 2 else 0
+    for matrix in values:
+        if matrix.ndim != 2 or matrix.shape[0] != response_count:
+            raise ValueError("sensitivity matrices must share a nonempty row dimension")
+        if not np.all(np.isfinite(matrix)):
+            raise ValueError("sensitivity matrices must be finite")
+    if response_count < 1 or values[0].shape[1] < 1:
+        raise ValueError("the primary sensitivity matrix must be nonempty")
+
+    shared_factor: np.ndarray | None = None
+    if covariance_factor is not None:
+        if covariance is None:
+            raise ValueError("covariance_factor requires a base covariance")
+        shared_factor = np.asarray(covariance_factor, dtype=float)
+        if (
+            shared_factor.ndim != 2
+            or shared_factor.shape[0] != response_count
+            or shared_factor.shape[1] < 1
+        ):
+            raise ValueError(
+                "covariance_factor must have shape (response, positive rank)"
+            )
+        if not np.all(np.isfinite(shared_factor)):
+            raise ValueError("covariance_factor must be finite")
+
     if covariance is None:
         return values
+
+    parts = list(values)
+    if shared_factor is not None:
+        parts.append(shared_factor)
+    widths = [part.shape[1] for part in parts]
+    combined = np.column_stack(parts)
     noise = np.asarray(covariance, dtype=float)
-    if noise.shape != (values.shape[0], values.shape[0]):
-        raise ValueError("covariance must match the response dimension")
-    if not np.all(np.isfinite(noise)) or not np.allclose(noise, noise.T, atol=1e-12):
-        raise ValueError("covariance must be finite and symmetric")
-    try:
-        factor = np.linalg.cholesky(noise)
-    except np.linalg.LinAlgError as error:
-        raise ValueError("covariance must be positive definite") from error
-    return np.linalg.solve(factor, values)
+    if noise.ndim == 1:
+        if noise.shape != (response_count,):
+            raise ValueError("diagonal covariance must match the response dimension")
+        if not np.all(np.isfinite(noise)) or np.any(noise <= 0.0):
+            raise ValueError("diagonal covariance must be finite and positive")
+        whitened = combined / np.sqrt(noise)[:, None]
+    elif noise.ndim == 2:
+        if noise.shape != (response_count, response_count):
+            raise ValueError("covariance must match the response dimension")
+        if not np.all(np.isfinite(noise)) or not np.allclose(
+            noise,
+            noise.T,
+            atol=1e-12,
+        ):
+            raise ValueError("covariance must be finite and symmetric")
+        try:
+            base_factor = np.linalg.cholesky(noise)
+        except np.linalg.LinAlgError as error:
+            raise ValueError("covariance must be positive definite") from error
+        whitened = np.linalg.solve(base_factor, combined)
+    else:
+        raise ValueError("covariance must be a diagonal vector or square matrix")
+
+    split_points = np.cumsum(widths[:-1])
+    whitened_parts = tuple(np.split(whitened, split_points, axis=1))
+    whitened_values = whitened_parts[: len(values)]
+    if shared_factor is None:
+        return whitened_values
+
+    whitened_factor = whitened_parts[-1]
+    left, singular_values, _ = np.linalg.svd(
+        whitened_factor,
+        full_matrices=False,
+    )
+    normalizer = np.hypot(1.0, singular_values)
+    shrinkage = (singular_values / normalizer) * (
+        singular_values / (1.0 + normalizer)
+    )
+    return tuple(
+        matrix - left @ (shrinkage[:, None] * (left.T @ matrix))
+        for matrix in whitened_values
+    )
 
 
 def _orthonormal_basis(matrix: np.ndarray, tolerance: float) -> np.ndarray:
@@ -276,6 +344,7 @@ def assess_intervention_identifiability(
     nuisance_sensitivity: np.ndarray | None = None,
     *,
     covariance: np.ndarray | None = None,
+    covariance_factor: np.ndarray | None = None,
     parameter_scales: np.ndarray | None = None,
     query_sensitivity: np.ndarray | None = None,
     config: IdentifiabilityConfig | None = None,
@@ -283,28 +352,38 @@ def assess_intervention_identifiability(
     """Assess intervention information conditional on nuisance response.
 
     Intervention columns are first converted to standardized parameter
-    coordinates using ``parameter_scales`` and whitened by ``covariance``. They
-    are then projected onto the orthogonal complement of nuisance response. If a
-    future ``query_sensitivity`` is supplied, the result also reports how much of
-    that query response lies in the unresolved intervention subspace. Thus a
+    coordinates using ``parameter_scales`` and whitened by ``covariance``. A
+    positive diagonal vector may replace a dense base covariance, and
+    ``covariance_factor`` adds an exact positive-semidefinite ``U U.T`` term
+    without materializing it. Sensitivities are then projected onto the
+    orthogonal complement of nuisance response. If a future
+    ``query_sensitivity`` is supplied, the result also reports how much of that
+    query response lies in the unresolved intervention subspace. Thus a
     parameter vector can be only partially identified while a particular future
     prediction remains locally identifiable.
     """
 
     settings = config or IdentifiabilityConfig()
     raw_intervention = np.asarray(intervention_sensitivity, dtype=float)
-    if raw_intervention.ndim != 2 or raw_intervention.shape[1] == 0:
+    if (
+        raw_intervention.ndim != 2
+        or raw_intervention.shape[0] == 0
+        or raw_intervention.shape[1] == 0
+    ):
         raise ValueError("intervention_sensitivity must be a nonempty matrix")
     scales = _parameter_scales(parameter_scales, raw_intervention.shape[1])
-    intervention = _whiten(raw_intervention * scales[None], covariance)
-    response_count, parameter_count = intervention.shape
     if nuisance_sensitivity is None:
-        nuisance = np.zeros((response_count, 0), dtype=float)
+        nuisance_raw = np.zeros((raw_intervention.shape[0], 0), dtype=float)
     else:
         nuisance_raw = np.asarray(nuisance_sensitivity, dtype=float)
-        if nuisance_raw.ndim != 2 or nuisance_raw.shape[0] != response_count:
+        if nuisance_raw.ndim != 2 or nuisance_raw.shape[0] != len(raw_intervention):
             raise ValueError("nuisance_sensitivity must share the response dimension")
-        nuisance = _whiten(nuisance_raw, covariance)
+    intervention, nuisance = _whiten_sensitivities(
+        (raw_intervention * scales[None], nuisance_raw),
+        covariance,
+        covariance_factor,
+    )
+    parameter_count = intervention.shape[1]
 
     nuisance_basis = _orthonormal_basis(nuisance, settings.relative_rank_tolerance)
     intervention_basis = _orthonormal_basis(
