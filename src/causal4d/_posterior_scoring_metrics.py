@@ -177,9 +177,7 @@ def gaussian_log_score(
     if mahalanobis < -1.0e-10:
         raise RuntimeError("query Mahalanobis distance became negative")
     mahalanobis = max(mahalanobis, 0.0)
-    log_score = 0.5 * (
-        len(mean) * np.log(2.0 * np.pi) + log_determinant + mahalanobis
-    )
+    log_score = 0.5 * (len(mean) * np.log(2.0 * np.pi) + log_determinant + mahalanobis)
     if labels is None:
         label_tuple = tuple(f"query[{index}]" for index in range(len(mean)))
     else:
@@ -307,12 +305,8 @@ def ordered_variance_attribution(
 
     global_mean = np.einsum("k,kd->d", weight_vector, means)
     centered = means - global_mean[None]
-    between_total = float(
-        np.dot(weight_vector, np.mean(np.square(centered), axis=1))
-    )
-    conditional = float(
-        np.dot(weight_vector, np.mean(variances, axis=1))
-    )
+    between_total = float(np.dot(weight_vector, np.mean(np.square(centered), axis=1)))
+    conditional = float(np.dot(weight_vector, np.mean(variances, axis=1)))
 
     prefixes: list[tuple[Any, ...]] = [tuple() for _ in range(len(means))]
     previous_explained = 0.0
@@ -378,4 +372,3 @@ def ordered_variance_attribution(
         conditional_readout_variance_m2=conditional,
         total_mean_coordinate_variance_m2=total,
     )
-
