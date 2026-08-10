@@ -36,6 +36,8 @@ jobs:
       physical_required: ${{ steps.summary.outputs.physical_required }}
       automatable: ${{ steps.summary.outputs.automatable }}
       dataset_present: ${{ steps.summary.outputs.dataset_present }}
+      root_selection: ${{ steps.summary.outputs.root_selection }}
+      selected_root_candidate: ${{ steps.summary.outputs.selected_root_candidate }}
     steps:
       - name: Check out exact reviewed main revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -96,8 +98,14 @@ jobs:
           set -euo pipefail
           PYTHONPATH="" .acquisition-readiness-venv/bin/python \
             scripts/ci/probe_self_hosted_acquisition.py \
-            --repository-root /opt/causal4d-frozen \
-            --dataset-root /data/causal4d-sloth-multi-action-v1 \
+            --root-candidate \
+              canonical \
+              /opt/causal4d-frozen \
+              /data/causal4d-sloth-multi-action-v1 \
+            --root-candidate \
+              workstation2-persistent \
+              /mnt/lexar4tb/causal4d-physical/causal4d-frozen \
+              /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1 \
             --output outputs/acquisition-readiness/report.json \
             | tee outputs/acquisition-readiness/report.txt
 
@@ -132,6 +140,7 @@ jobs:
           )
           action = report.get("next_action") or {}
           dataset = report["registered_roots"]["dataset"]
+          selection = report["registered_root_selection"]
           print(f"conclusion={report['conclusion']}")
           print(f"action_id={action.get('action_id') or 'unavailable'}")
           print(
@@ -140,6 +149,11 @@ jobs:
           )
           print(f"automatable={str(bool(action.get('automatable'))).lower()}")
           print(f"dataset_present={str(bool(dataset.get('exists'))).lower()}")
+          print(f"root_selection={selection['selection_status']}")
+          print(
+              "selected_root_candidate="
+              f"{selection.get('selected_candidate_id') or 'unavailable'}"
+          )
           PY
 
       - name: Upload sanitized readiness evidence
@@ -185,6 +199,8 @@ jobs:
       PHYSICAL_REQUIRED: ${{ needs.inspect.outputs.physical_required }}
       AUTOMATABLE: ${{ needs.inspect.outputs.automatable }}
       DATASET_PRESENT: ${{ needs.inspect.outputs.dataset_present }}
+      ROOT_SELECTION: ${{ needs.inspect.outputs.root_selection }}
+      SELECTED_ROOT_CANDIDATE: ${{ needs.inspect.outputs.selected_root_candidate }}
     steps:
       - name: Comment with the sanitized readiness result
         shell: bash
@@ -196,6 +212,8 @@ jobs:
           Self-hosted Causal4D acquisition readiness inspection: **${INSPECTION_RESULT}**
 
           - Exact reviewed main commit: \`${GITHUB_SHA}\`
+          - Registered root selection: \`${ROOT_SELECTION:-unavailable}\`
+          - Selected root candidate: \`${SELECTED_ROOT_CANDIDATE:-unavailable}\`
           - Registered dataset present: \`${DATASET_PRESENT:-unknown}\`
           - Derived next action: \`${ACTION_ID:-unavailable}\`
           - Physical acquisition required: \`${PHYSICAL_REQUIRED:-unknown}\`
