@@ -235,6 +235,21 @@ def read_regular_file_beneath(
     )
 
 
+def read_regular_file_no_symlinks(
+    path: str | Path,
+    *,
+    name: str = "artifact file",
+) -> ArtifactFileSnapshot:
+    """Read a path while rejecting symbolic links in every path component."""
+
+    absolute = Path(path).absolute()
+    root = Path(absolute.anchor)
+    relative = "/".join(absolute.parts[1:])
+    if not relative:
+        raise ArtifactValidationError(f"{name} must identify an ordinary file")
+    return read_regular_file_beneath(root, relative, name=name)
+
+
 def load_strict_json_object(payload: bytes, *, name: str) -> dict[str, Any]:
     """Decode one finite UTF-8 JSON object while rejecting duplicate keys."""
 
@@ -341,4 +356,5 @@ __all__ = [
     "load_strict_json_object",
     "read_regular_file",
     "read_regular_file_beneath",
+    "read_regular_file_no_symlinks",
 ]

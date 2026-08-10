@@ -9,8 +9,15 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from causal4d.artifact_io import ArtifactFileSnapshot, ArtifactValidationError
-from causal4d.numpy_archive import load_numpy_archive
+from causal4d.artifact_io import (
+    ArtifactFileSnapshot,
+    ArtifactValidationError,
+    read_regular_file_no_symlinks,
+)
+from causal4d.numpy_archive import (
+    load_numpy_archive,
+    load_numpy_archive_snapshot,
+)
 from causal4d.prefix_likelihood import prefix_component_log_likelihood
 from causal4d.rollout_bank import JointRolloutBank, SparseTrajectoryEvidence
 from causal4d.trusted_pickle import load_trusted_pickle
@@ -52,7 +59,7 @@ def test_trusted_pickle_unpickles_the_verified_snapshot(
     )
 
     monkeypatch.setattr(
-        "causal4d.trusted_pickle.read_regular_file_beneath",
+        "causal4d.trusted_pickle.read_regular_file_no_symlinks",
         lambda *_args, **_kwargs: snapshot,
     )
 
@@ -75,6 +82,71 @@ def test_numpy_archive_loads_one_content_verified_snapshot(tmp_path: Path) -> No
     assert not loaded.arrays["values"].flags.writeable
     with pytest.raises(ValueError):
         loaded.arrays["values"].setflags(write=True)
+
+
+def test_numpy_archive_decodes_the_supplied_snapshot_not_the_path(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "profile.npz"
+    np.savez(path, values=np.asarray([1.0]))
+    snapshot_path = tmp_path / "snapshot.npz"
+    np.savez(snapshot_path, values=np.asarray([2.0]))
+    payload = snapshot_path.read_bytes()
+    snapshot = ArtifactFileSnapshot(
+        path=path,
+        payload=payload,
+        sha256=_sha256(payload),
+        byte_count=len(payload),
+    )
+
+    loaded = load_numpy_archive_snapshot(snapshot)
+
+    np.testing.assert_array_equal(loaded.arrays["values"], [2.0])
+
+
+def test_numpy_archive_rejects_inconsistent_snapshot_identity(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "profile.npz"
+    np.savez(path, values=np.asarray([1.0]))
+    payload = path.read_bytes()
+    snapshot = ArtifactFileSnapshot(
+        path=path,
+        payload=payload,
+        sha256="0" * 64,
+        byte_count=len(payload),
+    )
+
+    with pytest.raises(ArtifactValidationError, match="identity is inconsistent"):
+        load_numpy_archive_snapshot(snapshot)
+
+
+def test_numpy_archive_snapshot_enforces_archive_size_limit(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "profile.npz"
+    np.savez(path, values=np.asarray([1.0]))
+    snapshot = read_regular_file_no_symlinks(path)
+
+    with pytest.raises(ArtifactValidationError, match="byte count exceeds"):
+        load_numpy_archive_snapshot(
+            snapshot,
+            max_archive_bytes=snapshot.byte_count - 1,
+        )
+
+
+def test_numpy_archive_snapshot_enforces_expanded_size_limit(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "profile.npz"
+    np.savez(path, values=np.asarray([1.0]))
+    snapshot = read_regular_file_no_symlinks(path)
+
+    with pytest.raises(ArtifactValidationError, match="expanded size exceeds"):
+        load_numpy_archive_snapshot(
+            snapshot,
+            max_expanded_bytes=1,
+        )
 
 
 def test_numpy_archive_rejects_digest_mismatch(tmp_path: Path) -> None:
@@ -210,3 +282,18 @@ def test_bayesian_phystwin_profile_accepts_a_bound_digest(tmp_path: Path) -> Non
         expected_sha256=digest,
     )
     assert len(particles.weights) == 2
+
+
+def test_regular_file_no_symlinks_rejects_symlinked_parent(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    target = source / "artifact.bin"
+    target.write_bytes(b"artifact")
+    linked = tmp_path / "linked"
+    try:
+        linked.symlink_to(source, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlinks are unavailable on this platform")
+
+    with pytest.raises(ArtifactValidationError):
+        read_regular_file_no_symlinks(linked / target.name)
