@@ -65,13 +65,8 @@ def test_belief_provider_v3_workflow_runs_contract_before_quality() -> None:
 def test_belief_provider_v3_workflow_pins_external_actions() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 
-    assert text.count(
-        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
-    ) == 2
-    assert (
-        "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97"
-        in text
-    )
+    assert text.count("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1") == 2
+    assert "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97" in text
     for line in text.splitlines():
         stripped = line.strip()
         if stripped.startswith("uses:"):
