@@ -87,6 +87,7 @@ jobs:
             src/causal4d/trusted_pickle.py \
             src/causal4d/immutable_array.py \
             src/causal4d/immutable_json.py \
+            src/causal4d/low_rank_numerics.py \
             src/causal4d/provider_contract.py \
             src/causal4d/replay_provider_contract.py
 
