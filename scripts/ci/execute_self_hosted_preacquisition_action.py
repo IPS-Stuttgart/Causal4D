@@ -9,7 +9,7 @@ import json
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from causal4d.operator_registry import (
     OPERATOR_REGISTRY_TEMPLATE_ARTIFACT_KIND,
@@ -147,7 +147,7 @@ def _registered_action(
     )
     action_value = decision.get("action")
     _require(isinstance(action_value, Mapping), "registered next action is missing")
-    action = dict(action_value)
+    action = dict(cast(Mapping[str, Any], action_value))
     _require(
         action.get("action_id") == expected_action_id,
         "registered next action differs from the requested allowlisted action",
@@ -180,7 +180,7 @@ def _registered_action(
 def _action_summary(decision: Mapping[str, Any]) -> dict[str, Any]:
     action_value = decision.get("action")
     _require(isinstance(action_value, Mapping), "registered next action is missing")
-    action = dict(action_value)
+    action = dict(cast(Mapping[str, Any], action_value))
     execution = action.get("registered_execution")
     execution_summary = None
     if isinstance(execution, Mapping):
@@ -260,7 +260,7 @@ def _validate_after_action(decision: Mapping[str, Any]) -> dict[str, Any]:
     )
     action_value = decision.get("action")
     _require(isinstance(action_value, Mapping), "post-action decision has no action")
-    action = dict(action_value)
+    action = dict(cast(Mapping[str, Any], action_value))
     _require(
         action.get("action_id") == EXPECTED_AFTER_ACTION_ID,
         "operator registry scaffold did not reach the registered sealing boundary",
