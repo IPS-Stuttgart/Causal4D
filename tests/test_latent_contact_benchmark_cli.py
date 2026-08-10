@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -90,6 +91,44 @@ def test_sbc_cli_publishes_atomically_with_producer_identity(
     assert summary["sbc"]["producer"] == artifact["producer"]
 
 
+def test_sbc_summary_binds_exact_artifact_and_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _patch_runtime(monkeypatch)
+    output = tmp_path / "run" / "sbc.json"
+
+    code = cli.main(
+        [
+            "--seeds",
+            "2,5",
+            "--frames",
+            "24",
+            "--sbc-trials-per-fold",
+            "7",
+            "--sbc-bins",
+            "4",
+            "--sbc-output-json",
+            str(output),
+        ]
+    )
+
+    assert code == 0
+    payload = output.read_bytes()
+    summary = json.loads(capsys.readouterr().out)
+    assert payload.endswith(b"\n")
+    assert summary["sbc"]["path"] == str(output.resolve())
+    assert summary["sbc"]["sha256"] == hashlib.sha256(payload).hexdigest()
+    assert summary["sbc"]["byte_count"] == len(payload)
+    assert summary["sbc"]["configuration"]["seeds"] == [2, 5]
+    assert summary["sbc"]["configuration"]["trials_per_fold"] == 7
+    assert summary["sbc"]["configuration"]["bin_count"] == 4
+    assert summary["sbc"]["configuration"]["benchmark"]["frame_count"] == 24
+    contact = summary["sbc"]["configuration"]["contact"]
+    assert contact["parameter_particle_count"] == 12
+
+
 def test_sbc_cli_refuses_existing_output_before_running_benchmark(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -127,6 +166,30 @@ def test_sbc_cli_requires_explicit_overwrite(
     artifact = json.loads(output.read_text(encoding="utf-8"))
     assert "old" not in artifact
     assert artifact["producer"]["module_sha256"] == "a" * 64
+
+
+def test_invalid_sbc_json_cannot_partially_replace_existing_artifact(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _patch_runtime(monkeypatch)
+    monkeypatch.setattr(
+        cli,
+        "run_controlled_latent_contact_sbc",
+        lambda **kwargs: {
+            "aggregate": {},
+            "interpretation": "invalid test payload",
+            "nonfinite": float("nan"),
+        },
+    )
+    output = tmp_path / "sbc.json"
+    sentinel = b'{"previous": true}\n'
+    output.write_bytes(sentinel)
+
+    with pytest.raises(ValueError, match="Out of range float values"):
+        cli.main(_arguments(output, overwrite=True))
+
+    assert output.read_bytes() == sentinel
 
 
 def test_sbc_cli_handles_no_overwrite_race(
