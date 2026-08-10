@@ -63,7 +63,7 @@ def _inventory(paths: Iterable[Path]) -> dict[str, Any]:
 
 def _glob_inventory(device_root: Path) -> dict[str, Any]:
     serial_by_id = device_root / "serial" / "by-id"
-    inventories = {
+    inventories: dict[str, Any] = {
         "serial_by_id": _inventory(
             serial_by_id.iterdir() if serial_by_id.is_dir() else ()
         ),
