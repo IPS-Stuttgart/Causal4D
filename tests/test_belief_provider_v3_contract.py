@@ -36,21 +36,15 @@ def _metadata() -> dict[str, object]:
         "compatibility": BAYESIAN_PHYSTWIN_BELIEF_V3_COMPATIBILITY,
         "component_prior": BAYESIAN_PHYSTWIN_BELIEF_V3_COMPONENT_PRIOR,
         "evidence_pooling": BAYESIAN_PHYSTWIN_BELIEF_V3_EVIDENCE_POOLING,
-        "raw_covariance_claim": (
-            BAYESIAN_PHYSTWIN_BELIEF_V3_RAW_COVARIANCE_CLAIM
-        ),
-        "recursive_stream_claim": (
-            BAYESIAN_PHYSTWIN_BELIEF_V3_RECURSIVE_STREAM_CLAIM
-        ),
+        "raw_covariance_claim": (BAYESIAN_PHYSTWIN_BELIEF_V3_RAW_COVARIANCE_CLAIM),
+        "recursive_stream_claim": (BAYESIAN_PHYSTWIN_BELIEF_V3_RECURSIVE_STREAM_CLAIM),
     }
 
 
 def _manifest(
     *,
     schema_version: int = 3,
-    capabilities: tuple[str, ...] = (
-        BAYESIAN_PHYSTWIN_BELIEF_PROVIDER_V3_CAPABILITIES
-    ),
+    capabilities: tuple[str, ...] = (BAYESIAN_PHYSTWIN_BELIEF_PROVIDER_V3_CAPABILITIES),
     schemas: dict[str, int] | None = None,
     metadata: dict[str, object] | None = None,
 ) -> PhysicalBeliefProviderManifest:
@@ -127,9 +121,7 @@ def test_belief_provider_v3_rejects_dynamic_schema_drift() -> None:
     schemas = dict(BAYESIAN_PHYSTWIN_BELIEF_V3_ARTIFACT_SCHEMA_VERSIONS)
     schemas["DynamicEndpointPrediction"] = 3
 
-    result = validate_bayesian_phystwin_belief_provider_v3(
-        _manifest(schemas=schemas)
-    )
+    result = validate_bayesian_phystwin_belief_provider_v3(_manifest(schemas=schemas))
 
     assert not result.compatible
     assert result.artifact_version_mismatches == (
@@ -158,9 +150,7 @@ def test_belief_provider_v3_rejects_metadata_drift(
     metadata[name] = value
 
     with pytest.raises(ValueError, match="unexpected"):
-        validate_bayesian_phystwin_belief_provider_v3(
-            _manifest(metadata=metadata)
-        )
+        validate_bayesian_phystwin_belief_provider_v3(_manifest(metadata=metadata))
 
 
 def test_belief_provider_v3_rejects_wrong_provider_name() -> None:
