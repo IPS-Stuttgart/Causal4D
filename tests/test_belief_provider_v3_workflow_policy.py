@@ -4,8 +4,11 @@ from pathlib import Path
 
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = _REPOSITORY_ROOT / ".github" / "workflows" / (
-    "belief-provider-v3-integration.yml"
+WORKFLOW = (
+    _REPOSITORY_ROOT
+    / ".github"
+    / "workflows"
+    / "belief-provider-v3-integration.yml"
 )
 BPT_BELIEF_PROVIDER_V3_REVISION = "62dff353903dcad273ffcd96644e3c2b3f9e5fd1"
 CAUSAL4D_HEAD_REF = "${{ github.event.pull_request.head.sha || github.sha }}"
