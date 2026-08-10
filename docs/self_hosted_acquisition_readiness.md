@@ -6,16 +6,19 @@ dataset mount, and local robot/sensor interfaces. GPU qualification alone does
 not establish those capabilities.
 
 The `Self-hosted acquisition readiness inspection` workflow performs a read-only
-qualification on the exact reviewed `main` revision. It is dispatched only after
-the registered maintainer opens an issue with the exact title:
+qualification on the exact reviewed `main` revision. It can be dispatched
+manually from `main`, or directly by the registered maintainer opening an issue
+with the exact title:
 
 ```text
 [self-hosted] inspect Causal4D acquisition readiness
 ```
 
-A GitHub-hosted authorization job dispatches the reviewed-main workflow. The
-self-hosted job receives a read-only repository token, no GitHub secrets, and no
-issue body or label content.
+For the issue route, the self-hosted job is allocated only after the event is
+verified as an issue-open event from the exact registered maintainer login and
+numeric account ID, on reviewed `main`, with the exact trigger title. Neither the
+issue body nor its labels reach the runner. The self-hosted job receives a
+read-only repository token and no GitHub secrets.
 
 The inspection records only sanitized capability evidence:
 
