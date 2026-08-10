@@ -6,6 +6,7 @@ import ast
 import importlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -33,6 +34,12 @@ def _allowed_bayesian_phystwin_modules() -> frozenset[str]:
 
 
 ALLOWED_BAYESIAN_PHYSTWIN_MODULES = _allowed_bayesian_phystwin_modules()
+
+_DEDICATED_PROVIDER_REQUIREMENTS = {
+    "bayesian_phystwin.causal4d_tree_block_provider_v1": (
+        "CAUSAL4D_REQUIRE_TREE_BLOCK_QUERY_PROVIDER"
+    ),
+}
 
 
 def _python_sources() -> list[Path]:
@@ -85,7 +92,17 @@ def test_every_imported_provider_name_resolves_when_bpt_is_installed() -> None:
             module_name = node.module or ""
             if module_name not in ALLOWED_BAYESIAN_PHYSTWIN_MODULES:
                 continue
-            module = importlib.import_module(module_name)
+            try:
+                module = importlib.import_module(module_name)
+            except ModuleNotFoundError as error:
+                requirement = _DEDICATED_PROVIDER_REQUIREMENTS.get(module_name)
+                if (
+                    error.name == module_name
+                    and requirement is not None
+                    and os.environ.get(requirement) != "1"
+                ):
+                    continue
+                raise
             for alias in node.names:
                 assert alias.name != "*"
                 assert hasattr(module, alias.name), (
