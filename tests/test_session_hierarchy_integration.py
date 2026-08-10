@@ -71,9 +71,7 @@ def test_identity_session_transition_is_exact_legacy_fallback() -> None:
     ):
         np.testing.assert_array_equal(actual, expected)
     assert "session_hierarchy_mode" not in legacy.metadata
-    assert hierarchical.metadata["session_hierarchy_mode"] == (
-        "zero_variance_identity"
-    )
+    assert hierarchical.metadata["session_hierarchy_mode"] == ("zero_variance_identity")
     assert hierarchical.session_hierarchy is not None
     assert hierarchical.session_hierarchy.mode == "zero_variance_identity"
     for session_weights in hierarchical.session_hierarchy.session_joint_weights:
