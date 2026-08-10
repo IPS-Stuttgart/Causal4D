@@ -72,6 +72,67 @@ def test_conflicting_sessions_retain_distinct_local_phi_posteriors() -> None:
     )
 
 
+def test_finite_hierarchy_matches_direct_enumeration() -> None:
+    execution_evidence = (
+        np.asarray([[0.2, -0.1], [-0.4, 0.3]]),
+        np.asarray([[-0.2, 0.4], [0.1, -0.3]]),
+        np.asarray([[0.5, -0.2], [-0.1, 0.2]]),
+    )
+    phi_prior = np.asarray([0.35, 0.65])
+    parameter_prior = np.asarray([0.4, 0.6])
+    transition = np.asarray([[0.8, 0.2], [0.15, 0.85]])
+    identifiers = ("paired", "paired", "other")
+    powers = np.asarray([0.5, 0.5, 1.0])
+
+    result = infer_session_phi_hierarchy(
+        execution_evidence,
+        phi_prior=phi_prior,
+        parameter_prior=parameter_prior,
+        session_ids=identifiers,
+        execution_evidence_powers=powers,
+        session_phi_transition=transition,
+    )
+
+    session_evidence = (
+        0.5 * execution_evidence[0] + 0.5 * execution_evidence[1],
+        execution_evidence[2],
+    )
+    expected_global = np.zeros((2, 2), dtype=float)
+    for global_phi in range(2):
+        for parameter in range(2):
+            weight = phi_prior[global_phi] * parameter_prior[parameter]
+            for evidence in session_evidence:
+                weight *= sum(
+                    transition[global_phi, session_phi]
+                    * np.exp(evidence[session_phi, parameter])
+                    for session_phi in range(2)
+                )
+            expected_global[global_phi, parameter] = weight
+    expected_global /= np.sum(expected_global)
+    np.testing.assert_allclose(result.global_weights, expected_global)
+
+    for session_index, evidence in enumerate(session_evidence):
+        expected_session = np.zeros((2, 2), dtype=float)
+        for session_phi in range(2):
+            for parameter in range(2):
+                for global_phi in range(2):
+                    normalizer = sum(
+                        transition[global_phi, candidate]
+                        * np.exp(evidence[candidate, parameter])
+                        for candidate in range(2)
+                    )
+                    expected_session[session_phi, parameter] += (
+                        expected_global[global_phi, parameter]
+                        * transition[global_phi, session_phi]
+                        * np.exp(evidence[session_phi, parameter])
+                        / normalizer
+                    )
+        np.testing.assert_allclose(
+            result.session_joint_weights[session_index],
+            expected_session,
+        )
+
+
 def test_same_session_composite_powers_preserve_one_evidence_unit() -> None:
     one = infer_session_phi_hierarchy(
         (np.asarray([[0.0], [-2.0]]),),
