@@ -139,9 +139,7 @@ def _global_uniformity_test(
         )
     )
     exceedance_count = int(np.count_nonzero(null_maxima >= observed_maximum))
-    p_value = float(
-        (exceedance_count + 1) / (_UNIFORMITY_MONTE_CARLO_REPLICATES + 1)
-    )
+    p_value = float((exceedance_count + 1) / (_UNIFORMITY_MONTE_CARLO_REPLICATES + 1))
     return {
         "method": "fixed Monte Carlo max-Pearson multinomial test",
         "null_hypothesis": "all randomized-rank histograms are uniform",
