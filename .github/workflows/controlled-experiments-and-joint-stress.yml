@@ -1,0 +1,122 @@
+name: Controlled experiments and joint-observation stress
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/controlled-experiments-and-joint-stress.yml"
+      - "scripts/experiments/joint_observation_stress.py"
+      - "src/causal4d/joint_observation.py"
+      - "tests/test_joint_observation.py"
+      - "tests/test_joint_observation_metamorphic.py"
+      - "tests/test_prob4d_joint_observation.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: controlled-evidence-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  controlled-benchmark:
+    name: Controlled ${{ matrix.benchmark }} benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        benchmark: [counterfactual, latent-contact]
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Causal4D
+        run: python -m pip install -e .
+      - name: Run registered controlled benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="build/controlled/${{ matrix.benchmark }}"
+          if [[ "${{ matrix.benchmark }}" == "counterfactual" ]]; then
+            causal4d benchmark counterfactual \
+              --output-dir "$output" \
+              --seeds 0:8 \
+              --frames 56 \
+              --training-repeats 2 \
+              --parameter-grid-count 5
+          else
+            causal4d benchmark latent-contact \
+              --output-dir "$output" \
+              --seeds 0:8 \
+              --frames 56 \
+              --training-repeats 2 \
+              --parameter-grid-count 5 \
+              --contact-parameter-particles 12 \
+              --require-gates
+          fi
+      - name: Verify result bundle
+        run: |
+          python scripts/ci/verify_result_bundle.py \
+            "build/controlled/${{ matrix.benchmark }}/manifest.json"
+      - name: Upload controlled result bundle
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: controlled-${{ matrix.benchmark }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/controlled/${{ matrix.benchmark }}/
+          if-no-files-found: warn
+          retention-days: 30
+
+  joint-observation-stress:
+    name: Joint-observation stress / Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12", "3.14"]
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install development environment
+        run: python -m pip install -e ".[dev]"
+      - name: Run focused joint-observation regressions
+        run: |
+          python -m pytest -q \
+            tests/test_joint_observation.py \
+            tests/test_joint_observation_metamorphic.py \
+            tests/test_prob4d_joint_observation.py
+      - name: Run randomized numerical stress experiment
+        run: |
+          python scripts/experiments/joint_observation_stress.py \
+            --output-json \
+              "build/joint-observation-stress/python-${{ matrix.python-version }}.json" \
+            --seed-start 0 \
+            --seed-stop 16 \
+            --components 96 \
+            --blocks 32 \
+            --shared-rank 7 \
+            --component-rank 3
+      - name: Upload numerical stress report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: joint-observation-stress-python-${{ matrix.python-version }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/joint-observation-stress/*.json
+          if-no-files-found: warn
+          retention-days: 30
