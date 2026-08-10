@@ -50,9 +50,7 @@ def _decision(
     command: list[str] | None = None,
 ) -> dict[str, object]:
     category = (
-        "scaffold"
-        if action_id == "scaffold_operator_registry"
-        else "manual_evidence"
+        "scaffold" if action_id == "scaffold_operator_registry" else "manual_evidence"
     )
     return {
         "schema_version": 1,
