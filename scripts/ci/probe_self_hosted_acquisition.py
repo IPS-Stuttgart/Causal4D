@@ -235,11 +235,12 @@ def _next_action_summary(
 ) -> tuple[dict[str, Any] | None, str | None]:
     if not repository_root.is_dir() or not dataset_root.is_dir():
         return None, "registered repository or dataset root is absent"
+    verify_file_hashes = True
     try:
         decision = build_preacquisition_operator_next_action(
             repository_root,
             dataset_root,
-            verify_file_hashes=True,
+            verify_file_hashes=verify_file_hashes,
         )
     except (OSError, KeyError, TypeError, ValueError) as error:
         return None, f"{type(error).__name__}: {error}"
@@ -262,7 +263,7 @@ def _next_action_summary(
             "protocol_id": decision.get("protocol_id"),
             "valid": decision.get("valid") is True,
             "ready": decision.get("ready") is True,
-            "verify_file_hashes": decision.get("verify_file_hashes") is True,
+            "verify_file_hashes": verify_file_hashes,
             "action_id": action.get("action_id"),
             "category": action.get("category"),
             "operator_role": action.get("operator_role"),

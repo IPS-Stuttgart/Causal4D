@@ -155,6 +155,51 @@ def test_root_selection_rejects_duplicate_candidate_ids(tmp_path: Path) -> None:
         )
 
 
+def test_next_action_summary_reports_the_requested_hash_verification(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository, dataset = _complete_pair(tmp_path, "persistent")
+    observed: dict[str, object] = {}
+
+    def build_decision(
+        repository_root: Path,
+        dataset_root: Path,
+        *,
+        verify_file_hashes: bool,
+    ) -> dict[str, object]:
+        observed["repository_root"] = repository_root
+        observed["dataset_root"] = dataset_root
+        observed["verify_file_hashes"] = verify_file_hashes
+        return {
+            "protocol_id": "protocol-v1",
+            "valid": True,
+            "ready": False,
+            "action": {
+                "action_id": "seal_operator_registry",
+                "category": "manual_evidence",
+                "operator_role": "principal_investigator",
+                "physical_acquisition_required": False,
+                "automatable": False,
+                "target_outcomes_permitted": False,
+                "blocking_items": [],
+            },
+        }
+
+    monkeypatch.setattr(
+        probe,
+        "build_preacquisition_operator_next_action",
+        build_decision,
+    )
+
+    summary, error = probe._next_action_summary(repository, dataset)
+
+    assert error is None
+    assert observed["verify_file_hashes"] is True
+    assert summary is not None
+    assert summary["verify_file_hashes"] is True
+
+
 def test_build_report_derives_action_from_selected_pair(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
