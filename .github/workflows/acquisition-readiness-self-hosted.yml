@@ -1,12 +1,8 @@
 name: Self-hosted acquisition readiness inspection
 
 on:
-  workflow_dispatch:
-    inputs:
-      trigger_issue_number:
-        description: Maintainer issue that authorized this inspection
-        required: true
-        type: string
+  issues:
+    types: [opened]
 
 permissions:
   contents: read
@@ -19,8 +15,13 @@ jobs:
   inspect:
     name: Inspect registered acquisition readiness on workstation2
     if: >-
-      github.event_name == 'workflow_dispatch' &&
-      github.ref == 'refs/heads/main'
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.issue.user.login == 'FlorianPfaff' &&
+      github.event.issue.user.id == 6773539 &&
+      github.event.issue.title ==
+        '[self-hosted] inspect Causal4D acquisition readiness'
     runs-on: [self-hosted, Linux, X64, nvidia-smi]
     timeout-minutes: 45
     outputs:
@@ -154,8 +155,16 @@ jobs:
         run: rm -rf .acquisition-readiness-venv outputs/acquisition-readiness/wheels
 
   report:
-    name: Report acquisition readiness to the authorizing issue
-    if: always()
+    name: Report acquisition readiness to the trigger issue
+    if: >-
+      always() &&
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.issue.user.login == 'FlorianPfaff' &&
+      github.event.issue.user.id == 6773539 &&
+      github.event.issue.title ==
+        '[self-hosted] inspect Causal4D acquisition readiness'
     needs: inspect
     runs-on: ubuntu-latest
     permissions:
@@ -163,7 +172,7 @@ jobs:
       issues: write
     env:
       GH_TOKEN: ${{ github.token }}
-      ISSUE_NUMBER: ${{ inputs.trigger_issue_number }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
       INSPECTION_RESULT: ${{ needs.inspect.result }}
       CONCLUSION: ${{ needs.inspect.outputs.conclusion }}
       ACTION_ID: ${{ needs.inspect.outputs.action_id }}
@@ -175,9 +184,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          case "${ISSUE_NUMBER}" in
-            ''|*[!0-9]*) exit 2 ;;
-          esac
           run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/"
           run_url+="${GITHUB_RUN_ID}"
           body="$(cat <<EOF
