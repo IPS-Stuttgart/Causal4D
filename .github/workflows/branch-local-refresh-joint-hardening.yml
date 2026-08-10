@@ -1,0 +1,30 @@
+name: Branch-local refresh for joint hardening
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.head_ref == 'agent/harden-joint-covariance-numerics'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the pull-request head branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - name: Merge current main and remove this temporary workflow
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-edit origin/main
+          rm .github/workflows/branch-local-refresh-joint-hardening.yml
+          git add -A
+          git commit -m "Remove branch-local refresh workflow"
+          git push origin HEAD:${{ github.head_ref }}
