@@ -42,12 +42,8 @@ def _bank() -> ContactRolloutBank:
             trajectories[contact_index, parameter_index, :, :, 0] = (
                 slope * time[:, None]
             )
-            trajectories[contact_index, parameter_index, :, 0, 1] = (
-                0.35 * slope * time
-            )
-            trajectories[contact_index, parameter_index, :, 1, 1] = (
-                -0.20 * slope * time
-            )
+            trajectories[contact_index, parameter_index, :, 0, 1] = 0.35 * slope * time
+            trajectories[contact_index, parameter_index, :, 1, 1] = -0.20 * slope * time
     return ContactRolloutBank(
         graph_object=graph_object,
         action=action,
