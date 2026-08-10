@@ -26,6 +26,9 @@ from causal4d.preacquisition_readiness import (
     seal_preacquisition_gate,
     write_preacquisition_readiness,
 )
+from causal4d.preacquisition_source_panel_builder import (
+    stage_source_panel_manifest,
+)
 from causal4d.preacquisition_source_panel_control import (
     build_source_panel_status,
     write_source_panel_status,
@@ -127,6 +130,27 @@ def build_parser() -> argparse.ArgumentParser:
         "--require-complete",
         action="store_true",
         help="return exit code 3 while the valid source panel is incomplete",
+    )
+
+    source_stage = subparsers.add_parser(
+        "source-panel-stage",
+        help=(
+            "construct the exact next completed source manifest from registered "
+            "identities and local artifact bytes"
+        ),
+    )
+    source_stage.add_argument("repository_root")
+    source_stage.add_argument("dataset_root")
+    source_stage.add_argument("--started-at-utc", required=True)
+    source_stage.add_argument("--ended-at-utc", required=True)
+    source_stage.add_argument(
+        "--artifact",
+        action="append",
+        required=True,
+        help=(
+            "artifact path below the registered execution directory; repeat for "
+            "every file"
+        ),
     )
 
     source_verify = subparsers.add_parser(
@@ -259,6 +283,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             if args.output_json:
                 write_source_panel_status(args.output_json, result)
+        elif args.command == "source-panel-stage":
+            result = stage_source_panel_manifest(
+                args.repository_root,
+                args.dataset_root,
+                started_at_utc=args.started_at_utc,
+                ended_at_utc=args.ended_at_utc,
+                artifacts=args.artifact,
+            )
         elif args.command == "source-panel-verify-staged":
             result = verify_source_panel_manifest_staging(
                 args.repository_root,
