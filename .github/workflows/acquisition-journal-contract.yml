@@ -8,8 +8,11 @@ on:
       - "src/causal4d/acquisition_journal_io.py"
       - "src/causal4d/acquisition_journal_lock.py"
       - "src/causal4d/acquisition_journal_seal.py"
+      - "src/causal4d/artifact_io.py"
+      - "src/causal4d/cli/acquisition_operations.py"
       - "tests/test_acquisition_flight_recorder.py"
       - "tests/test_acquisition_journal_locking.py"
+      - "tests/test_acquisition_operations.py"
       - "docs/causal4d_acquisition_flight_recorder.md"
   push:
     branches: [main]
@@ -18,8 +21,11 @@ on:
       - "src/causal4d/acquisition_journal_io.py"
       - "src/causal4d/acquisition_journal_lock.py"
       - "src/causal4d/acquisition_journal_seal.py"
+      - "src/causal4d/artifact_io.py"
+      - "src/causal4d/cli/acquisition_operations.py"
       - "tests/test_acquisition_flight_recorder.py"
       - "tests/test_acquisition_journal_locking.py"
+      - "tests/test_acquisition_operations.py"
   workflow_dispatch:
 
 permissions:
@@ -48,25 +54,31 @@ jobs:
       - name: Install development environment
         run: python -m pip install -e ".[dev]"
 
-      - name: Check claim-bearing journal code
+      - name: Check claim-bearing acquisition code
         run: |
           python -m ruff check \
             src/causal4d/acquisition_journal_io.py \
             src/causal4d/acquisition_journal_lock.py \
             src/causal4d/acquisition_journal_seal.py \
-            tests/test_acquisition_journal_locking.py
+            src/causal4d/cli/acquisition_operations.py \
+            tests/test_acquisition_journal_locking.py \
+            tests/test_acquisition_operations.py
           python -m ruff format --check \
             src/causal4d/acquisition_journal_io.py \
             src/causal4d/acquisition_journal_lock.py \
             src/causal4d/acquisition_journal_seal.py \
-            tests/test_acquisition_journal_locking.py
+            src/causal4d/cli/acquisition_operations.py \
+            tests/test_acquisition_journal_locking.py \
+            tests/test_acquisition_operations.py
           python -m mypy \
             src/causal4d/acquisition_journal_io.py \
             src/causal4d/acquisition_journal_lock.py \
-            src/causal4d/acquisition_journal_seal.py
+            src/causal4d/acquisition_journal_seal.py \
+            src/causal4d/cli/acquisition_operations.py
 
       - name: Exercise journal invariants and process races
         run: |
           python -m pytest -q \
             tests/test_acquisition_journal_locking.py \
-            tests/test_acquisition_flight_recorder.py
+            tests/test_acquisition_flight_recorder.py \
+            tests/test_acquisition_operations.py
