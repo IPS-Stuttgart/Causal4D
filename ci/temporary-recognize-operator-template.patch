@@ -1,0 +1,427 @@
+--- a/src/causal4d/operator_registry.py	2026-08-10 17:42:43.797871000 +0000
++++ b/src/causal4d/operator_registry.py	2026-08-10 18:27:21.929502422 +0000
+@@ -4,6 +4,7 @@
+ 
+ import hashlib
+ import json
++import os
+ import re
+ from collections.abc import Mapping
+ from copy import deepcopy
+@@ -66,9 +67,19 @@
+     raise ValueError(f"non-finite JSON constant is forbidden: {value}")
+ 
+ 
++def _contains_symlink_component(path: Path) -> bool:
++    candidate = path.absolute()
++    return any(
++        component.is_symlink() for component in (candidate, *candidate.parents)
++    )
++
++
+ def _read_json_mapping(path: Path, *, name: str) -> dict[str, Any]:
++    _require(
++        not _contains_symlink_component(path),
++        f"{name} contains a symlink component",
++    )
+     _require(path.is_file(), f"{name} is missing")
+-    _require(not path.is_symlink(), f"{name} must not be a symlink")
+     payload = json.loads(
+         path.read_text(encoding="utf-8"),
+         parse_constant=_reject_json_constant,
+@@ -183,6 +194,101 @@
+     return record
+ 
+ 
++def validate_operator_registry_template(
++    protocol: Mapping[str, Any],
++    preacquisition_v4: Mapping[str, Any],
++    template: Mapping[str, Any],
++) -> dict[str, Any]:
++    """Validate one unsealed registry draft without requiring it to be complete."""
++
++    _require(
++        set(template) == _REGISTRY_FIELDS,
++        "operator registry template fields differ from the registered schema",
++    )
++    _require(
++        template.get("schema_version") == OPERATOR_REGISTRY_SCHEMA_VERSION,
++        "unsupported operator registry template schema",
++    )
++    _require(
++        template.get("artifact_kind") == OPERATOR_REGISTRY_TEMPLATE_ARTIFACT_KIND,
++        "unexpected operator registry template artifact kind",
++    )
++    _require(
++        template.get("status") == "template",
++        "operator registry draft is not an unsealed template",
++    )
++    _require(
++        template.get("protocol_id") == protocol["protocol_id"],
++        "operator registry template protocol id mismatch",
++    )
++    _require(
++        template.get("protocol_design_sha256") == protocol["design_sha256"],
++        "operator registry template protocol digest mismatch",
++    )
++    _require(
++        template.get("preacquisition_plan_id") == preacquisition_v4["plan_id"],
++        "operator registry template pre-acquisition plan mismatch",
++    )
++    _require(
++        template.get("preacquisition_amendment_sha256")
++        == preacquisition_v4["amendment_sha256"],
++        "operator registry template pre-acquisition amendment mismatch",
++    )
++    _require(
++        template.get("person_identity_digest_method")
++        == PERSON_IDENTITY_DIGEST_METHOD,
++        "operator registry template uses an unsupported identity digest method",
++    )
++    _require(
++        template.get("sealed_at_utc") is None
++        and template.get("sealed_by_operator_id") is None
++        and template.get("artifact_sha256") is None,
++        "operator registry template contains seal metadata",
++    )
++    _require(
++        template.get("target_outcomes_used") is False,
++        "target outcomes entered operator identity evidence",
++    )
++
++    operators_value = template.get("operators")
++    _require(
++        isinstance(operators_value, list),
++        "operator registry template operators must be a list",
++    )
++    records: list[dict[str, Any]] = []
++    for index, value in enumerate(operators_value):
++        _require(
++            isinstance(value, Mapping),
++            f"operators[{index}] must be an object",
++        )
++        record = dict(value)
++        roles = record.get("roles")
++        _require(
++            isinstance(roles, list),
++            f"operators[{index}].roles must be a list",
++        )
++        record["roles"] = sorted(roles)
++        records.append(_validate_operator_record(record, index=index))
++
++    operator_ids = [str(record["operator_id"]) for record in records]
++    person_digests = [str(record["person_identity_sha256"]) for record in records]
++    _require(
++        len(operator_ids) == len(set(operator_ids)),
++        "operator registry template contains duplicate operator ids",
++    )
++    _require(
++        len(person_digests) == len(set(person_digests)),
++        "operator registry template contains duplicate person identity digests",
++    )
++    return {
++        "passed": True,
++        "operator_count": len(records),
++        "populated": bool(records),
++        "target_outcomes_used": False,
++        "person_identity_digest_method": PERSON_IDENTITY_DIGEST_METHOD,
++    }
++
++
+ def validate_operator_registry(
+     protocol: Mapping[str, Any],
+     preacquisition_v4: Mapping[str, Any],
+@@ -485,6 +591,43 @@
+     return approver
+ 
+ 
++def load_operator_registry_template_prerequisite(
++    protocol: Mapping[str, Any],
++    preacquisition_v4: Mapping[str, Any],
++    dataset_root: str | Path,
++) -> dict[str, Any]:
++    """Inspect the optional unsealed registry draft without exposing identities."""
++
++    path = Path(dataset_root) / OPERATOR_REGISTRY_TEMPLATE_PATH
++    result: dict[str, Any] = {
++        "path": str(path.absolute()),
++        "present": os.path.lexists(path),
++        "valid": False,
++        "template": True,
++        "error": None,
++    }
++    if not result["present"]:
++        result["error"] = "operator_registry.template.json is missing"
++        return result
++    try:
++        template = _read_json_mapping(path, name="operator registry template")
++        result.update(
++            validate_operator_registry_template(
++                protocol,
++                preacquisition_v4,
++                template,
++            )
++        )
++        result["sha256"], result["bytes"] = _sha256_file(path)
++        result["valid"] = True
++    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
++        message = str(error).strip()
++        result["error"] = (
++            f"{type(error).__name__}: {message}" if message else type(error).__name__
++        )
++    return result
++
++
+ def load_operator_registry_prerequisite(
+     protocol: Mapping[str, Any],
+     preacquisition_v4: Mapping[str, Any],
+@@ -493,11 +636,17 @@
+     """Load the canonical registry as one fail-closed acquisition prerequisite."""
+ 
+     path = Path(dataset_root) / OPERATOR_REGISTRY_PATH
++    template_status = load_operator_registry_template_prerequisite(
++        protocol,
++        preacquisition_v4,
++        dataset_root,
++    )
+     result: dict[str, Any] = {
+-        "path": str(path.resolve()),
+-        "present": path.is_file(),
++        "path": str(path.absolute()),
++        "present": os.path.lexists(path),
+         "valid": False,
+         "error": None,
++        "template_status": template_status,
+     }
+     if not result["present"]:
+         result["error"] = "operator_registry.json is missing"
+@@ -714,6 +863,7 @@
+     "ROLE_INDEPENDENT_VERIFIER",
+     "ROLE_SOFTWARE_ENVIRONMENT_APPROVER",
+     "load_operator_registry_prerequisite",
++    "load_operator_registry_template_prerequisite",
+     "load_registered_operator_registry",
+     "operator_registry_sha256",
+     "operator_registry_template",
+@@ -726,4 +876,5 @@
+     "validate_gate_approver_identity",
+     "validate_method_freeze_operator_identity",
+     "validate_operator_registry",
++    "validate_operator_registry_template",
+ ]
+--- a/src/causal4d/preacquisition_next_action.py	2026-08-10 17:42:43.799871000 +0000
++++ b/src/causal4d/preacquisition_next_action.py	2026-08-10 18:22:08.925878824 +0000
+@@ -11,6 +11,10 @@
+ from typing import Any
+ 
+ from causal4d.atomic_io import atomic_write_json, atomic_write_text
++from causal4d.operator_registry import (
++    OPERATOR_REGISTRY_PATH,
++    OPERATOR_REGISTRY_TEMPLATE_PATH,
++)
+ from causal4d.preacquisition_readiness import build_preacquisition_readiness
+ from causal4d.preacquisition_readiness_contracts import (
+     GATE_PATHS,
+@@ -302,11 +306,32 @@
+ 
+     registry = readiness.get("prerequisites", {}).get("operator_registry", {})
+     if _pending(readiness, "prerequisites", "operator_registry"):
+-        template = str(root / "preacquisition/operator_registry.template.json")
++        template = str(root / OPERATOR_REGISTRY_TEMPLATE_PATH)
++        template_status = registry.get("template_status", {})
++        if template_status.get("present") and not template_status.get("valid"):
++            template_error = template_status.get("error")
++            blockers = ["operator_registry_template_invalid"]
++            if isinstance(template_error, str) and template_error:
++                blockers.append(template_error)
++            return _action(
++                "stop_and_repair_invalid_evidence",
++                "Stop and repair the invalid operator registry template",
++                "principal_investigator_and_independent_verifier",
++                category="invalid_evidence",
++                command=_readiness(
++                    "status",
++                    repository,
++                    dataset,
++                    "--verify-file-hashes",
++                ),
++                completion=next_check,
++                inputs=[template],
++                blockers=blockers,
++            )
+         operation = (
+-            "scaffold-operator-registry"
+-            if not registry.get("present")
+-            else "seal-operator-registry"
++            "seal-operator-registry"
++            if template_status.get("valid") is True
++            else "scaffold-operator-registry"
+         )
+         arguments: list[object] = [repository, dataset]
+         if operation == "seal-operator-registry":
+@@ -328,7 +353,7 @@
+             outputs=[
+                 template
+                 if operation.startswith("scaffold")
+-                else str(root / "preacquisition/operator_registry.json")
++                else str(root / OPERATOR_REGISTRY_PATH)
+             ],
+             automatable=operation.startswith("scaffold"),
+         )
+--- a/tests/test_operator_registry.py	2026-08-10 17:42:43.822869800 +0000
++++ b/tests/test_operator_registry.py	2026-08-10 18:27:21.929806516 +0000
+@@ -19,6 +19,7 @@
+     ROLE_GATE_APPROVER,
+     ROLE_INDEPENDENT_VERIFIER,
+     ROLE_SOFTWARE_ENVIRONMENT_APPROVER,
++    load_operator_registry_prerequisite,
+     operator_registry_sha256,
+     operator_registry_template,
+     require_distinct_operator_people,
+@@ -152,7 +153,9 @@
+         require_distinct_operator_people(
+             first,
+             alias,
+-            relationship="method freeze must be verified by a distinct registered person",
++            relationship=(
++                "method freeze must be verified by a distinct registered person"
++            ),
+         )
+ 
+ 
+@@ -213,6 +216,54 @@
+         )
+ 
+ 
++def test_registry_prerequisite_reports_a_valid_existing_template(
++    tmp_path: Path,
++) -> None:
++    protocol, v4 = _registered_values()
++    template_path = tmp_path / OPERATOR_REGISTRY_TEMPLATE_PATH
++    template_path.parent.mkdir(parents=True)
++    template_path.write_text(
++        json.dumps(operator_registry_template(protocol, v4)),
++        encoding="utf-8",
++    )
++
++    result, registry = load_operator_registry_prerequisite(
++        protocol,
++        v4,
++        tmp_path,
++    )
++
++    assert registry is None
++    assert result["present"] is False
++    assert result["template_status"]["present"] is True
++    assert result["template_status"]["valid"] is True
++    assert result["template_status"]["operator_count"] == 0
++    assert result["template_status"]["target_outcomes_used"] is False
++
++
++def test_registry_prerequisite_reports_an_invalid_existing_template(
++    tmp_path: Path,
++) -> None:
++    protocol, v4 = _registered_values()
++    template = operator_registry_template(protocol, v4)
++    template["target_outcomes_used"] = True
++    template_path = tmp_path / OPERATOR_REGISTRY_TEMPLATE_PATH
++    template_path.parent.mkdir(parents=True)
++    template_path.write_text(json.dumps(template), encoding="utf-8")
++
++    result, registry = load_operator_registry_prerequisite(
++        protocol,
++        v4,
++        tmp_path,
++    )
++
++    assert registry is None
++    assert result["present"] is False
++    assert result["template_status"]["present"] is True
++    assert result["template_status"]["valid"] is False
++    assert "target outcomes" in result["template_status"]["error"]
++
++
+ def test_registry_scaffold_and_seal_are_non_overwriting(
+     monkeypatch: pytest.MonkeyPatch,
+     tmp_path: Path,
+--- a/tests/test_preacquisition_next_action.py	2026-08-10 17:42:43.823869700 +0000
++++ b/tests/test_preacquisition_next_action.py	2026-08-10 18:22:08.926148250 +0000
+@@ -147,6 +147,62 @@
+     assert decision["action"]["physical_acquisition_required"] is False
+ 
+ 
++def test_existing_operator_registry_template_advances_to_human_seal() -> None:
++    readiness = _readiness()
++    readiness["prerequisites"]["operator_registry"] = {
++        **_prerequisite(present=False, valid=False),
++        "template_status": {
++            "path": "/data/run/preacquisition/operator_registry.template.json",
++            "present": True,
++            "valid": True,
++            "template": True,
++            "error": None,
++            "operator_count": 0,
++        },
++    }
++    readiness["missing_prerequisites"] = ["operator_registry"]
++
++    decision = _derive(readiness, _source_panel())
++
++    action = decision["action"]
++    assert decision["valid"] is True
++    assert action["action_id"] == "seal_operator_registry"
++    assert action["automatable"] is False
++    assert action["physical_acquisition_required"] is False
++    assert action["input_paths"] == [
++        "/data/run/preacquisition/operator_registry.template.json"
++    ]
++    assert action["output_paths"] == [
++        "/data/run/preacquisition/operator_registry.json"
++    ]
++
++
++def test_invalid_operator_registry_template_requires_repair() -> None:
++    readiness = _readiness()
++    readiness["prerequisites"]["operator_registry"] = {
++        **_prerequisite(present=False, valid=False),
++        "template_status": {
++            "path": "/data/run/preacquisition/operator_registry.template.json",
++            "present": True,
++            "valid": False,
++            "template": True,
++            "error": "ValueError: protocol digest mismatch",
++        },
++    }
++    readiness["missing_prerequisites"] = ["operator_registry"]
++
++    decision = _derive(readiness, _source_panel())
++
++    action = decision["action"]
++    assert decision["valid"] is False
++    assert action["action_id"] == "stop_and_repair_invalid_evidence"
++    assert action["automatable"] is False
++    assert action["blocking_items"] == [
++        "operator_registry_template_invalid",
++        "ValueError: protocol digest mismatch",
++    ]
++
++
+ def test_malformed_evidence_precedes_missing_operator_registry() -> None:
+     readiness = _readiness()
+     readiness["prerequisites"]["operator_registry"] = _prerequisite(
+--- a/docs/causal4d_preacquisition_next_action.md	2026-08-10 17:42:43.732874900 +0000
++++ b/docs/causal4d_preacquisition_next_action.md	2026-08-10 18:27:21.929184339 +0000
+@@ -58,6 +58,13 @@
+ 11. run the final hash-verified readiness gate; and
+ 12. validate the freeze and begin only the first registered confirmatory session.
+ 
++Operator-registry scaffolding is proposed only when both the sealed registry and its
++registered draft template are absent. When the sealed registry is missing but a
++valid unsealed template is already present, the action advances to
++`seal_operator_registry` and remains nonautomatable. A present malformed or
++symlinked template yields `stop_and_repair_invalid_evidence`; it is never silently
++replaced or treated as a fresh scaffold target.
++
+ The source-panel action includes the exact execution ID, session ID, registered
+ command profile, manifest template, staging destination, preflight-report path,
+ and exactly-once publication command. It never skips ahead or selects a
