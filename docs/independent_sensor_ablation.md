@@ -118,7 +118,9 @@ registered linear-query scores, evaluate each returned arm separately through
 `causal4d.posterior_scoring` and bind the resulting score-artifact identities in
 the ablation report metadata. This keeps proper-score computation separate from
 the evidence-factor attribution and prevents the ablation builder from reading
-held-out values implicitly.
+held-out values implicitly. Because metadata participates in the report content
+address, adding or replacing a bound score artifact changes the ablation report
+identity.
 
 ## Interpretation boundary
 
