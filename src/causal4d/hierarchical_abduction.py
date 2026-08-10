@@ -16,6 +16,10 @@ from causal4d.prefix_likelihood import (
     prefix_component_log_likelihood,
 )
 from causal4d.rollout_bank import JointRolloutBank
+from causal4d.session_hierarchy import (
+    SessionHierarchyPosterior,
+    infer_session_phi_hierarchy,
+)
 from causal4d.weighting import log_weights_from_probabilities
 
 
@@ -114,7 +118,7 @@ def _session_evidence_powers(
 
 @dataclass(frozen=True)
 class HierarchicalAbductionResult:
-    """Posterior with shared ``(theta, phi)`` and local execution hypotheses."""
+    """Posterior with persistent, session-local, and execution-local variables."""
 
     phi_names: tuple[str, ...]
     phi_values: np.ndarray
@@ -123,6 +127,7 @@ class HierarchicalAbductionResult:
     execution_joint_weights: tuple[np.ndarray, ...]
     execution_log_evidence: tuple[np.ndarray, ...]
     metadata: dict[str, Any] = field(default_factory=dict)
+    session_hierarchy: SessionHierarchyPosterior | None = None
 
     def __post_init__(self) -> None:
         phi = _readonly_array(self.phi_values)
@@ -169,6 +174,19 @@ class HierarchicalAbductionResult:
                 raise ValueError("execution log evidence must not contain NaN or +inf")
             execution_weights.append(supplied)
             execution_evidence.append(log_evidence)
+        hierarchy = self.session_hierarchy
+        if hierarchy is not None:
+            if hierarchy.global_weights.shape != shared.shape or not np.array_equal(
+                hierarchy.global_weights,
+                shared,
+            ):
+                raise ValueError(
+                    "session hierarchy global weights must equal shared_weights"
+                )
+            if hierarchy.session_phi_transition.shape != (len(phi), len(phi)):
+                raise ValueError("session hierarchy must match the phi support")
+            if len(hierarchy.execution_session_ids) != len(execution_weights):
+                raise ValueError("session hierarchy must cover every execution")
         object.__setattr__(self, "phi_values", phi)
         object.__setattr__(self, "parameter_particles", particles)
         object.__setattr__(self, "shared_weights", shared)
@@ -178,11 +196,21 @@ class HierarchicalAbductionResult:
 
     @property
     def phi_marginal(self) -> np.ndarray:
+        """Marginal of shared ``phi`` or global ``phi_bar`` support."""
+
         return np.sum(self.shared_weights, axis=1)
 
     @property
     def parameter_marginal(self) -> np.ndarray:
         return np.sum(self.shared_weights, axis=0)
+
+    @property
+    def session_phi_marginals(self) -> tuple[np.ndarray, ...]:
+        """Ordered session-local marginals, empty for the shared-``phi`` model."""
+
+        if self.session_hierarchy is None:
+            return ()
+        return self.session_hierarchy.session_phi_marginals
 
 
 def abduct_hierarchical_interventions(
@@ -199,12 +227,13 @@ def abduct_hierarchical_interventions(
     particle_discrepancy_variance_m2: Sequence[np.ndarray | None] | None = None,
     session_ids: Sequence[str] | None = None,
     execution_evidence_powers: Sequence[float] | None = None,
+    session_phi_transition: np.ndarray | None = None,
 ) -> HierarchicalAbductionResult:
     """Pool persistent intervention and twin variables across executions.
 
     Physical parameter particles and persistent intervention variables ``phi``
-    are shared. Each execution retains its own local hypothesis within a ``phi``
-    group, so contact and slip variables remain event-specific.
+    are shared by default. Each execution retains its own local hypothesis within
+    a ``phi`` group, so contact and slip variables remain event-specific.
 
     When ``session_ids`` are supplied, execution log evidences are weighted by
     the reciprocal number of executions in that session. Each grasp/session then
@@ -212,6 +241,13 @@ def abduct_hierarchical_interventions(
     execution retains its full local ``kappa`` posterior. Supplying neither
     session IDs nor explicit powers preserves the original independent-execution
     product exactly.
+
+    ``session_phi_transition[g, f]`` optionally specifies
+    ``p(phi_s=f | phi_bar=g)`` on the same finite support. This introduces a
+    session-local persistent intervention while retaining a global hardware
+    hyperstate and shared physical particles. Exact zeros preserve excluded
+    support. An identity transition is the zero-session-variance limit and
+    reproduces the original shared-``phi`` weights and execution posteriors.
     """
 
     bank_list = tuple(banks)
@@ -335,29 +371,81 @@ def abduct_hierarchical_interventions(
             )
         execution_log_evidence.append(evidence)
 
-    shared_log_weights = (
-        log_weights_from_probabilities(phi_prior, name="shared phi prior")[:, None]
-        + log_weights_from_probabilities(
-            reference.parameter_weights,
-            name="shared parameter prior",
-        )[None]
-    )
-    for power, evidence in zip(evidence_powers, execution_log_evidence, strict=True):
-        shared_log_weights += float(power) * evidence
-    shared_weights = _normalize_log_weights(shared_log_weights)
+    session_hierarchy: SessionHierarchyPosterior | None = None
+    if session_phi_transition is None:
+        shared_log_weights = (
+            log_weights_from_probabilities(phi_prior, name="shared phi prior")[:, None]
+            + log_weights_from_probabilities(
+                reference.parameter_weights,
+                name="shared parameter prior",
+            )[None]
+        )
+        for power, evidence in zip(
+            evidence_powers,
+            execution_log_evidence,
+            strict=True,
+        ):
+            shared_log_weights += float(power) * evidence
+        shared_weights = _normalize_log_weights(shared_log_weights)
+        session_weight_lookup: dict[str, np.ndarray] = {}
+        hierarchy_mode = "shared_phi"
+    else:
+        session_hierarchy = infer_session_phi_hierarchy(
+            execution_log_evidence,
+            phi_prior=phi_prior,
+            parameter_prior=reference.parameter_weights,
+            session_ids=session_identifiers,
+            execution_evidence_powers=evidence_powers,
+            session_phi_transition=session_phi_transition,
+        )
+        shared_weights = session_hierarchy.global_weights
+        session_weight_lookup = dict(
+            zip(
+                session_hierarchy.session_ids,
+                session_hierarchy.session_joint_weights,
+                strict=True,
+            )
+        )
+        hierarchy_mode = session_hierarchy.mode
 
     execution_joint_weights = []
-    for groups, local_prior, log_likelihood, evidence in zip(
-        group_indices,
-        local_log_priors,
-        component_log_likelihoods,
-        execution_log_evidence,
-        strict=True,
+    for execution, (groups, local_prior, log_likelihood, evidence) in enumerate(
+        zip(
+            group_indices,
+            local_log_priors,
+            component_log_likelihoods,
+            execution_log_evidence,
+            strict=True,
+        )
     ):
         conditional = np.exp(local_prior[:, None] + log_likelihood - evidence[groups])
-        joint = shared_weights[groups] * conditional
+        persistent_weights = (
+            shared_weights
+            if session_hierarchy is None
+            else session_weight_lookup[session_identifiers[execution]]
+        )
+        joint = persistent_weights[groups] * conditional
         joint /= np.sum(joint)
         execution_joint_weights.append(joint)
+
+    result_metadata: dict[str, Any] = {
+        "execution_count": len(bank_list),
+        "session_count": len(set(session_identifiers)),
+        "session_ids": list(session_identifiers),
+        "execution_evidence_powers": evidence_powers.tolist(),
+        "shared_evidence_mode": evidence_mode,
+        "shared_variables": ["theta", "phi"],
+        "execution_specific_variables": ["kappa"],
+        "future_frames_read": 0,
+    }
+    if session_hierarchy is not None:
+        result_metadata.update(
+            {
+                "session_hierarchy_mode": hierarchy_mode,
+                "shared_variables": ["theta", "phi_bar"],
+                "session_variables": ["phi_session"],
+            }
+        )
 
     return HierarchicalAbductionResult(
         phi_names=phi_names,
@@ -366,14 +454,6 @@ def abduct_hierarchical_interventions(
         shared_weights=shared_weights,
         execution_joint_weights=tuple(execution_joint_weights),
         execution_log_evidence=tuple(execution_log_evidence),
-        metadata={
-            "execution_count": len(bank_list),
-            "session_count": len(set(session_identifiers)),
-            "session_ids": list(session_identifiers),
-            "execution_evidence_powers": evidence_powers.tolist(),
-            "shared_evidence_mode": evidence_mode,
-            "shared_variables": ["theta", "phi"],
-            "execution_specific_variables": ["kappa"],
-            "future_frames_read": 0,
-        },
+        metadata=result_metadata,
+        session_hierarchy=session_hierarchy,
     )
