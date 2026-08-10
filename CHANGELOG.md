@@ -4,6 +4,7 @@
 
 ### Added
 
+- Group repeated joint-observation selectors before propagating diagonal trajectory variance, and fail closed when a Woodbury quadratic becomes negative beyond scale-aware floating-point roundoff. The same guard now covers Gaussian and grouped Student-t low-rank paths.
 - Add a registered Causal4D consumer for strict claim-bearing tree-block
   posterior queries, including independent provider/result revalidation,
   immutable query covariance, and an exact installed-wheel provider pin.

@@ -19,6 +19,7 @@ import numpy as np
 from causal4d.contracts import array_sha256
 from causal4d.immutable_array import readonly_array, readonly_integer_array
 from causal4d.immutable_json import plain_json, validated_json_mapping
+from causal4d.low_rank_numerics import nonnegative_woodbury_quadratic
 from causal4d.weighting import log_weights_from_probabilities
 
 
@@ -146,6 +147,51 @@ def _validated_factor(
     if not np.all(np.isfinite(factor)):
         raise ValueError(f"{name} must be finite")
     return factor
+
+
+def _group_selector_terms(
+    *,
+    row_indices: np.ndarray,
+    frame_indices: np.ndarray,
+    node_indices: np.ndarray,
+    coordinate_indices: np.ndarray,
+    coefficients: np.ndarray,
+) -> tuple[tuple[int, np.ndarray, np.ndarray], ...]:
+    """Compile sparse terms by selected trajectory scalar and output row."""
+
+    representatives: dict[tuple[int, int, int], int] = {}
+    coefficients_by_selector: dict[tuple[int, int, int], dict[int, float]] = {}
+    selectors = zip(
+        map(int, frame_indices),
+        map(int, node_indices),
+        map(int, coordinate_indices),
+    )
+    for term, selector in enumerate(selectors):
+        representatives.setdefault(selector, term)
+        row_coefficients = coefficients_by_selector.setdefault(selector, {})
+        row = int(row_indices[term])
+        row_coefficients[row] = row_coefficients.get(row, 0.0) + float(
+            coefficients[term]
+        )
+
+    groups: list[tuple[int, np.ndarray, np.ndarray]] = []
+    for selector, row_coefficients in coefficients_by_selector.items():
+        rows: list[int] = []
+        combined_coefficients: list[float] = []
+        for row, coefficient in row_coefficients.items():
+            if coefficient == 0.0:
+                continue
+            rows.append(row)
+            combined_coefficients.append(coefficient)
+        if rows:
+            groups.append(
+                (
+                    representatives[selector],
+                    np.asarray(rows, dtype=np.intp),
+                    np.asarray(combined_coefficients, dtype=float),
+                )
+            )
+    return tuple(groups)
 
 
 @dataclass(frozen=True)
@@ -397,24 +443,18 @@ class LinearJointObservationEvidence:
             ),
             dtype=float,
         )
-        selectors = tuple(
-            zip(
-                map(int, self.frame_indices),
-                map(int, self.node_indices),
-                map(int, self.coordinate_indices),
-            )
+        groups = _group_selector_terms(
+            row_indices=self.row_indices,
+            frame_indices=self.frame_indices,
+            node_indices=self.node_indices,
+            coordinate_indices=self.coordinate_indices,
+            coefficients=self.coefficients,
         )
-        for left, left_selector in enumerate(selectors):
-            left_row = int(self.row_indices[left])
-            for right, right_selector in enumerate(selectors):
-                if left_selector != right_selector:
-                    continue
-                right_row = int(self.row_indices[right])
-                output[..., left_row, right_row] += (
-                    self.coefficients[left]
-                    * self.coefficients[right]
-                    * selected[..., left]
-                )
+        for representative, rows, coefficients in groups:
+            outer = coefficients[:, None] * coefficients[None, :]
+            output[..., rows[:, None], rows[None, :]] += (
+                selected[..., representative, None, None] * outer
+            )
         return output
 
     def apply_independent_covariance_blocks(
@@ -437,36 +477,28 @@ class LinearJointObservationEvidence:
             (*variances.shape[:-3], block_count, block_size, block_size),
             dtype=float,
         )
-        selectors = tuple(
-            zip(
-                map(int, self.frame_indices),
-                map(int, self.node_indices),
-                map(int, self.coordinate_indices),
-            )
+        groups = _group_selector_terms(
+            row_indices=self.row_indices,
+            frame_indices=self.frame_indices,
+            node_indices=self.node_indices,
+            coordinate_indices=self.coordinate_indices,
+            coefficients=self.coefficients,
         )
-        for left, left_selector in enumerate(selectors):
-            left_row = int(self.row_indices[left])
-            left_block, left_coordinate = divmod(left_row, block_size)
-            for right, right_selector in enumerate(selectors):
-                if left_selector != right_selector:
-                    continue
-                right_row = int(self.row_indices[right])
-                right_block, right_coordinate = divmod(right_row, block_size)
-                if left_block != right_block:
-                    raise ValueError(
-                        "independent component variance induces off-block "
-                        "covariance; use dense base covariance"
-                    )
-                output[
-                    ...,
-                    left_block,
-                    left_coordinate,
-                    right_coordinate,
-                ] += (
-                    self.coefficients[left]
-                    * self.coefficients[right]
-                    * selected[..., left]
+        for representative, rows, coefficients in groups:
+            blocks = rows // block_size
+            if np.any(blocks != blocks[0]):
+                raise ValueError(
+                    "independent component variance induces off-block "
+                    "covariance; use dense base covariance"
                 )
+            coordinates = rows % block_size
+            outer = coefficients[:, None] * coefficients[None, :]
+            output[
+                ...,
+                int(blocks[0]),
+                coordinates[:, None],
+                coordinates[None, :],
+            ] += selected[..., representative, None, None] * outer
         return output
 
 
@@ -601,7 +633,12 @@ def _joint_gaussian_log_density_dense(
             whitened_residual,
             whitened_factor,
         )
-        quadratic = np.maximum(quadratic - correction, 0.0)
+        quadratic = nonnegative_woodbury_quadratic(
+            quadratic,
+            correction,
+            dimension=dimension,
+            name="joint Gaussian Woodbury quadratic",
+        )
         log_determinant += low_rank_log_determinant
     result = -0.5 * (dimension * np.log(2.0 * np.pi) + log_determinant + quadratic)
     if not np.all(np.isfinite(result)):
@@ -675,7 +712,12 @@ def _joint_gaussian_log_density_blocks(
             flattened_residual,
             flattened_factor,
         )
-        quadratic = np.maximum(quadratic - correction, 0.0)
+        quadratic = nonnegative_woodbury_quadratic(
+            quadratic,
+            correction,
+            dimension=dimension,
+            name="joint Gaussian Woodbury quadratic",
+        )
         log_determinant += low_rank_log_determinant
     result = -0.5 * (dimension * np.log(2.0 * np.pi) + log_determinant + quadratic)
     if not np.all(np.isfinite(result)):
@@ -824,7 +866,12 @@ class _PreparedJointGaussianBaseSolver:
                 whitened_residual,
                 combined_factor,
             )
-            quadratic = np.maximum(quadratic - correction, 0.0)
+            quadratic = nonnegative_woodbury_quadratic(
+                quadratic,
+                correction,
+                dimension=self.observation_count,
+                name="prepared joint Gaussian Woodbury quadratic",
+            )
             log_determinant += low_rank_log_determinant
         elif self.shared_whitened_factor is not None:
             low_rank_cholesky = self.shared_low_rank_cholesky
@@ -840,7 +887,12 @@ class _PreparedJointGaussianBaseSolver:
                 whitened_projection,
                 whitened_projection,
             )
-            quadratic = np.maximum(quadratic - correction, 0.0)
+            quadratic = nonnegative_woodbury_quadratic(
+                quadratic,
+                correction,
+                dimension=self.observation_count,
+                name="prepared shared Woodbury quadratic",
+            )
             log_determinant += self.shared_low_rank_log_determinant
 
         result = -0.5 * (
