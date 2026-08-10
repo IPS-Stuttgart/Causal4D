@@ -11,7 +11,9 @@ from causal4d.controlled_latent_contact_sbc import (
 from causal4d.simulation_calibration import SimulationCalibrationResult
 
 
-def _result(*, trials: int, seed: int, counts: tuple[int, int]) -> SimulationCalibrationResult:
+def _result(
+    *, trials: int, seed: int, counts: tuple[int, int]
+) -> SimulationCalibrationResult:
     parameter_histograms = (counts, counts, counts)
     return SimulationCalibrationResult(
         trial_count=trials,
