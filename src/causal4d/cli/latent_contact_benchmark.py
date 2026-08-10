@@ -7,6 +7,8 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
+from causal4d.artifact_io import read_regular_file
+from causal4d.atomic_io import atomic_write_json
 from causal4d.benchmark import CounterfactualBenchmarkConfig
 from causal4d.contact_evaluation import (
     run_latent_contact_benchmark,
@@ -117,13 +119,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.sbc_output_json
             else Path(args.output_dir) / "sbc.json"
         )
-        sbc_path.parent.mkdir(parents=True, exist_ok=True)
-        sbc_path.write_text(
-            json.dumps(sbc, indent=2, sort_keys=True, allow_nan=False) + "\n",
-            encoding="utf-8",
-        )
+        atomic_write_json(sbc_path, sbc)
+        sbc_snapshot = read_regular_file(sbc_path, name="SBC result")
         summary["sbc"] = {
             "path": str(sbc_path.resolve()),
+            "sha256": sbc_snapshot.sha256,
+            "byte_count": sbc_snapshot.byte_count,
+            "configuration": {
+                "seeds": seeds,
+                "trials_per_fold": args.sbc_trials_per_fold,
+                "bin_count": args.sbc_bins,
+                "benchmark": benchmark_config.as_dict(),
+                "contact": contact_config.as_dict(),
+            },
             "aggregate": sbc["aggregate"],
             "interpretation": sbc["interpretation"],
         }
