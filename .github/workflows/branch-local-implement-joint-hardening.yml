@@ -41,7 +41,8 @@ jobs:
             tests/test_low_rank_numerics.py \
             tests/test_joint_observation_selector_grouping.py
           python -m ruff check .
-          python -m mypy src/causal4d/low_rank_numerics.py
+          python -m mypy --python-version 3.12 \
+            src/causal4d/low_rank_numerics.py
       - name: Run focused and complete tests
         run: |
           python -m pytest -q \
