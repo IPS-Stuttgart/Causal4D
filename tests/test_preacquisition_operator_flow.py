@@ -96,14 +96,20 @@ def _source_decision() -> dict:
     return decision
 
 
-def test_source_action_inserts_preflight_and_independent_review() -> None:
+def test_source_action_inserts_staging_preflight_and_independent_review() -> None:
     result = operator_flow.enrich_preacquisition_next_action(_source_decision())
 
     action = result["action"]
-    assert result["schema_version"] == 2
-    assert result["operator_flow_schema_version"] == 1
+    assert result["schema_version"] == 3
+    assert result["operator_flow_schema_version"] == 2
     assert action["after_completion_argv"] is None
     assert action["after_completion_text"] is None
+    assert action["staged_manifest_build_argv"][3] == "source-panel-stage"
+    assert action["staged_manifest_build_argv"].count("--artifact") == 1
+    assert action["staged_manifest_path"].endswith(
+        "staging/source-lift_high-r1.json"
+    )
+    assert "Repeat --artifact" in action["staged_manifest_build_note"]
     assert action["post_acquisition_verification_argv"][3] == (
         "source-panel-verify-staged"
     )
@@ -115,11 +121,13 @@ def test_source_action_inserts_preflight_and_independent_review() -> None:
     assert action["claim_bearing_publication_argv"][3] == "source-panel-publish"
     assert action["operator_sequence"] == [
         "acquire_registered_source_execution",
+        "build_staged_manifest_from_registered_template_and_artifact_bytes",
         "verify_staged_manifest_and_artifacts",
         "independent_review_of_preflight_report",
         "publish_exactly_once",
         "recompute_next_action",
     ]
+    assert action["staged_manifest_path"] in action["output_paths"]
     assert action["preflight_report_path"] in action["output_paths"]
     assert result["evidence_sha256"] == next_action_evidence_sha256(result)
     assert result["status_sha256"] == next_action_status_sha256(result)
@@ -139,6 +147,8 @@ def test_non_source_action_gets_explicit_empty_publication_boundary() -> None:
     result = operator_flow.enrich_preacquisition_next_action(decision)
 
     action = result["action"]
+    assert action["staged_manifest_build_argv"] is None
+    assert action["staged_manifest_path"] is None
     assert action["post_acquisition_verification_argv"] is None
     assert action["claim_bearing_publication_argv"] is None
     assert action["independent_review_required_before_publication"] is False
@@ -161,15 +171,17 @@ def test_source_action_requires_registered_execution_identity() -> None:
         operator_flow.enrich_preacquisition_next_action(decision)
 
 
-def test_markdown_orders_verification_before_publication() -> None:
+def test_markdown_orders_staging_verification_and_publication() -> None:
     result = operator_flow.enrich_preacquisition_next_action(_source_decision())
 
     markdown = operator_flow.render_preacquisition_operator_next_action_markdown(result)
 
+    staging = markdown.index("### Build staged manifest")
     verification = markdown.index("### Verify staged evidence")
     publication = markdown.index("### Publish after independent review")
     completion = markdown.index("### Completion check")
-    assert verification < publication < completion
+    assert staging < verification < publication < completion
+    assert "Repeat --artifact" in markdown
     assert "requires independent review" in markdown
     assert result["evidence_sha256"] in markdown
 
@@ -214,6 +226,7 @@ def test_build_wrapper_enriches_underlying_decision(
         "/data",
     )
 
+    assert result["action"]["staged_manifest_build_argv"] is not None
     assert result["action"]["post_acquisition_verification_argv"] is not None
 
 
@@ -238,4 +251,6 @@ def test_json_and_markdown_writers_are_atomic(tmp_path: Path) -> None:
     )
     assert json_path.is_file()
     assert markdown_path.is_file()
-    assert "Verify staged evidence" in markdown_path.read_text(encoding="utf-8")
+    markdown = markdown_path.read_text(encoding="utf-8")
+    assert "Build staged manifest" in markdown
+    assert "Verify staged evidence" in markdown
