@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from collections.abc import Mapping
 from copy import deepcopy
@@ -66,9 +67,17 @@ def _reject_json_constant(value: str) -> Any:
     raise ValueError(f"non-finite JSON constant is forbidden: {value}")
 
 
+def _contains_symlink_component(path: Path) -> bool:
+    candidate = path.absolute()
+    return any(component.is_symlink() for component in (candidate, *candidate.parents))
+
+
 def _read_json_mapping(path: Path, *, name: str) -> dict[str, Any]:
+    _require(
+        not _contains_symlink_component(path),
+        f"{name} contains a symlink component",
+    )
     _require(path.is_file(), f"{name} is missing")
-    _require(not path.is_symlink(), f"{name} must not be a symlink")
     payload = json.loads(
         path.read_text(encoding="utf-8"),
         parse_constant=_reject_json_constant,
@@ -181,6 +190,100 @@ def _validate_operator_record(value: Any, *, index: int) -> dict[str, Any]:
         f"operators[{index}].roles must be sorted canonically",
     )
     return record
+
+
+def validate_operator_registry_template(
+    protocol: Mapping[str, Any],
+    preacquisition_v4: Mapping[str, Any],
+    template: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Validate one unsealed registry draft without requiring it to be complete."""
+
+    _require(
+        set(template) == _REGISTRY_FIELDS,
+        "operator registry template fields differ from the registered schema",
+    )
+    _require(
+        template.get("schema_version") == OPERATOR_REGISTRY_SCHEMA_VERSION,
+        "unsupported operator registry template schema",
+    )
+    _require(
+        template.get("artifact_kind") == OPERATOR_REGISTRY_TEMPLATE_ARTIFACT_KIND,
+        "unexpected operator registry template artifact kind",
+    )
+    _require(
+        template.get("status") == "template",
+        "operator registry draft is not an unsealed template",
+    )
+    _require(
+        template.get("protocol_id") == protocol["protocol_id"],
+        "operator registry template protocol id mismatch",
+    )
+    _require(
+        template.get("protocol_design_sha256") == protocol["design_sha256"],
+        "operator registry template protocol digest mismatch",
+    )
+    _require(
+        template.get("preacquisition_plan_id") == preacquisition_v4["plan_id"],
+        "operator registry template pre-acquisition plan mismatch",
+    )
+    _require(
+        template.get("preacquisition_amendment_sha256")
+        == preacquisition_v4["amendment_sha256"],
+        "operator registry template pre-acquisition amendment mismatch",
+    )
+    _require(
+        template.get("person_identity_digest_method") == PERSON_IDENTITY_DIGEST_METHOD,
+        "operator registry template uses an unsupported identity digest method",
+    )
+    _require(
+        template.get("sealed_at_utc") is None
+        and template.get("sealed_by_operator_id") is None
+        and template.get("artifact_sha256") is None,
+        "operator registry template contains seal metadata",
+    )
+    _require(
+        template.get("target_outcomes_used") is False,
+        "target outcomes entered operator identity evidence",
+    )
+
+    operators_value = template.get("operators")
+    _require(
+        isinstance(operators_value, list),
+        "operator registry template operators must be a list",
+    )
+    records: list[dict[str, Any]] = []
+    for index, value in enumerate(operators_value):
+        _require(
+            isinstance(value, Mapping),
+            f"operators[{index}] must be an object",
+        )
+        record = dict(value)
+        roles = record.get("roles")
+        _require(
+            isinstance(roles, list),
+            f"operators[{index}].roles must be a list",
+        )
+        record["roles"] = sorted(roles)
+        records.append(_validate_operator_record(record, index=index))
+
+    operator_ids = [str(record["operator_id"]) for record in records]
+    person_digests = [str(record["person_identity_sha256"]) for record in records]
+    _require(
+        len(operator_ids) == len(set(operator_ids)),
+        "operator registry template contains duplicate operator ids",
+    )
+    _require(
+        len(person_digests) == len(set(person_digests)),
+        "operator registry template contains duplicate person identity digests",
+    )
+    return {
+        "passed": True,
+        "operator_count": len(records),
+        "populated": bool(records),
+        "target_outcomes_used": False,
+        "person_identity_digest_method": PERSON_IDENTITY_DIGEST_METHOD,
+    }
 
 
 def validate_operator_registry(
@@ -485,6 +588,43 @@ def validate_gate_approver_identity(
     return approver
 
 
+def load_operator_registry_template_prerequisite(
+    protocol: Mapping[str, Any],
+    preacquisition_v4: Mapping[str, Any],
+    dataset_root: str | Path,
+) -> dict[str, Any]:
+    """Inspect the optional unsealed registry draft without exposing identities."""
+
+    path = Path(dataset_root) / OPERATOR_REGISTRY_TEMPLATE_PATH
+    result: dict[str, Any] = {
+        "path": str(path.absolute()),
+        "present": os.path.lexists(path),
+        "valid": False,
+        "template": True,
+        "error": None,
+    }
+    if not result["present"]:
+        result["error"] = "operator_registry.template.json is missing"
+        return result
+    try:
+        template = _read_json_mapping(path, name="operator registry template")
+        result.update(
+            validate_operator_registry_template(
+                protocol,
+                preacquisition_v4,
+                template,
+            )
+        )
+        result["sha256"], result["bytes"] = _sha256_file(path)
+        result["valid"] = True
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        message = str(error).strip()
+        result["error"] = (
+            f"{type(error).__name__}: {message}" if message else type(error).__name__
+        )
+    return result
+
+
 def load_operator_registry_prerequisite(
     protocol: Mapping[str, Any],
     preacquisition_v4: Mapping[str, Any],
@@ -493,11 +633,17 @@ def load_operator_registry_prerequisite(
     """Load the canonical registry as one fail-closed acquisition prerequisite."""
 
     path = Path(dataset_root) / OPERATOR_REGISTRY_PATH
+    template_status = load_operator_registry_template_prerequisite(
+        protocol,
+        preacquisition_v4,
+        dataset_root,
+    )
     result: dict[str, Any] = {
-        "path": str(path.resolve()),
-        "present": path.is_file(),
+        "path": str(path.absolute()),
+        "present": os.path.lexists(path),
         "valid": False,
         "error": None,
+        "template_status": template_status,
     }
     if not result["present"]:
         result["error"] = "operator_registry.json is missing"
@@ -714,6 +860,7 @@ __all__ = [
     "ROLE_INDEPENDENT_VERIFIER",
     "ROLE_SOFTWARE_ENVIRONMENT_APPROVER",
     "load_operator_registry_prerequisite",
+    "load_operator_registry_template_prerequisite",
     "load_registered_operator_registry",
     "operator_registry_sha256",
     "operator_registry_template",
@@ -726,4 +873,5 @@ __all__ = [
     "validate_gate_approver_identity",
     "validate_method_freeze_operator_identity",
     "validate_operator_registry",
+    "validate_operator_registry_template",
 ]
