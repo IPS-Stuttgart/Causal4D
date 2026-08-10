@@ -219,9 +219,7 @@ def analyze_external_bridge(
                 "kind": kind,
                 "beta": beta,
                 **{
-                    key: value
-                    for key, value in metrics.items()
-                    if key != "frame_ade_m"
+                    key: value for key, value in metrics.items() if key != "frame_ade_m"
                 },
             }
             metrics_rows.append(row)

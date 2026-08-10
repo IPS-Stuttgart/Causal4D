@@ -99,16 +99,14 @@ def _horizon_svg(
     height: int = 600,
 ) -> str:
     finite_rows = [
-        row
-        for row in rows
-        if row["ade_m"] is not None and np.isfinite(row["ade_m"])
+        row for row in rows if row["ade_m"] is not None and np.isfinite(row["ade_m"])
     ]
     if not finite_rows:
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">'
             '<rect width="100%" height="100%" fill="white"/>'
             '<text x="30" y="50" font-family="sans-serif" font-size="18">'
-            'No reference trajectory supplied.</text></svg>\n'
+            "No reference trajectory supplied.</text></svg>\n"
         )
     methods: list[str] = []
     for row in finite_rows:
@@ -125,8 +123,10 @@ def _horizon_svg(
         px = margin_left + (x - minimum_x) / x_span * (
             width - margin_left - margin_right
         )
-        py = height - margin_bottom - y / maximum_y * (
-            height - margin_top - margin_bottom
+        py = (
+            height
+            - margin_bottom
+            - y / maximum_y * (height - margin_top - margin_bottom)
         )
         return px, py
 
@@ -134,16 +134,16 @@ def _horizon_svg(
     elements = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
         '<rect width="100%" height="100%" fill="white"/>',
-        f'<line x1="{margin_left}" y1="{height-margin_bottom}" x2="{width-margin_right}" y2="{height-margin_bottom}" stroke="#222"/>',
-        f'<line x1="{margin_left}" y1="{margin_top}" x2="{margin_left}" y2="{height-margin_bottom}" stroke="#222"/>',
-        f'<text x="{width/2:.1f}" y="{height-20}" text-anchor="middle" font-family="sans-serif" font-size="14">Forecast horizon [s]</text>',
-        f'<text x="20" y="{height/2:.1f}" transform="rotate(-90 20 {height/2:.1f})" text-anchor="middle" font-family="sans-serif" font-size="14">Mean point error [m]</text>',
+        f'<line x1="{margin_left}" y1="{height - margin_bottom}" x2="{width - margin_right}" y2="{height - margin_bottom}" stroke="#222"/>',
+        f'<line x1="{margin_left}" y1="{margin_top}" x2="{margin_left}" y2="{height - margin_bottom}" stroke="#222"/>',
+        f'<text x="{width / 2:.1f}" y="{height - 20}" text-anchor="middle" font-family="sans-serif" font-size="14">Forecast horizon [s]</text>',
+        f'<text x="20" y="{height / 2:.1f}" transform="rotate(-90 20 {height / 2:.1f})" text-anchor="middle" font-family="sans-serif" font-size="14">Mean point error [m]</text>',
     ]
     for tick in range(6):
         y = maximum_y * tick / 5.0
         _, py = transform(minimum_x, y)
         elements.append(
-            f'<text x="{margin_left-10}" y="{py+4:.2f}" text-anchor="end" font-family="sans-serif" font-size="11">{y:.3g}</text>'
+            f'<text x="{margin_left - 10}" y="{py + 4:.2f}" text-anchor="end" font-family="sans-serif" font-size="11">{y:.3g}</text>'
         )
     legend_y = 24
     for method_index, method in enumerate(methods):
@@ -169,8 +169,8 @@ def _horizon_svg(
             legend_x = margin_left + (method_index % 6) * 135
         elements.extend(
             (
-                f'<line x1="{legend_x}" y1="{legend_y}" x2="{legend_x+20}" y2="{legend_y}" stroke="{color}" stroke-width="2"/>',
-                f'<text x="{legend_x+25}" y="{legend_y+4}" font-family="sans-serif" font-size="10">{html.escape(method)}</text>',
+                f'<line x1="{legend_x}" y1="{legend_y}" x2="{legend_x + 20}" y2="{legend_y}" stroke="{color}" stroke-width="2"/>',
+                f'<text x="{legend_x + 25}" y="{legend_y + 4}" font-family="sans-serif" font-size="10">{html.escape(method)}</text>',
             )
         )
     elements.append("</svg>")

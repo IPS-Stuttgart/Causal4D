@@ -71,9 +71,7 @@ class ExternalReferenceTrajectory:
         if valid.shape == positions.shape[:2]:
             valid = np.repeat(valid[..., None], 3, axis=2)
         if valid.shape != positions.shape:
-            raise ValueError(
-                "reference validity must have shape (T, N) or (T, N, 3)"
-            )
+            raise ValueError("reference validity must have shape (T, N) or (T, N, 3)")
         if np.any(valid & ~np.isfinite(positions)):
             raise ValueError("valid reference coordinates must be finite")
         if not np.any(valid):

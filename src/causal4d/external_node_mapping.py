@@ -206,10 +206,10 @@ def render_external_node_mapping_svg(
         f'viewBox="0 0 {width} {height}">',
         '<rect width="100%" height="100%" fill="white"/>',
         f'<text x="20" y="30" font-family="sans-serif" font-size="18">'
-        f'External query-node mapping ({html.escape(projection)})</text>',
+        f"External query-node mapping ({html.escape(projection)})</text>",
         f'<text x="20" y="52" font-family="sans-serif" font-size="12">'
-        f'accepted={str(report["accepted"]).lower()}, '
-        f'max distance={report["maximum_assigned_distance_m"]:.6g} m</text>',
+        f"accepted={str(report['accepted']).lower()}, "
+        f"max distance={report['maximum_assigned_distance_m']:.6g} m</text>",
     ]
     for entry in entries:
         query_position = np.asarray(entry["query_position_m"], dtype=float)
@@ -227,7 +227,7 @@ def render_external_node_mapping_svg(
                 f'fill="{status}"/>',
                 f'<text x="{qx + 7:.3f}" y="{qy - 7:.3f}" '
                 f'font-family="sans-serif" font-size="10">'
-                f'{html.escape(str(entry["query_id"]))} → {entry["node_id"]}</text>',
+                f"{html.escape(str(entry['query_id']))} → {entry['node_id']}</text>",
             )
         )
     elements.append("</svg>")

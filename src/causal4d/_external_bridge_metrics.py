@@ -60,9 +60,7 @@ def _weighted_quantile(
     flat_weights = weights.reshape(-1).astype(np.float64)
     order = np.argsort(values, axis=0, kind="mergesort")
     sorted_values = np.take_along_axis(values, order, axis=0)
-    broadcast_weights = np.broadcast_to(
-        flat_weights.reshape(-1, 1, 1, 1), values.shape
-    )
+    broadcast_weights = np.broadcast_to(flat_weights.reshape(-1, 1, 1, 1), values.shape)
     sorted_weights = np.take_along_axis(broadcast_weights, order, axis=0)
     cumulative = np.cumsum(sorted_weights, axis=0)
     cumulative[-1] = 1.0
@@ -130,9 +128,7 @@ def _weight_diagnostics(
     positive = flat > 0.0
     if np.any(positive & (flat_prior <= 0.0)):
         raise RuntimeError("posterior placed mass outside prior support")
-    kl = float(
-        np.sum(flat[positive] * np.log(flat[positive] / flat_prior[positive]))
-    )
+    kl = float(np.sum(flat[positive] * np.log(flat[positive] / flat_prior[positive])))
     best_flat = int(np.argmax(flat))
     hypothesis_index, particle_index = np.unravel_index(best_flat, posterior.shape)
     return {
@@ -143,9 +139,7 @@ def _weight_diagnostics(
         "top_hypothesis_id": hypothesis_ids[hypothesis_index],
         "top_hypothesis_index": int(hypothesis_index),
         "top_parameter_particle_index": int(particle_index),
-        "weights_bit_identical_to_prior": bool(
-            posterior.tobytes() == prior.tobytes()
-        ),
+        "weights_bit_identical_to_prior": bool(posterior.tobytes() == prior.tobytes()),
     }
 
 
@@ -170,9 +164,11 @@ def _constant_velocity_prediction(
     previous_positions = reference.positions_m[previous, reference_node_indices]
     last_positions = reference.positions_m[last, reference_node_indices]
     velocity = (last_positions - previous_positions) / delta_t
-    prediction = last_positions[None] + (
-        query_times_s - reference.frame_times_s[last]
-    )[:, None, None] * velocity[None]
+    prediction = (
+        last_positions[None]
+        + (query_times_s - reference.frame_times_s[last])[:, None, None]
+        * velocity[None]
+    )
     prediction[:, ~np.all(valid, axis=1)] = np.nan
     return prediction
 

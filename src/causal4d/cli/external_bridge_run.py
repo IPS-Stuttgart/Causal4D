@@ -92,9 +92,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "case_id": report["case_id"],
         "doctor_warning_count": len(report["doctor"]["warnings"]),
         "evaluation_only_best_beta": report["evaluation_only_best_beta"],
-        "exact_beta_zero_fallback": report["doctor"][
-            "beta_zero_weights_bit_identical"
-        ],
+        "exact_beta_zero_fallback": report["doctor"]["beta_zero_weights_bit_identical"],
         "manifest_id": manifest["manifest_id"],
         "output_dir": str(Path(args.output_dir).resolve()),
         "reference_evaluated": reference is not None,
