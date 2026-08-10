@@ -86,10 +86,7 @@ def test_sbc_summary_binds_exact_artifact_and_configuration(
     assert summary["sbc"]["configuration"]["trials_per_fold"] == 7
     assert summary["sbc"]["configuration"]["bin_count"] == 4
     assert summary["sbc"]["configuration"]["benchmark"]["frame_count"] == 24
-    assert (
-        summary["sbc"]["configuration"]["contact"]["parameter_particle_count"]
-        == 12
-    )
+    assert summary["sbc"]["configuration"]["contact"]["parameter_particle_count"] == 12
     assert summary["sbc"]["aggregate"] == sbc["aggregate"]
     assert summary["sbc"]["interpretation"] == sbc["interpretation"]
 
