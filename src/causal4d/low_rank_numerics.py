@@ -23,7 +23,8 @@ def nonnegative_woodbury_quadratic(
     Tiny negative values can arise from floating-point roundoff and are clipped
     to zero. A negative value beyond a dimension- and scale-aware tolerance
     indicates numerical breakdown and fails closed instead of silently becoming
-    a valid likelihood.
+    a valid likelihood. The tolerance scales with the observation dimension,
+    because that controls accumulated triangular-solve and dot-product error.
     """
 
     if type(dimension) is not int or dimension < 1:
