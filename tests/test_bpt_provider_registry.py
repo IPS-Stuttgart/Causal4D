@@ -12,7 +12,7 @@ import pytest
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 _REGISTRY_PATH = _REPOSITORY_ROOT / "ci" / "bayesian_phystwin_provider_registry.json"
-_DOC_PATH = _REPOSITORY_ROOT / "docs" / "bayesian_phystwin_provider.md"
+_DOCS_ROOT = _REPOSITORY_ROOT / "docs"
 _EXPECTED_ENTRY_FIELDS = frozenset(
     {
         "module",
@@ -52,6 +52,12 @@ def _registry() -> dict[str, Any]:
     )
     assert isinstance(payload, dict)
     return payload
+
+
+def _documentation() -> str:
+    paths = sorted(_DOCS_ROOT.glob("*.md"))
+    assert paths
+    return "\n".join(path.read_text(encoding="utf-8") for path in paths)
 
 
 def test_provider_registry_schema_and_entries_are_exact() -> None:
@@ -99,7 +105,7 @@ def test_provider_registry_schema_and_entries_are_exact() -> None:
 
 def test_registry_contract_modules_and_documentation_exist() -> None:
     registry = _registry()
-    documentation = _DOC_PATH.read_text(encoding="utf-8")
+    documentation = _documentation()
     for entry in registry["modules"]:
         module = entry["module"]
         assert f"`{module}`" in documentation
@@ -114,6 +120,7 @@ def test_registry_contains_current_additive_provider_boundaries() -> None:
     modules = {entry["module"] for entry in _registry()["modules"]}
     assert "bayesian_phystwin.causal4d_artifacts_v2" in modules
     assert "bayesian_phystwin.causal4d_belief_provider_v2" in modules
+    assert "bayesian_phystwin.causal4d_belief_provider_v3" in modules
     assert "bayesian_phystwin.causal4d_tree_block_provider_v1" in modules
 
 
