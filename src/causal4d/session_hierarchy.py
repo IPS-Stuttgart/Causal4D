@@ -248,9 +248,7 @@ def infer_session_phi_hierarchy(
         for power, values in zip(powers, evidence, strict=True):
             global_log_weights += float(power) * values
         global_weights = _normalize_log_weights(global_log_weights)
-        session_joint_weights = tuple(
-            global_weights.copy() for _ in session_order
-        )
+        session_joint_weights = tuple(global_weights.copy() for _ in session_order)
         mode = "zero_variance_identity"
     else:
         log_transition = log_weights_from_probabilities(
