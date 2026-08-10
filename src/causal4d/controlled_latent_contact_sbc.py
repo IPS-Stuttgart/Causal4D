@@ -87,7 +87,9 @@ def aggregate_controlled_sbc(
         raise ValueError("all SBC folds must use the same bin count")
     bin_count = selected[0].bin_count
     parameter_count = len(selected[0].parameter_rank_histograms)
-    if any(len(result.parameter_rank_histograms) != parameter_count for result in selected):
+    if any(
+        len(result.parameter_rank_histograms) != parameter_count for result in selected
+    ):
         raise ValueError("all SBC folds must expose the same parameter dimensions")
 
     joint = np.sum(
@@ -99,7 +101,9 @@ def aggregate_controlled_sbc(
         axis=0,
     )
     parameters = np.sum(
-        np.asarray([result.parameter_rank_histograms for result in selected], dtype=int),
+        np.asarray(
+            [result.parameter_rank_histograms for result in selected], dtype=int
+        ),
         axis=0,
     )
     total_trials = int(sum(result.trial_count for result in selected))
@@ -133,9 +137,7 @@ def aggregate_controlled_sbc(
             "mean_joint_entropy": _weighted_mean(
                 selected, "mean_joint_posterior_entropy"
             ),
-            "mean_prior_joint_entropy": _weighted_mean(
-                selected, "prior_joint_entropy"
-            ),
+            "mean_prior_joint_entropy": _weighted_mean(selected, "prior_joint_entropy"),
             "mean_entropy_reduction": _weighted_mean(
                 selected, "mean_entropy_reduction"
             ),
