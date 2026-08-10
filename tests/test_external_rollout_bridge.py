@@ -119,9 +119,7 @@ def test_external_rollout_import_roundtrip_and_doctor(
     assert report["rollout_fractional_frame_indices"] == [1.0, 2.0, 3.0]
     assert report["warnings"] == []
 
-    assert (
-        rollout_import_main([str(source), str(manifest), str(canonical)]) == 0
-    )
+    assert rollout_import_main([str(source), str(manifest), str(canonical)]) == 0
     import_summary = json.loads(capsys.readouterr().out)
     assert import_summary["rollout_count"] == 2
     assert (
