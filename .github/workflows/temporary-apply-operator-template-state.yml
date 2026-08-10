@@ -39,8 +39,38 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
           test -z "$(git status --porcelain=v1)"
-          git apply --check ci/temporary-recognize-operator-template.patch
-          git apply ci/temporary-recognize-operator-template.patch
+          patch=ci/temporary-recognize-operator-template.patch
+          doc=docs/causal4d_preacquisition_next_action.md
+          git apply --check --exclude="${doc}" "${patch}"
+          git apply --exclude="${doc}" "${patch}"
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("docs/causal4d_preacquisition_next_action.md")
+          text = path.read_text(encoding="utf-8")
+          paragraph = (
+              "Operator-registry scaffolding is proposed only when both the sealed "
+              "registry and its\nregistered draft template are absent. When the "
+              "sealed registry is missing but a\nvalid unsealed template is already "
+              "present, the action advances to\n`seal_operator_registry` and remains "
+              "nonautomatable. A present malformed or\nsymlinked template yields "
+              "`stop_and_repair_invalid_evidence`; it is never silently\nreplaced or "
+              "treated as a fresh scaffold target.\n\n"
+          )
+          needle = (
+              "12. validate the freeze and begin only the first registered "
+              "confirmatory session.\n\nThe source-panel action includes"
+          )
+          replacement = (
+              "12. validate the freeze and begin only the first registered "
+              "confirmatory session.\n\n" + paragraph + "The source-panel action includes"
+          )
+          if paragraph in text:
+              raise SystemExit("documentation paragraph already exists")
+          if text.count(needle) != 1:
+              raise SystemExit("documentation insertion boundary is not unique")
+          path.write_text(text.replace(needle, replacement), encoding="utf-8")
+          PY
           git rm \
             ci/temporary-recognize-operator-template.patch \
             .github/workflows/temporary-apply-operator-template-state.yml
