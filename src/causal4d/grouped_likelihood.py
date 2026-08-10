@@ -8,9 +8,12 @@ from typing import Mapping
 
 import numpy as np
 
+from causal4d.low_rank_numerics import nonnegative_woodbury_quadratic
+from causal4d.observation_evidence import (
+    GroupedObservationEvidence,
+    ObservationGroup,
+)
 from causal4d.weighting import log_weights_from_probabilities
-
-from causal4d.observation_evidence import GroupedObservationEvidence, ObservationGroup
 
 
 @dataclass(frozen=True)
@@ -109,8 +112,7 @@ def _broadcast_additive_covariance_factor(
     factor = np.asarray(values, dtype=float)
     if factor.ndim < 2 or factor.shape[-2] != dimension or factor.shape[-1] < 1:
         raise ValueError(
-            "additive_covariance_factor_m must end in "
-            "(coordinate, positive_rank)"
+            "additive_covariance_factor_m must end in (coordinate, positive_rank)"
         )
     rank = factor.shape[-1]
     try:
@@ -203,9 +205,11 @@ def _multivariate_student_t_log_density_low_rank(
         whitened_projection,
         whitened_projection,
     )
-    covariance_quadratic = np.maximum(
-        base_quadratic - correction_quadratic,
-        0.0,
+    covariance_quadratic = nonnegative_woodbury_quadratic(
+        base_quadratic,
+        correction_quadratic,
+        dimension=dimension,
+        name="grouped Student-t Woodbury quadratic",
     )
     base_log_determinant = 2.0 * np.sum(
         np.log(np.diagonal(base_cholesky, axis1=-2, axis2=-1)),
@@ -216,9 +220,7 @@ def _multivariate_student_t_log_density_low_rank(
         axis=-1,
     )
     scale_multiplier = (
-        (degrees_of_freedom - 2.0)
-        / degrees_of_freedom
-        * covariance_multiplier
+        (degrees_of_freedom - 2.0) / degrees_of_freedom * covariance_multiplier
     )
     if not np.isfinite(scale_multiplier) or scale_multiplier <= 0.0:
         raise ValueError("Student-t covariance multiplier must be positive")
@@ -422,9 +424,7 @@ def posterior_weights_from_grouped_evidence(
         prefix_frame_count=prefix_frame_count,
         component_variance_m2=component_variance_m2,
         component_group_covariance_m2=component_group_covariance_m2,
-        component_group_covariance_factor_m=(
-            component_group_covariance_factor_m
-        ),
+        component_group_covariance_factor_m=(component_group_covariance_factor_m),
     )
     log_posterior = log_weights_from_probabilities(prior, name="prior_weights") + score
     maximum = float(np.max(log_posterior))
