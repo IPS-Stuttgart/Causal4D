@@ -110,6 +110,16 @@ Reports are strict finite JSON, loaded from exact ordinary-file bytes, and
 published atomically without overwrite by default. A changed field with a stale
 artifact identity is rejected.
 
+## Relationship to posterior scoring
+
+The optional component metrics are deterministic losses attached to finite
+posterior components. For distribution-level logarithmic, energy, variogram, or
+registered linear-query scores, evaluate each returned arm separately through
+`causal4d.posterior_scoring` and bind the resulting score-artifact identities in
+the ablation report metadata. This keeps proper-score computation separate from
+the evidence-factor attribution and prevents the ablation builder from reading
+held-out values implicitly.
+
 ## Interpretation boundary
 
 An actuator-only contraction of `phi` shows that measured realization is
