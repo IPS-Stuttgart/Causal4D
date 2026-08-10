@@ -1,0 +1,58 @@
+name: Format BayesianPhysTwin belief handoff
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: format-bpt-belief-handoff-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    if: >-
+      github.head_ref == 'agent/bpt-belief-handoff-v1' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/bpt-belief-handoff-v1
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Apply authoritative Ruff rewrite
+        run: |
+          python -m pip install ruff==0.16.2
+          python -m ruff check --fix \
+            src/causal4d/bpt_belief_handoff.py \
+            tests/test_bpt_belief_handoff.py
+          python -m ruff format \
+            src/causal4d/bpt_belief_handoff.py \
+            tests/test_bpt_belief_handoff.py
+          python -m ruff check \
+            src/causal4d/bpt_belief_handoff.py \
+            tests/test_bpt_belief_handoff.py
+          python -m ruff format --check \
+            src/causal4d/bpt_belief_handoff.py \
+            tests/test_bpt_belief_handoff.py
+          git diff --check
+      - name: Publish canonical formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/causal4d/bpt_belief_handoff.py \
+            tests/test_bpt_belief_handoff.py
+          if git diff --cached --quiet; then
+            echo "Files are already canonical."
+            exit 0
+          fi
+          git diff --cached --check
+          git commit -m "Format strict BayesianPhysTwin belief handoff"
+          git push origin HEAD:agent/bpt-belief-handoff-v1
