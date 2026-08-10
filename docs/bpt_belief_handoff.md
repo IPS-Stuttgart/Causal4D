@@ -97,6 +97,14 @@ The receipt carries two separately named quantities:
 Both must be finite values in `[0, 1]`. They are never combined or relabelled as
 one quantity.
 
+## Optional-provider boundary
+
+The handoff module is intentionally not imported by the package root. Importing
+core Causal4D therefore does not import or require BayesianPhysTwin. The provider
+type is resolved only when `bind_bayesian_phystwin_belief_handoff()` is invoked,
+so core-only installations retain the existing dependency boundary while an
+installed BayesianPhysTwin wheel is still checked at the actual handoff point.
+
 ## Scientific boundary
 
 The receipt establishes implementation, content identity, causal-prefix
