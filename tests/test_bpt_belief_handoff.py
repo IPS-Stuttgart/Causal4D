@@ -50,9 +50,7 @@ class _FakeUpdate:
 def _install_fake_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     package = ModuleType("bayesian_phystwin")
     package.__path__ = []  # type: ignore[attr-defined]
-    provider = ModuleType(
-        "bayesian_phystwin.causal4d_tree_block_provider_v1"
-    )
+    provider = ModuleType("bayesian_phystwin.causal4d_tree_block_provider_v1")
     provider.ClaimBearingTreeBlockProb4DUpdateV1 = _FakeUpdate
     monkeypatch.setitem(sys.modules, "bayesian_phystwin", package)
     monkeypatch.setitem(
@@ -362,9 +360,7 @@ def test_duplicate_or_correlated_evidence_consumption_fails_closed(
             candidate_belief=_belief(
                 offset=0.02,
                 metadata={
-                    "consumed_evidence_ledger": (
-                        first.evidence_ledger.as_dict()
-                    )
+                    "consumed_evidence_ledger": (first.evidence_ledger.as_dict())
                 },
             ),
             query_covariance=query,
@@ -410,9 +406,7 @@ def test_receipt_round_trip_and_tamper_detection(
         metadata={"purpose": "unit-test"},
     )
 
-    restored = BayesianPhysTwinBeliefHandoffReceiptV1.from_dict(
-        bound.receipt.as_dict()
-    )
+    restored = BayesianPhysTwinBeliefHandoffReceiptV1.from_dict(bound.receipt.as_dict())
     assert restored.as_dict() == bound.receipt.as_dict()
     assert restored.receipt_id == bound.receipt.receipt_id
 

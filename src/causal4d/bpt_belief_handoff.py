@@ -181,9 +181,7 @@ def _ledger_from_metadata(
     try:
         return ConsumedEvidenceLedgerV1.from_dict(payload)
     except (TypeError, ValueError) as error:
-        raise ValueError(
-            "belief embeds an invalid consumed-evidence ledger"
-        ) from error
+        raise ValueError("belief embeds an invalid consumed-evidence ledger") from error
 
 
 def _validate_ledger_for_belief(
@@ -384,9 +382,7 @@ class BayesianPhysTwinBeliefHandoffReceiptV1:
             "raw_prob4d_reinterpreted": self.raw_prob4d_reinterpreted,
             "evidence_ledger_id": self.evidence_ledger_id,
             "bpt_truncation_mass": self.bpt_truncation_mass,
-            "causal4d_support_reduction_mass": (
-                self.causal4d_support_reduction_mass
-            ),
+            "causal4d_support_reduction_mass": (self.causal4d_support_reduction_mass),
             "metadata": plain_json(self.metadata),
             "claim_boundary": BPT_BELIEF_HANDOFF_CLAIM_BOUNDARY,
         }
@@ -435,9 +431,7 @@ class BayesianPhysTwinBeliefHandoffReceiptV1:
             raw_prob4d_reinterpreted=fields["raw_prob4d_reinterpreted"],
             evidence_ledger_id=fields["evidence_ledger_id"],
             bpt_truncation_mass=fields["bpt_truncation_mass"],
-            causal4d_support_reduction_mass=fields[
-                "causal4d_support_reduction_mass"
-            ],
+            causal4d_support_reduction_mass=fields["causal4d_support_reduction_mass"],
             metadata=fields["metadata"],
         )
         if fields["receipt_id"] != receipt.receipt_id:
@@ -462,9 +456,7 @@ class BoundBayesianPhysTwinBeliefV1:
             self.receipt,
             BayesianPhysTwinBeliefHandoffReceiptV1,
         ):
-            raise TypeError(
-                "receipt must be BayesianPhysTwinBeliefHandoffReceiptV1"
-            )
+            raise TypeError("receipt must be BayesianPhysTwinBeliefHandoffReceiptV1")
         if self.belief.artifact_id != self.receipt.delivered_belief_id:
             raise ValueError("delivered belief and handoff receipt identities differ")
         if self.evidence_ledger.artifact_id != self.receipt.evidence_ledger_id:
@@ -643,9 +635,7 @@ def bind_bayesian_phystwin_belief_handoff(
                 "tree_block_result_id": update.tree_block_result_id,
                 "linearization_artifact_id": update.linearization_artifact_id,
                 "provider_manifest_id": update.provider_manifest_id,
-                "calibration_artifact_ids": dict(
-                    update.calibration_artifact_ids
-                ),
+                "calibration_artifact_ids": dict(update.calibration_artifact_ids),
                 "runtime_revision_source": update.runtime_revision_source,
                 "query_covariance_result_id": query_covariance.result_id,
             },
@@ -665,9 +655,7 @@ def bind_bayesian_phystwin_belief_handoff(
         exact_baseline = False
     else:
         if query_covariance is not None:
-            raise ValueError(
-                "rejected update must not consume observation covariance"
-            )
+            raise ValueError("rejected update must not consume observation covariance")
         if candidate_belief.artifact_id != baseline_belief.artifact_id:
             raise ValueError("rejected update must retain the exact baseline belief")
         next_ledger = ledger
