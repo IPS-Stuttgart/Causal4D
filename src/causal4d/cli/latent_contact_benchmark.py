@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
+import sys
 from collections.abc import Sequence
+from importlib import metadata
 from pathlib import Path
 
+from causal4d.atomic_io import atomic_write_json
 from causal4d.benchmark import CounterfactualBenchmarkConfig
 from causal4d.contact_evaluation import (
     run_latent_contact_benchmark,
@@ -32,6 +37,39 @@ def _parse_seeds(value: str) -> list[int]:
     if not seeds:
         raise argparse.ArgumentTypeError("at least one seed is required")
     return seeds
+
+
+def _sbc_producer_identity() -> dict[str, str]:
+    try:
+        package_version = metadata.version("causal4d")
+    except metadata.PackageNotFoundError:
+        package_version = "unknown"
+    source_path = Path(run_controlled_latent_contact_sbc.__code__.co_filename).resolve()
+    source_digest = hashlib.sha256(source_path.read_bytes()).hexdigest()
+    return {
+        "distribution": "causal4d",
+        "version": package_version,
+        "module": "causal4d.controlled_latent_contact_sbc",
+        "module_sha256": source_digest,
+    }
+
+
+def _report_existing_sbc_output(path: Path) -> int:
+    print(
+        json.dumps(
+            {
+                "error": (
+                    "SBC output already exists; pass --overwrite-sbc-output "
+                    "to replace it explicitly"
+                ),
+                "path": str(path.absolute()),
+            },
+            indent=2,
+            sort_keys=True,
+        ),
+        file=sys.stderr,
+    )
+    return 2
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -69,6 +107,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="optional SBC JSON path; defaults to OUTPUT_DIR/sbc.json",
     )
     parser.add_argument(
+        "--overwrite-sbc-output",
+        action="store_true",
+        help=(
+            "replace an existing SBC JSON explicitly; default publication is once-only"
+        ),
+    )
+    parser.add_argument(
         "--require-gates",
         action="store_true",
         help="return status 2 when any pre-registered milestone gate fails",
@@ -80,6 +125,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.sbc_trials_per_fold < 0:
         raise ValueError("sbc-trials-per-fold must be nonnegative")
+    sbc_path: Path | None = None
+    if args.sbc_trials_per_fold:
+        sbc_path = (
+            Path(args.sbc_output_json)
+            if args.sbc_output_json
+            else Path(args.output_dir) / "sbc.json"
+        )
+        if os.path.lexists(sbc_path) and not args.overwrite_sbc_output:
+            return _report_existing_sbc_output(sbc_path)
+
     benchmark_config = CounterfactualBenchmarkConfig(
         frame_count=args.frames,
         training_repeats=args.training_repeats,
@@ -105,6 +160,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "artifacts": paths,
     }
     if args.sbc_trials_per_fold:
+        assert sbc_path is not None
         sbc = run_controlled_latent_contact_sbc(
             seeds=seeds,
             trials_per_fold=args.sbc_trials_per_fold,
@@ -112,20 +168,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             benchmark_config=benchmark_config,
             contact_config=contact_config,
         )
-        sbc_path = (
-            Path(args.sbc_output_json)
-            if args.sbc_output_json
-            else Path(args.output_dir) / "sbc.json"
-        )
-        sbc_path.parent.mkdir(parents=True, exist_ok=True)
-        sbc_path.write_text(
-            json.dumps(sbc, indent=2, sort_keys=True, allow_nan=False) + "\n",
-            encoding="utf-8",
-        )
+        sbc["producer"] = _sbc_producer_identity()
+        try:
+            atomic_write_json(
+                sbc_path,
+                sbc,
+                overwrite=args.overwrite_sbc_output,
+            )
+        except FileExistsError:
+            return _report_existing_sbc_output(sbc_path)
         summary["sbc"] = {
             "path": str(sbc_path.resolve()),
             "aggregate": sbc["aggregate"],
             "interpretation": sbc["interpretation"],
+            "producer": sbc["producer"],
         }
     print(json.dumps(summary, indent=2, sort_keys=True))
     if args.require_gates and not result["success_gates"]["overall_passed"]:

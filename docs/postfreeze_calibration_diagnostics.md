@@ -13,7 +13,7 @@ They address two questions that remain useful after the primary method is frozen
 2. can graph discrepancy uncertainty grow with horizon without fitting one dense
    cross-mode transition matrix that may become unstable or transfer poorly?
 
-Neither diagnostic is a substitute for the independent-execution calibration gate.
+Neither diagnostic substitutes for the independent-execution calibration gate.
 
 ## Simulation-based calibration
 
@@ -54,13 +54,13 @@ When `likelihood_power=1`, `dynamic_likelihood_weight=0`, and the simulated
 observation standard deviation equals `likelihood_scale_m`, the experiment is an
 exact self-consistency check for the finite independent-Gaussian prefix likelihood.
 Approximately uniform randomized ranks are then expected up to Monte Carlo error.
-Changing the likelihood power, adding derivative terms, or deliberately mismatching
+Changing likelihood power, adding derivative terms, or deliberately mismatching
 noise creates a sensitivity diagnostic rather than an exact SBC null.
 
 ### Controlled benchmark command
 
 The leave-one-topology benchmark can run the exact self-consistency diagnostic in
-one invocation without changing the benchmark defaults:
+one invocation without changing benchmark defaults:
 
 ```bash
 causal4d benchmark latent-contact \
@@ -70,15 +70,38 @@ causal4d benchmark latent-contact \
   --output-dir runs/causal4d-latent-contact-v1
 ```
 
-The normal benchmark artifacts are unchanged. The opt-in SBC result is written to
-`OUTPUT_DIR/sbc.json` unless `--sbc-output-json` is supplied. Each seed contains
-three leave-one-topology-out folds. The target object's physical-parameter posterior
-is fitted from its training/validation interactions, the contact prior is learned
-from the other two topologies exactly as in the controlled latent-contact study, and
-SBC truths are then sampled from that finite bank's own declared joint prior.
+The normal benchmark artifacts are unchanged. The opt-in SBC result is published
+atomically to `OUTPUT_DIR/sbc.json` unless `--sbc-output-json` is supplied. The
+command refuses to replace an existing SBC artifact by default and performs that
+check before running the expensive benchmark. Replacement requires the explicit
+flag:
 
-`causal4d.controlled_latent_contact_sbc.run_controlled_latent_contact_sbc` exposes the
-same operation as a Python API. The aggregate report sums rank histograms across
+```bash
+causal4d benchmark latent-contact \
+  --seeds 0:5 \
+  --sbc-trials-per-fold 5000 \
+  --sbc-output-json runs/controlled-sbc.json \
+  --overwrite-sbc-output
+```
+
+The no-overwrite publication is race-safe: a destination created after the initial
+check still causes a clean failure rather than replacement. JSON serialization
+forbids non-finite values and the atomic writer does not leave a partial destination
+on process or machine failure.
+
+Every saved result contains a `producer` object with the Causal4D distribution and
+version, the runtime diagnostic module name, and the SHA-256 of the exact loaded
+module bytes. This supplements the benchmark configuration and seed inventory with
+a direct implementation identity.
+
+Each seed contains three leave-one-topology-out folds. The target object's
+physical-parameter posterior is fitted from its training/validation interactions,
+the contact prior is learned from the other two topologies exactly as in the
+controlled latent-contact study, and SBC truths are sampled from that finite bank's
+own declared joint prior.
+
+`causal4d.controlled_latent_contact_sbc.run_controlled_latent_contact_sbc` exposes
+the same operation as a Python API. The aggregate report sums rank histograms across
 folds and uses trial-count weighting for posterior summaries; it never relabels
 folds, frames, points, or coordinates as independent physical executions.
 
@@ -93,8 +116,8 @@ its own controlled model. It does **not** establish:
 - calibrated physical deployment uncertainty; or
 - Prob4D/BayesianPhysTwin provider competence.
 
-This distinction is useful for the current Causal4D failure attribution: if SBC is
-well behaved while real coverage remains poor, the remaining evidence points toward
+This distinction is useful for current Causal4D failure attribution: if SBC is well
+behaved while real coverage remains poor, the remaining evidence points toward
 model/discrepancy shift rather than a basic finite-posterior implementation error.
 
 ## Mode-wise graph discrepancy dynamics
@@ -145,12 +168,12 @@ mean, variance = forecast_modewise_graph_discrepancy(
 The forecast starts with zero latent-coefficient uncertainty at the last observed
 prefix coefficient and recursively accumulates per-mode innovation variance. The
 existing projection variance remains as an irreducible node-coordinate floor. This
-therefore produces explicit horizon-dependent uncertainty without requiring a dense
-cross-mode covariance transition.
+produces explicit horizon-dependent uncertainty without requiring a dense cross-mode
+covariance transition.
 
 ### Real diagnostic comparison
 
-The existing graph-discrepancy command now evaluates all five arms in one evidence
+The existing graph-discrepancy command evaluates all five arms in one evidence
 bundle:
 
 ```text
@@ -186,7 +209,7 @@ For any future post-freeze study, compare at least:
 - the existing dense learned graph transition; and
 - mode-wise stochastic dynamics with a source-frozen persistence prior.
 
-Select the prior weight and any retention bounds using controlled/source data only.
+Select the prior weight and retention bounds using controlled/source data only.
 Report held-out trajectory accuracy, proper scores, horizon coverage, interval width,
 worst-group coverage, and the full negative result when persistence still wins.
 
