@@ -63,7 +63,8 @@ registered draft template are absent. When the sealed registry is missing but a
 valid unsealed template is already present, the action advances to
 `seal_operator_registry` and remains nonautomatable. A present malformed or
 symlinked template yields `stop_and_repair_invalid_evidence`; it is never silently
-replaced or treated as a fresh scaffold target.
+replaced or treated as a fresh scaffold target. The draft itself is operational
+state, not a governed approval.
 
 The source-panel action includes the exact execution ID, session ID, command profile,
 manifest template, fixed staging destination, preflight path, review-receipt path,
