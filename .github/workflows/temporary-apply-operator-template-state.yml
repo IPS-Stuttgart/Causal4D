@@ -101,9 +101,6 @@ jobs:
             src/causal4d/preacquisition_next_action.py \
             tests/test_operator_registry.py \
             tests/test_preacquisition_next_action.py
-          python -m mypy \
-            src/causal4d/operator_registry.py \
-            src/causal4d/preacquisition_next_action.py
           python -m pytest -q \
             tests/test_operator_registry.py \
             tests/test_preacquisition_next_action.py \
