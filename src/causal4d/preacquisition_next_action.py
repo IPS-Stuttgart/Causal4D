@@ -11,6 +11,10 @@ from pathlib import Path
 from typing import Any
 
 from causal4d.atomic_io import atomic_write_json, atomic_write_text
+from causal4d.operator_registry import (
+    OPERATOR_REGISTRY_PATH,
+    OPERATOR_REGISTRY_TEMPLATE_PATH,
+)
 from causal4d.preacquisition_readiness import build_preacquisition_readiness
 from causal4d.preacquisition_readiness_contracts import (
     GATE_PATHS,
@@ -302,11 +306,32 @@ def _derive_action(
 
     registry = readiness.get("prerequisites", {}).get("operator_registry", {})
     if _pending(readiness, "prerequisites", "operator_registry"):
-        template = str(root / "preacquisition/operator_registry.template.json")
+        template = str(root / OPERATOR_REGISTRY_TEMPLATE_PATH)
+        template_status = registry.get("template_status", {})
+        if template_status.get("present") and not template_status.get("valid"):
+            template_error = template_status.get("error")
+            blockers = ["operator_registry_template_invalid"]
+            if isinstance(template_error, str) and template_error:
+                blockers.append(template_error)
+            return _action(
+                "stop_and_repair_invalid_evidence",
+                "Stop and repair the invalid operator registry template",
+                "principal_investigator_and_independent_verifier",
+                category="invalid_evidence",
+                command=_readiness(
+                    "status",
+                    repository,
+                    dataset,
+                    "--verify-file-hashes",
+                ),
+                completion=next_check,
+                inputs=[template],
+                blockers=blockers,
+            )
         operation = (
-            "scaffold-operator-registry"
-            if not registry.get("present")
-            else "seal-operator-registry"
+            "seal-operator-registry"
+            if template_status.get("valid") is True
+            else "scaffold-operator-registry"
         )
         arguments: list[object] = [repository, dataset]
         if operation == "seal-operator-registry":
@@ -328,7 +353,7 @@ def _derive_action(
             outputs=[
                 template
                 if operation.startswith("scaffold")
-                else str(root / "preacquisition/operator_registry.json")
+                else str(root / OPERATOR_REGISTRY_PATH)
             ],
             automatable=operation.startswith("scaffold"),
         )

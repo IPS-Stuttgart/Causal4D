@@ -19,6 +19,7 @@ from causal4d.operator_registry import (
     ROLE_GATE_APPROVER,
     ROLE_INDEPENDENT_VERIFIER,
     ROLE_SOFTWARE_ENVIRONMENT_APPROVER,
+    load_operator_registry_prerequisite,
     operator_registry_sha256,
     operator_registry_template,
     require_distinct_operator_people,
@@ -152,7 +153,9 @@ def test_person_level_independence_rejects_two_alias_ids() -> None:
         require_distinct_operator_people(
             first,
             alias,
-            relationship="method freeze must be verified by a distinct registered person",
+            relationship=(
+                "method freeze must be verified by a distinct registered person"
+            ),
         )
 
 
@@ -211,6 +214,54 @@ def test_software_environment_approval_has_an_independent_role() -> None:
             registry,
             freezer_person_identity_sha256="1" * 64,
         )
+
+
+def test_registry_prerequisite_reports_a_valid_existing_template(
+    tmp_path: Path,
+) -> None:
+    protocol, v4 = _registered_values()
+    template_path = tmp_path / OPERATOR_REGISTRY_TEMPLATE_PATH
+    template_path.parent.mkdir(parents=True)
+    template_path.write_text(
+        json.dumps(operator_registry_template(protocol, v4)),
+        encoding="utf-8",
+    )
+
+    result, registry = load_operator_registry_prerequisite(
+        protocol,
+        v4,
+        tmp_path,
+    )
+
+    assert registry is None
+    assert result["present"] is False
+    assert result["template_status"]["present"] is True
+    assert result["template_status"]["valid"] is True
+    assert result["template_status"]["operator_count"] == 0
+    assert result["template_status"]["target_outcomes_used"] is False
+
+
+def test_registry_prerequisite_reports_an_invalid_existing_template(
+    tmp_path: Path,
+) -> None:
+    protocol, v4 = _registered_values()
+    template = operator_registry_template(protocol, v4)
+    template["target_outcomes_used"] = True
+    template_path = tmp_path / OPERATOR_REGISTRY_TEMPLATE_PATH
+    template_path.parent.mkdir(parents=True)
+    template_path.write_text(json.dumps(template), encoding="utf-8")
+
+    result, registry = load_operator_registry_prerequisite(
+        protocol,
+        v4,
+        tmp_path,
+    )
+
+    assert registry is None
+    assert result["present"] is False
+    assert result["template_status"]["present"] is True
+    assert result["template_status"]["valid"] is False
+    assert "target outcomes" in result["template_status"]["error"]
 
 
 def test_registry_scaffold_and_seal_are_non_overwriting(

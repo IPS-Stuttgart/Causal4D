@@ -58,6 +58,13 @@ action from this sequence:
 11. run the final hash-verified readiness gate; and
 12. validate the freeze and begin only the first registered confirmatory session.
 
+Operator-registry scaffolding is proposed only when both the sealed registry and its
+registered draft template are absent. When the sealed registry is missing but a
+valid unsealed template is already present, the action advances to
+`seal_operator_registry` and remains nonautomatable. A present malformed or
+symlinked template yields `stop_and_repair_invalid_evidence`; it is never silently
+replaced or treated as a fresh scaffold target.
+
 The source-panel action includes the exact execution ID, session ID, command profile,
 manifest template, fixed staging destination, preflight path, review-receipt path,
 and exactly-once publication command. It never skips ahead or selects a different

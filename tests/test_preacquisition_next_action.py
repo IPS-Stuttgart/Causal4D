@@ -147,6 +147,60 @@ def test_missing_operator_registry_precedes_physical_work() -> None:
     assert decision["action"]["physical_acquisition_required"] is False
 
 
+def test_existing_operator_registry_template_advances_to_human_seal() -> None:
+    readiness = _readiness()
+    readiness["prerequisites"]["operator_registry"] = {
+        **_prerequisite(present=False, valid=False),
+        "template_status": {
+            "path": "/data/run/preacquisition/operator_registry.template.json",
+            "present": True,
+            "valid": True,
+            "template": True,
+            "error": None,
+            "operator_count": 0,
+        },
+    }
+    readiness["missing_prerequisites"] = ["operator_registry"]
+
+    decision = _derive(readiness, _source_panel())
+
+    action = decision["action"]
+    assert decision["valid"] is True
+    assert action["action_id"] == "seal_operator_registry"
+    assert action["automatable"] is False
+    assert action["physical_acquisition_required"] is False
+    assert action["input_paths"] == [
+        "/data/run/preacquisition/operator_registry.template.json"
+    ]
+    assert action["output_paths"] == ["/data/run/preacquisition/operator_registry.json"]
+
+
+def test_invalid_operator_registry_template_requires_repair() -> None:
+    readiness = _readiness()
+    readiness["prerequisites"]["operator_registry"] = {
+        **_prerequisite(present=False, valid=False),
+        "template_status": {
+            "path": "/data/run/preacquisition/operator_registry.template.json",
+            "present": True,
+            "valid": False,
+            "template": True,
+            "error": "ValueError: protocol digest mismatch",
+        },
+    }
+    readiness["missing_prerequisites"] = ["operator_registry"]
+
+    decision = _derive(readiness, _source_panel())
+
+    action = decision["action"]
+    assert decision["valid"] is False
+    assert action["action_id"] == "stop_and_repair_invalid_evidence"
+    assert action["automatable"] is False
+    assert action["blocking_items"] == [
+        "operator_registry_template_invalid",
+        "ValueError: protocol digest mismatch",
+    ]
+
+
 def test_malformed_evidence_precedes_missing_operator_registry() -> None:
     readiness = _readiness()
     readiness["prerequisites"]["operator_registry"] = _prerequisite(
