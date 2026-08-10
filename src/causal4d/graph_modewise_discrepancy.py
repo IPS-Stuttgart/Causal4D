@@ -86,9 +86,7 @@ class ModewiseGraphDynamics:
             "minimum_retention": float(self.minimum_retention),
             "maximum_retention": float(self.maximum_retention),
             "fit_transition_count": int(self.fit_transition_count),
-            "innovation_variance_floor_m2": float(
-                self.innovation_variance_floor_m2
-            ),
+            "innovation_variance_floor_m2": float(self.innovation_variance_floor_m2),
         }
 
 
