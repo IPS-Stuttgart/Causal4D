@@ -95,6 +95,43 @@ underlying generic importer also supports camera coordinates, `m`/`cm`/`mm`,
 `PFC`/`FPC`/`KPFC`/`KFPC` layouts, explicit frame indices, and coordinate-level
 validity; see [`docs/external_forecast_import.md`](../../docs/external_forecast_import.md).
 
+## Import rollouts from an existing simulator
+
+The simulator can remain in its own environment and only needs to export one
+non-pickled NPZ:
+
+```python
+np.savez_compressed(
+    "producer_rollouts.npz",
+    node_ids=node_ids,                         # [N]
+    trajectories_world_m=trajectories_world_m, # [R,T,N,3]
+    rollout_weights=rollout_weights,           # [R]
+    frame_times_s=frame_times_s,                # [T], includes t0
+    rollout_ids=rollout_ids,                    # [R], optional
+    parameter_values=parameter_values,          # [R,D], optional
+)
+```
+
+Copy and edit `external_rollout_manifest_v1.json`, then run:
+
+```bash
+python -m causal4d.cli.external_rollout_import \
+  producer_rollouts.npz \
+  external_rollout_manifest.json \
+  canonical_rollout_bank.npz
+
+python -m causal4d.cli.external_bridge_doctor \
+  canonical_forecast.npz \
+  canonical_rollout_bank.npz \
+  instruction \
+  bridge_doctor.json
+```
+
+The doctor checks node identities, time overlap, anchor alignment, motion scale,
+and the byte-identical zero-semantic-weight fallback before any positive
+reweighting is attempted. See
+[`docs/external_rollout_import.md`](../../docs/external_rollout_import.md).
+
 ## Generate the physical posterior
 
 BayesianPhysTwin supplies uncertain state/parameter particles and PhysTwin/Warp
