@@ -48,8 +48,7 @@ BAYESIAN_PHYSTWIN_BELIEF_V3_COMPONENT_PRIOR = (
     "probabilities override family balancing"
 )
 BAYESIAN_PHYSTWIN_BELIEF_V3_EVIDENCE_POOLING = (
-    "per-track by default; object-pooled weights are an explicit source-frozen "
-    "option"
+    "per-track by default; object-pooled weights are an explicit source-frozen option"
 )
 BAYESIAN_PHYSTWIN_BELIEF_V3_RAW_COVARIANCE_CLAIM = (
     "model-based predictive covariance including within-component uncertainty "
@@ -76,9 +75,7 @@ def load_bayesian_phystwin_belief_provider_v3_manifest(
         causal4d_belief_provider_v3_manifest,
     )
 
-    values = causal4d_belief_provider_v3_manifest(
-        provider_revision=provider_revision
-    )
+    values = causal4d_belief_provider_v3_manifest(provider_revision=provider_revision)
     manifest = PhysicalBeliefProviderManifest.from_provider_descriptor(values)
     if (
         provider_revision is not None
@@ -100,12 +97,8 @@ def _validate_belief_provider_v3_metadata(
         "compatibility": BAYESIAN_PHYSTWIN_BELIEF_V3_COMPATIBILITY,
         "component_prior": BAYESIAN_PHYSTWIN_BELIEF_V3_COMPONENT_PRIOR,
         "evidence_pooling": BAYESIAN_PHYSTWIN_BELIEF_V3_EVIDENCE_POOLING,
-        "raw_covariance_claim": (
-            BAYESIAN_PHYSTWIN_BELIEF_V3_RAW_COVARIANCE_CLAIM
-        ),
-        "recursive_stream_claim": (
-            BAYESIAN_PHYSTWIN_BELIEF_V3_RECURSIVE_STREAM_CLAIM
-        ),
+        "raw_covariance_claim": (BAYESIAN_PHYSTWIN_BELIEF_V3_RAW_COVARIANCE_CLAIM),
+        "recursive_stream_claim": (BAYESIAN_PHYSTWIN_BELIEF_V3_RECURSIVE_STREAM_CLAIM),
     }
     mismatches = {}
     for name, value in expected.items():
