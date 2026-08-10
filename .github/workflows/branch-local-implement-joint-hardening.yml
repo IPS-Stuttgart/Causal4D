@@ -1,0 +1,63 @@
+name: Branch-local joint hardening implementation
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    if: github.head_ref == 'agent/harden-joint-covariance-numerics'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out the pull-request head branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Apply the scoped patch and remove branch-local automation
+        run: |
+          python scripts/ci/apply_joint_covariance_hardening.py
+          rm \
+            .github/workflows/branch-local-implement-joint-hardening.yml \
+            .github/workflows/implement-joint-covariance-hardening.yml \
+            scripts/ci/apply_joint_covariance_hardening.py
+      - name: Install development environment
+        run: python -m pip install -e ".[dev]"
+      - name: Format, lint, and type-check
+        run: |
+          python -m ruff format \
+            src/causal4d/low_rank_numerics.py \
+            src/causal4d/joint_observation.py \
+            src/causal4d/grouped_likelihood.py \
+            tests/test_low_rank_numerics.py \
+            tests/test_joint_observation_selector_grouping.py
+          python -m ruff check .
+          python -m mypy src/causal4d/low_rank_numerics.py
+      - name: Run focused and complete tests
+        run: |
+          python -m pytest -q \
+            tests/test_low_rank_numerics.py \
+            tests/test_joint_observation_selector_grouping.py \
+            tests/test_joint_observation.py \
+            tests/test_joint_observation_adversarial.py \
+            tests/test_joint_observation_metamorphic.py \
+            tests/test_prepared_joint_observation.py \
+            tests/test_grouped_likelihood_low_rank.py
+          python -m pytest -q
+      - name: Commit and push the validated implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Harden joint covariance numerics"
+          git push origin HEAD:${{ github.head_ref }}
