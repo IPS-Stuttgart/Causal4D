@@ -50,13 +50,16 @@ def test_energy_and_variogram_detect_dependence() -> None:
         np.asarray([[0, 1]]),
         np.asarray([1.0]),
     ) == pytest.approx(0.0)
-    assert weighted_variogram_score(
-        anticorrelated,
-        weights,
-        truth,
-        np.asarray([[0, 1]]),
-        np.asarray([1.0]),
-    ) > 0.0
+    assert (
+        weighted_variogram_score(
+            anticorrelated,
+            weights,
+            truth,
+            np.asarray([[0, 1]]),
+            np.asarray([1.0]),
+        )
+        > 0.0
+    )
 
 
 def test_gaussian_log_score_uses_full_covariance() -> None:

@@ -102,9 +102,7 @@ class OrderedVarianceAttributionV1:
             "artifact_kind": "OrderedVarianceAttribution",
             "contributions": [value.as_dict() for value in self.contributions],
             "between_component_variance_m2": self.between_component_variance_m2,
-            "conditional_readout_variance_m2": (
-                self.conditional_readout_variance_m2
-            ),
+            "conditional_readout_variance_m2": (self.conditional_readout_variance_m2),
             "total_mean_coordinate_variance_m2": (
                 self.total_mean_coordinate_variance_m2
             ),
@@ -320,26 +318,18 @@ class TrajectoryPosteriorScoreV1:
             "truth_sha256": self.truth_sha256,
             "exact_component_energy_score_m": self.exact_component_energy_score_m,
             "sampled_mixture_energy_score_m": self.sampled_mixture_energy_score_m,
-            "exact_component_variogram_score": (
-                self.exact_component_variogram_score
-            ),
-            "sampled_mixture_variogram_score": (
-                self.sampled_mixture_variogram_score
-            ),
+            "exact_component_variogram_score": (self.exact_component_variogram_score),
+            "sampled_mixture_variogram_score": (self.sampled_mixture_variogram_score),
             "variogram_order": self.variogram_order,
             "variogram_score_unit_power_m": 2.0 * self.variogram_order,
             "component_count": self.component_count,
             "selected_coordinate_count": self.selected_coordinate_count,
             "variogram_pair_count": self.variogram_pair_count,
-            "conditional_draws_per_component": (
-                self.conditional_draws_per_component
-            ),
+            "conditional_draws_per_component": (self.conditional_draws_per_component),
             "random_seed": self.random_seed,
             "effective_component_count": self.effective_component_count,
             "variance_attribution": self.variance_attribution.as_dict(),
-            "variance_attribution_id": (
-                self.variance_attribution.attribution_id
-            ),
+            "variance_attribution_id": (self.variance_attribution.attribution_id),
             "query_score": (
                 None if self.query_score is None else self.query_score.as_dict()
             ),
@@ -353,4 +343,3 @@ class TrajectoryPosteriorScoreV1:
     @property
     def score_id(self) -> str:
         return _canonical_id(self.as_dict())
-
