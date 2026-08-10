@@ -113,13 +113,8 @@ def load_numpy_archive_snapshot(
     )
     expected = _validated_sha256(expected_sha256)
     actual_sha256 = hashlib.sha256(snapshot.payload).hexdigest()
-    if (
-        snapshot.byte_count != len(snapshot.payload)
-        or snapshot.sha256 != actual_sha256
-    ):
-        raise ArtifactValidationError(
-            "NumPy archive snapshot identity is inconsistent"
-        )
+    if snapshot.byte_count != len(snapshot.payload) or snapshot.sha256 != actual_sha256:
+        raise ArtifactValidationError("NumPy archive snapshot identity is inconsistent")
     if snapshot.byte_count > archive_limit:
         raise ArtifactValidationError(
             "NumPy archive byte count exceeds the configured limit"
