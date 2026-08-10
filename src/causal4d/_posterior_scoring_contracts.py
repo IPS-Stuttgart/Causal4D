@@ -255,9 +255,7 @@ class TrajectoryScoreSpecificationV1:
             "variogram": {
                 "pairs_shape": list(self.variogram_pairs.shape),
                 "pairs_sha256": _array_sha256(self.variogram_pairs),
-                "pair_weights_sha256": _array_sha256(
-                    self.variogram_pair_weights
-                ),
+                "pair_weights_sha256": _array_sha256(self.variogram_pair_weights),
                 "order": self.variogram_order,
                 "score_unit_power_m": 2.0 * self.variogram_order,
             },
