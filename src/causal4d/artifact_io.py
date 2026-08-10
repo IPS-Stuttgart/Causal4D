@@ -116,14 +116,10 @@ def _validated_relative_parts(value: Any, *, name: str) -> tuple[str, ...]:
         or value.endswith("/")
         or "//" in value
     ):
-        raise ArtifactValidationError(
-            f"{name} must be a safe POSIX relative path"
-        )
+        raise ArtifactValidationError(f"{name} must be a safe POSIX relative path")
     parts = tuple(value.split("/"))
     if any(part in {"", ".", ".."} for part in parts):
-        raise ArtifactValidationError(
-            f"{name} must be a safe POSIX relative path"
-        )
+        raise ArtifactValidationError(f"{name} must be a safe POSIX relative path")
     return parts
 
 
@@ -264,9 +260,7 @@ def load_strict_json_object(payload: bytes, *, name: str) -> dict[str, Any]:
         return result
 
     def reject_constant(token: str) -> Any:
-        raise _StrictJSONValueError(
-            f"{name} contains non-finite JSON number {token!r}"
-        )
+        raise _StrictJSONValueError(f"{name} contains non-finite JSON number {token!r}")
 
     def parse_float(token: str) -> float:
         value = float(token)
@@ -310,15 +304,12 @@ def load_npz_bytes(
         with zipfile.ZipFile(io.BytesIO(payload), mode="r") as zip_archive:
             members = [entry.filename for entry in zip_archive.infolist()]
             if len(members) != len(set(members)):
-                raise ArtifactValidationError(
-                    f"{name} contains duplicate ZIP members"
-                )
+                raise ArtifactValidationError(f"{name} contains duplicate ZIP members")
             if set(members) != expected_members:
                 missing = sorted(expected_members - set(members))
                 extra = sorted(set(members) - expected_members)
                 raise ArtifactValidationError(
-                    f"{name} array inventory changed; "
-                    f"missing={missing}, extra={extra}"
+                    f"{name} array inventory changed; missing={missing}, extra={extra}"
                 )
 
         with np.load(io.BytesIO(payload), allow_pickle=False) as archive:
@@ -327,12 +318,10 @@ def load_npz_bytes(
                 missing = sorted(expected - actual)
                 extra = sorted(actual - expected)
                 raise ArtifactValidationError(
-                    f"{name} array inventory changed; "
-                    f"missing={missing}, extra={extra}"
+                    f"{name} array inventory changed; missing={missing}, extra={extra}"
                 )
             arrays = {
-                key: np.array(archive[key], copy=True)
-                for key in sorted(expected)
+                key: np.array(archive[key], copy=True) for key in sorted(expected)
             }
     except ArtifactValidationError:
         raise
