@@ -1,6 +1,7 @@
 name: Self-hosted acquisition readiness inspection
 
 on:
+  workflow_dispatch:
   issues:
     types: [opened]
 
@@ -15,13 +16,18 @@ jobs:
   inspect:
     name: Inspect registered acquisition readiness on workstation2
     if: >-
-      github.event_name == 'issues' &&
-      github.event.action == 'opened' &&
       github.ref == 'refs/heads/main' &&
-      github.event.issue.user.login == 'FlorianPfaff' &&
-      github.event.issue.user.id == 6773539 &&
-      github.event.issue.title ==
-        '[self-hosted] inspect Causal4D acquisition readiness'
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'issues' &&
+          github.event.action == 'opened' &&
+          github.event.issue.user.login == 'FlorianPfaff' &&
+          github.event.issue.user.id == 6773539 &&
+          github.event.issue.title ==
+            '[self-hosted] inspect Causal4D acquisition readiness'
+        )
+      )
     runs-on: [self-hosted, Linux, X64, nvidia-smi]
     timeout-minutes: 45
     outputs:
