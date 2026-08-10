@@ -24,6 +24,20 @@
       "secrets_allowed": false
     },
     {
+      "workflow": "automatable-preacquisition-self-hosted.yml",
+      "job": "execute",
+      "authorization_model": "main-only",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi"
+      ],
+      "purpose": "Execute one exact allowlisted nonphysical registered next action",
+      "dataset_access": "registered-local-preacquisition-single-template-write",
+      "secrets_allowed": false
+    },
+    {
       "workflow": "contact-posterior-concentration.yml",
       "job": "evaluate",
       "authorization_model": "main-only",
