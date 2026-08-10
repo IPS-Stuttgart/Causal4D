@@ -25,6 +25,7 @@ def nonnegative_woodbury_quadratic(
     indicates numerical breakdown and fails closed instead of silently becoming
     a valid likelihood. The tolerance scales with the observation dimension,
     because that controls accumulated triangular-solve and dot-product error.
+    Broadcasting follows NumPy semantics and does not alter either input array.
     """
 
     if type(dimension) is not int or dimension < 1:
