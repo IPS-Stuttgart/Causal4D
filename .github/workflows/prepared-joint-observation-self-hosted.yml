@@ -69,12 +69,18 @@ jobs:
           from pathlib import Path
 
           import causal4d
+          import causal4d.per_view_residual_localization
           import causal4d.prepared_joint_observation
+          import causal4d.prob4d_prepared_observation
+          import causal4d.simulation_calibration
 
           source_root = (Path.cwd() / "src").resolve()
           origins = (
               Path(causal4d.__file__).resolve(),
+              Path(causal4d.per_view_residual_localization.__file__).resolve(),
               Path(causal4d.prepared_joint_observation.__file__).resolve(),
+              Path(causal4d.prob4d_prepared_observation.__file__).resolve(),
+              Path(causal4d.simulation_calibration.__file__).resolve(),
           )
           for origin in origins:
               print("installed import", origin)
@@ -96,6 +102,11 @@ jobs:
             tests/test_joint_observation_adversarial.py \
             tests/test_joint_observation_metamorphic.py \
             tests/test_prepared_joint_observation.py \
+            tests/test_prob4d_joint_observation.py \
+            tests/test_prob4d_prepared_observation.py \
+            tests/test_per_view_residual_localization.py \
+            tests/test_graph_modewise_discrepancy.py \
+            tests/test_simulation_calibration.py \
             | tee outputs/prepared-joint-observation/pytest.txt
 
       - name: Run parity and 2048-row rank-7 scale benchmarks
@@ -113,6 +124,22 @@ jobs:
             --rank 7 \
             --chunk-size 8 \
             | tee outputs/prepared-joint-observation/benchmark.txt
+
+      - name: Run prepared Prob4D, per-view, and SBC benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="" .prepared-joint-venv/bin/python \
+            scripts/ci/benchmark_prob4d_prepared_per_view.py \
+            --output \
+              outputs/prepared-joint-observation/prob4d-per-view-sbc.json \
+            --component-count 256 \
+            --repeat-count 100 \
+            --component-chunk-size 32 \
+            --per-view-node-count 4096 \
+            --sbc-trials 5000 \
+            | tee \
+              outputs/prepared-joint-observation/prob4d-per-view-sbc.txt
 
       - name: Record runner identity
         shell: bash
@@ -174,6 +201,7 @@ jobs:
           Prepared joint-observation self-hosted validation: **${VALIDATION_RESULT}**
 
           - Exact reviewed main commit: \`${GITHUB_SHA}\`
+          - Prepared Prob4D, per-view localization, and SBC executed: \`true\`
           - Workflow run: ${run_url}
           - Artifact: \`prepared-joint-observation-self-hosted\`
           - Physical evidence increment: \`0\`
