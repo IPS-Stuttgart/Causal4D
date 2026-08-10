@@ -42,3 +42,12 @@ Focused tests compare both compatibility paths with an explicitly materialized
 sparse operator, compare them with the prepared operator, cover duplicate-row
 aggregation, and verify every low-rank likelihood route uses the shared numerical
 guard.
+
+## Validation boundary
+
+The focused suite exercises every modified numerical route and is followed by the
+complete default test suite. Permanent pull-request gates additionally cover the
+supported Python matrix, declared dependency floors, packaging, security scans,
+and the pinned BayesianPhysTwin installed-wheel boundary. These checks establish
+implementation and compatibility preservation; they do not create physical
+evidence or alter the registered real-experiment method.
