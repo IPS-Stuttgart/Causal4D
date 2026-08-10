@@ -33,7 +33,7 @@ jobs:
           persist-credentials: true
           clean: true
 
-      - name: Apply exact source substitutions and remove temporary files
+      - name: Apply function-bounded source substitutions and remove temporary files
         shell: bash
         run: |
           set -euo pipefail
@@ -44,36 +44,44 @@ jobs:
 
           probe_path = Path("scripts/ci/probe_self_hosted_acquisition.py")
           probe = probe_path.read_text(encoding="utf-8")
-          old_call = '''    try:
-              decision = build_preacquisition_operator_next_action(
-                  repository_root,
-                  dataset_root,
-                  verify_file_hashes=True,
-              )
-          '''
-          new_call = '''    verify_file_hashes = True
-              try:
-                  decision = build_preacquisition_operator_next_action(
-                      repository_root,
-                      dataset_root,
-                      verify_file_hashes=verify_file_hashes,
-                  )
-          '''
-          old_field = '''            "verify_file_hashes": decision.get("verify_file_hashes") is True,
-          '''
-          new_field = '''            "verify_file_hashes": verify_file_hashes,
-          '''
-          if probe.count(old_call) != 1:
-              raise SystemExit("next-action call boundary is not unique")
-          if probe.count(old_field) != 1:
+          start_marker = "def _next_action_summary("
+          end_marker = "\n\ndef _unselected_path_status"
+          if probe.count(start_marker) != 1 or probe.count(end_marker) != 1:
+              raise SystemExit("next-action function boundaries are not unique")
+          start = probe.index(start_marker)
+          end = probe.index(end_marker, start)
+          block = probe[start:end]
+          try_marker = (
+              "    try:\n"
+              "        decision = build_preacquisition_operator_next_action(\n"
+          )
+          if block.count(try_marker) != 1:
+              raise SystemExit("next-action builder boundary is not unique")
+          if block.count("            verify_file_hashes=True,\n") != 1:
+              raise SystemExit("hash-verification argument boundary is not unique")
+          old_field = (
+              '            "verify_file_hashes": '
+              'decision.get("verify_file_hashes") is True,\n'
+          )
+          if block.count(old_field) != 1:
               raise SystemExit("verification-report field boundary is not unique")
-          probe = probe.replace(old_call, new_call).replace(old_field, new_field)
-          probe_path.write_text(probe, encoding="utf-8")
+          block = block.replace(
+              try_marker,
+              "    verify_file_hashes = True\n" + try_marker,
+          )
+          block = block.replace(
+              "            verify_file_hashes=True,\n",
+              "            verify_file_hashes=verify_file_hashes,\n",
+          )
+          block = block.replace(
+              old_field,
+              '            "verify_file_hashes": verify_file_hashes,\n',
+          )
+          probe_path.write_text(probe[:start] + block + probe[end:], encoding="utf-8")
 
           test_path = Path("tests/test_self_hosted_acquisition_probe.py")
           tests = test_path.read_text(encoding="utf-8")
-          marker = '''def test_build_report_derives_action_from_selected_pair(
-          '''
+          marker = "def test_build_report_derives_action_from_selected_pair(\n"
           inserted = '''def test_next_action_summary_reports_the_requested_hash_verification(
               tmp_path: Path,
               monkeypatch: pytest.MonkeyPatch,
@@ -120,7 +128,7 @@ jobs:
 
 
           '''
-          if inserted in tests:
+          if "test_next_action_summary_reports_the_requested_hash_verification" in tests:
               raise SystemExit("hash-verification regression already exists")
           if tests.count(marker) != 1:
               raise SystemExit("test insertion boundary is not unique")
