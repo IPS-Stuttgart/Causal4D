@@ -1,0 +1,199 @@
+name: Self-hosted acquisition readiness inspection
+
+on:
+  workflow_dispatch:
+    inputs:
+      trigger_issue_number:
+        description: Maintainer issue that authorized this inspection
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: acquisition-readiness-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    name: Inspect registered acquisition readiness on workstation2
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64, nvidia-smi]
+    timeout-minutes: 45
+    outputs:
+      conclusion: ${{ steps.summary.outputs.conclusion }}
+      action_id: ${{ steps.summary.outputs.action_id }}
+      physical_required: ${{ steps.summary.outputs.physical_required }}
+      automatable: ${{ steps.summary.outputs.automatable }}
+      dataset_present: ${{ steps.summary.outputs.dataset_present }}
+    steps:
+      - name: Check out exact reviewed main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          clean: true
+
+      - name: Verify reviewed main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Build and install the exact Causal4D wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p outputs/acquisition-readiness/wheels
+          python -m venv .acquisition-readiness-venv
+          .acquisition-readiness-venv/bin/python -m pip install \
+            --upgrade pip "build>=1.2"
+          .acquisition-readiness-venv/bin/python -m build --wheel \
+            --outdir outputs/acquisition-readiness/wheels .
+          wheel="$(
+            find outputs/acquisition-readiness/wheels -maxdepth 1 \
+              -name 'causal4d-*.whl' -print -quit
+          )"
+          test -n "${wheel}"
+          sha256sum "${wheel}" \
+            | tee outputs/acquisition-readiness/wheel-sha256.txt
+          .acquisition-readiness-venv/bin/python -m pip install "${wheel}"
+          .acquisition-readiness-venv/bin/python -m pip check
+          .acquisition-readiness-venv/bin/python - <<'PY'
+          from pathlib import Path
+
+          import causal4d
+
+          source_root = (Path.cwd() / "src").resolve()
+          origin = Path(causal4d.__file__).resolve()
+          print("installed import", origin)
+          if origin.is_relative_to(source_root):
+              raise SystemExit(
+                  "Causal4D resolved from the checkout instead of the wheel"
+              )
+          PY
+
+      - name: Run read-only acquisition readiness probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="" .acquisition-readiness-venv/bin/python \
+            scripts/ci/probe_self_hosted_acquisition.py \
+            --repository-root /opt/causal4d-frozen \
+            --dataset-root /data/causal4d-sloth-multi-action-v1 \
+            --output outputs/acquisition-readiness/report.json \
+            | tee outputs/acquisition-readiness/report.txt
+
+      - name: Record runner and GPU identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "commit=${GITHUB_SHA}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            uname -a
+          } | tee outputs/acquisition-readiness/runner.txt
+          nvidia-smi -L \
+            | tee outputs/acquisition-readiness/nvidia-smi-L.txt
+
+      - name: Export sanitized result fields
+        id: summary
+        shell: bash
+        run: |
+          .acquisition-readiness-venv/bin/python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path("outputs/acquisition-readiness/report.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          action = report.get("next_action") or {}
+          dataset = report["registered_roots"]["dataset"]
+          print(f"conclusion={report['conclusion']}")
+          print(f"action_id={action.get('action_id') or 'unavailable'}")
+          print(
+              "physical_required="
+              f"{str(bool(action.get('physical_acquisition_required'))).lower()}"
+          )
+          print(f"automatable={str(bool(action.get('automatable'))).lower()}")
+          print(f"dataset_present={str(bool(dataset.get('exists'))).lower()}")
+          PY
+
+      - name: Upload sanitized readiness evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: causal4d-acquisition-readiness-self-hosted
+          path: |
+            outputs/acquisition-readiness/report.json
+            outputs/acquisition-readiness/report.txt
+            outputs/acquisition-readiness/runner.txt
+            outputs/acquisition-readiness/nvidia-smi-L.txt
+            outputs/acquisition-readiness/wheel-sha256.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove isolated environment and wheel
+        if: always()
+        run: rm -rf .acquisition-readiness-venv outputs/acquisition-readiness/wheels
+
+  report:
+    name: Report acquisition readiness to the authorizing issue
+    if: always()
+    needs: inspect
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_NUMBER: ${{ inputs.trigger_issue_number }}
+      INSPECTION_RESULT: ${{ needs.inspect.result }}
+      CONCLUSION: ${{ needs.inspect.outputs.conclusion }}
+      ACTION_ID: ${{ needs.inspect.outputs.action_id }}
+      PHYSICAL_REQUIRED: ${{ needs.inspect.outputs.physical_required }}
+      AUTOMATABLE: ${{ needs.inspect.outputs.automatable }}
+      DATASET_PRESENT: ${{ needs.inspect.outputs.dataset_present }}
+    steps:
+      - name: Comment with the sanitized readiness result
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${ISSUE_NUMBER}" in
+            ''|*[!0-9]*) exit 2 ;;
+          esac
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/"
+          run_url+="${GITHUB_RUN_ID}"
+          body="$(cat <<EOF
+          Self-hosted Causal4D acquisition readiness inspection: **${INSPECTION_RESULT}**
+
+          - Exact reviewed main commit: \`${GITHUB_SHA}\`
+          - Registered dataset present: \`${DATASET_PRESENT:-unknown}\`
+          - Derived next action: \`${ACTION_ID:-unavailable}\`
+          - Physical acquisition required: \`${PHYSICAL_REQUIRED:-unknown}\`
+          - Mechanically automatable: \`${AUTOMATABLE:-unknown}\`
+          - Conclusion: \`${CONCLUSION:-unavailable}\`
+          - Workflow run: ${run_url}
+          - Artifact: \`causal4d-acquisition-readiness-self-hosted\`
+          - Physical evidence increment: \`0\`
+          EOF
+          )"
+          gh issue comment "${ISSUE_NUMBER}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --body "${body}"
