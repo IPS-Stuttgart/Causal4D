@@ -106,9 +106,7 @@ def test_source_action_inserts_staging_preflight_and_independent_review() -> Non
     assert action["after_completion_text"] is None
     assert action["staged_manifest_build_argv"][3] == "source-panel-stage"
     assert action["staged_manifest_build_argv"].count("--artifact") == 1
-    assert action["staged_manifest_path"].endswith(
-        "staging/source-lift_high-r1.json"
-    )
+    assert action["staged_manifest_path"].endswith("staging/source-lift_high-r1.json")
     assert "Repeat --artifact" in action["staged_manifest_build_note"]
     assert action["post_acquisition_verification_argv"][3] == (
         "source-panel-verify-staged"
