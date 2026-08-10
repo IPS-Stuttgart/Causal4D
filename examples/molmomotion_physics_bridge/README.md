@@ -215,6 +215,48 @@ A positive beta is not admitted merely because the import succeeds. It requires
 independent source-only competence and trust evidence. Rejection must return the
 byte-identical physical weights.
 
+## Freeze trust on source and confirmation cases
+
+Use `external_bridge_trust_study_v1.json` as the copyable manifest. It keeps
+selection executions and independent confirmation executions distinct and can
+include incorrect-caption controls.
+
+```bash
+python -m causal4d.cli.external_bridge_workflow fit-trust \
+  external_bridge_trust_study.json \
+  external_bridge_trust_calibration.json \
+  --beta 0 --beta 1 --beta 3 --beta 6 --beta 12 \
+  --scale-m 0.05 \
+  --minimum-selection-relative-improvement 0.01 \
+  --minimum-confirmation-relative-improvement 0.01 \
+  --maximum-case-relative-harm 0.05 \
+  --require-controls \
+  --require-admission
+```
+
+This selects beta only on source cases, freezes label-free support and alignment
+thresholds, and evaluates the fixed choice on the independent confirmation
+panel. Missing or unsuccessful confirmation yields `admitted_beta=0` with
+explicit reasons.
+
+Apply the frozen calibration to a new target without reading its future:
+
+```bash
+python -m causal4d.cli.external_bridge_workflow apply-trust \
+  target_forecast.npz \
+  target_rollout_bank.npz \
+  instruction \
+  external_bridge_trust_calibration.json \
+  target_results \
+  --require-acceptance
+```
+
+An optional target `--reference` is evaluated only after admission and cannot
+change the applied beta. Source-artifact reuse or target OOD rejection returns
+the exact beta-zero physical weights. See
+[`docs/external_bridge_workflow.md`](../../docs/external_bridge_workflow.md) for
+the complete study and report contract.
+
 ## Add Prob4D only after the first bridge works
 
 The released PhysTwin case already provides metric tracks and calibration, so
