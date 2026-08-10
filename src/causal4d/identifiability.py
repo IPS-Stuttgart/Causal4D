@@ -291,9 +291,7 @@ def _whiten_sensitivities(
         full_matrices=False,
     )
     normalizer = np.hypot(1.0, singular_values)
-    shrinkage = (singular_values / normalizer) * (
-        singular_values / (1.0 + normalizer)
-    )
+    shrinkage = (singular_values / normalizer) * (singular_values / (1.0 + normalizer))
     return tuple(
         matrix - left @ (shrinkage[:, None] * (left.T @ matrix))
         for matrix in whitened_values
