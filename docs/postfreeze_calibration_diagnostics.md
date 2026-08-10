@@ -57,6 +57,31 @@ Approximately uniform randomized ranks are then expected up to Monte Carlo error
 Changing the likelihood power, adding derivative terms, or deliberately mismatching
 noise creates a sensitivity diagnostic rather than an exact SBC null.
 
+### Controlled benchmark command
+
+The leave-one-topology benchmark can run the exact self-consistency diagnostic in
+one invocation without changing the benchmark defaults:
+
+```bash
+causal4d benchmark latent-contact \
+  --seeds 0:5 \
+  --sbc-trials-per-fold 5000 \
+  --sbc-bins 10 \
+  --output-dir runs/causal4d-latent-contact-v1
+```
+
+The normal benchmark artifacts are unchanged. The opt-in SBC result is written to
+`OUTPUT_DIR/sbc.json` unless `--sbc-output-json` is supplied. Each seed contains
+three leave-one-topology-out folds. The target object's physical-parameter posterior
+is fitted from its training/validation interactions, the contact prior is learned
+from the other two topologies exactly as in the controlled latent-contact study, and
+SBC truths are then sampled from that finite bank's own declared joint prior.
+
+`causal4d.controlled_latent_contact_sbc.run_controlled_latent_contact_sbc` exposes the
+same operation as a Python API. The aggregate report sums rank histograms across
+folds and uses trial-count weighting for posterior summaries; it never relabels
+folds, frames, points, or coordinates as independent physical executions.
+
 ### Interpretation boundary
 
 Passing SBC means that the finite inference implementation is self-consistent under
@@ -122,6 +147,36 @@ prefix coefficient and recursively accumulates per-mode innovation variance. The
 existing projection variance remains as an irreducible node-coordinate floor. This
 therefore produces explicit horizon-dependent uncertainty without requiring a dense
 cross-mode covariance transition.
+
+### Real diagnostic comparison
+
+The existing graph-discrepancy command now evaluates all five arms in one evidence
+bundle:
+
+```text
+current_random_walk_readout
+state_only
+graph_persistence
+graph_modewise
+graph_temporal
+```
+
+Use the unchanged diagnostic route:
+
+```bash
+causal4d diagnostic discrepancy graph-temporal \
+  physical.npz final_data.pkl optimal_params.pkl parameter_profile.npz \
+  graph_discrepancy.json \
+  --modewise-persistence-prior-weight 0.25 \
+  --modewise-minimum-retention 0.0 \
+  --modewise-maximum-retention 1.0
+```
+
+The mode-wise fit reads O-minus only. The target contributes only the same declared
+O-plus prefix used by the persistence and dense-AR arms. The saved model NPZ binds
+per-mode retention, per-coordinate innovation variance, and shrinkage settings; the
+moments NPZ adds `graph_modewise_mean_m` and `graph_modewise_variance_m2` without
+storing held-out future labels.
 
 ## Prospective use
 
