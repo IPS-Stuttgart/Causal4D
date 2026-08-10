@@ -74,9 +74,7 @@ def _glob_inventory(device_root: Path) -> dict[str, Any]:
         "input_events": _inventory((device_root / "input").glob("event*")),
     }
     inventories["candidate_device_count"] = sum(
-        int(value["count"])
-        for value in inventories.values()
-        if isinstance(value, dict)
+        int(value["count"]) for value in inventories.values() if isinstance(value, dict)
     )
     return inventories
 
