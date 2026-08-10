@@ -78,8 +78,7 @@ def _summary_markdown(report: Mapping[str, Any]) -> str:
         )
         if trust["reasons"]:
             lines.append(
-                "- Reasons: "
-                + ", ".join(f"`{value}`" for value in trust["reasons"])
+                "- Reasons: " + ", ".join(f"`{value}`" for value in trust["reasons"])
             )
         lines.append("")
     metrics = report["metrics"]

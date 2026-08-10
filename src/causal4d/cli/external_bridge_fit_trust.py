@@ -105,9 +105,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "output": str(Path(args.output_calibration_json).resolve()),
         "reasons": list(calibration.reasons),
         "selected_beta": calibration.selected_beta,
-        "selection_relative_improvement": calibration.selection[
-            "relative_improvement"
-        ],
+        "selection_relative_improvement": calibration.selection["relative_improvement"],
         "confirmation_relative_improvement": calibration.confirmation[
             "relative_improvement"
         ],

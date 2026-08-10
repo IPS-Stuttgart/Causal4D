@@ -232,8 +232,10 @@ def _float_tuple(values: Any, *, name: str) -> tuple[float, ...]:
         _require_nonnegative(value, name=f"{name}[{index}]")
         for index, value in enumerate(values)
     )
-    if not result or result[0] != 0.0 or any(
-        right <= left for left, right in zip(result, result[1:], strict=False)
+    if (
+        not result
+        or result[0] != 0.0
+        or any(right <= left for left, right in zip(result, result[1:], strict=False))
     ):
         raise ValueError(f"{name} must be strictly increasing and start at zero")
     return result
@@ -250,12 +252,7 @@ def _canonical_json(value: Mapping[str, Any]) -> bytes:
 
 def _safe_relative_path(value: Any, *, name: str) -> str:
     text = _require_string(value, name=name)
-    if (
-        "\\" in text
-        or text.startswith("/")
-        or text.endswith("/")
-        or "//" in text
-    ):
+    if "\\" in text or text.startswith("/") or text.endswith("/") or "//" in text:
         raise ValueError(f"{name} must be a safe POSIX relative path")
     parts = text.split("/")
     if any(part in {"", ".", ".."} for part in parts):

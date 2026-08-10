@@ -45,15 +45,16 @@ def fit_external_bridge_trust(
     """Select beta on source cases and admit it only after independent confirmation."""
 
     candidates = tuple(sorted(set(float(value) for value in beta_candidates)))
-    if not candidates or candidates[0] != 0.0 or any(
-        not np.isfinite(value) or value < 0.0 for value in candidates
+    if (
+        not candidates
+        or candidates[0] != 0.0
+        or any(not np.isfinite(value) or value < 0.0 for value in candidates)
     ):
         raise ValueError(
             "beta_candidates must be finite, nonnegative, and include zero"
         )
     if any(
-        right <= left
-        for left, right in zip(candidates, candidates[1:], strict=False)
+        right <= left for left, right in zip(candidates, candidates[1:], strict=False)
     ):
         raise ValueError("beta_candidates must be strictly increasing")
     if not np.isfinite(scale_m) or scale_m <= 0.0:
@@ -286,9 +287,7 @@ def fit_external_bridge_trust(
             "rollout_bank_artifact_id": case.rollouts.bank.artifact_id,
             "reference_artifact_id": case.reference.artifact_id,
             "forecast_id": case.specification.forecast_id,
-            "control_forecast_ids": list(
-                case.specification.control_forecast_ids
-            ),
+            "control_forecast_ids": list(case.specification.control_forecast_ids),
         }
 
     source_cases = {

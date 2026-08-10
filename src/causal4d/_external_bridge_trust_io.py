@@ -62,11 +62,14 @@ def load_external_bridge_trust_study(
     )
     if payload["schema"] != EXTERNAL_BRIDGE_TRUST_STUDY_SCHEMA:
         raise ValueError("unexpected external bridge trust study schema")
-    if _require_integer(
-        payload["schema_version"],
-        name="external bridge trust study schema_version",
-        minimum=1,
-    ) != EXTERNAL_BRIDGE_TRUST_STUDY_SCHEMA_VERSION:
+    if (
+        _require_integer(
+            payload["schema_version"],
+            name="external bridge trust study schema_version",
+            minimum=1,
+        )
+        != EXTERNAL_BRIDGE_TRUST_STUDY_SCHEMA_VERSION
+    ):
         raise ValueError("unsupported external bridge trust study schema version")
     selection_raw = payload["selection_cases"]
     confirmation_raw = payload["confirmation_cases"]
@@ -119,11 +122,14 @@ def load_external_bridge_trust_calibration(
     )
     if payload["schema"] != EXTERNAL_BRIDGE_TRUST_CALIBRATION_SCHEMA:
         raise ValueError("unexpected external bridge trust calibration schema")
-    if _require_integer(
-        payload["schema_version"],
-        name="external bridge trust calibration schema_version",
-        minimum=1,
-    ) != EXTERNAL_BRIDGE_TRUST_CALIBRATION_SCHEMA_VERSION:
+    if (
+        _require_integer(
+            payload["schema_version"],
+            name="external bridge trust calibration schema_version",
+            minimum=1,
+        )
+        != EXTERNAL_BRIDGE_TRUST_CALIBRATION_SCHEMA_VERSION
+    ):
         raise ValueError("unsupported external bridge trust calibration schema version")
     expected_id = _require_sha256(payload["calibration_id"], name="calibration_id")
     calibration = ExternalBridgeTrustCalibration(

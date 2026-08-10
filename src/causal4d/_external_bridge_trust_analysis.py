@@ -134,9 +134,7 @@ def _support_diagnostics(
     if not np.any(valid):
         raise ValueError("forecast has no valid coordinates")
     residual = component_displacements - target_displacement[None, None]
-    component_distance = np.sqrt(
-        np.mean(np.square(residual[:, :, valid]), axis=2)
-    )
+    component_distance = np.sqrt(np.mean(np.square(residual[:, :, valid]), axis=2))
     prior = rollouts.bank.prior_joint_weights
     raw_motion_ratio = doctor["motion"]["forecast_to_rollout_ratio"]
     rollout_motion_zero = raw_motion_ratio is None
@@ -144,9 +142,7 @@ def _support_diagnostics(
     return validated_json_mapping(
         {
             "doctor": plain_json(doctor),
-            "minimum_physical_support_distance_m": float(
-                np.min(component_distance)
-            ),
+            "minimum_physical_support_distance_m": float(np.min(component_distance)),
             "prior_weighted_support_distance_m": float(
                 np.sum(prior * component_distance)
             ),
@@ -156,9 +152,7 @@ def _support_diagnostics(
             "semantic_to_physical_motion_ratio": motion_ratio,
             "rollout_motion_zero": rollout_motion_zero,
             "anchor_error_m": float(doctor["anchor"]["prior_weighted_rms_m"]),
-            "valid_coordinate_fraction": float(
-                doctor["valid_coordinate_fraction"]
-            ),
+            "valid_coordinate_fraction": float(doctor["valid_coordinate_fraction"]),
         },
         error_message="external bridge trust diagnostics must be finite JSON data",
     )
@@ -253,9 +247,7 @@ def _analyze_cases(
                 "rollout_bank_artifact_id": case.rollouts.bank.artifact_id,
                 "reference_artifact_id": case.reference.artifact_id,
                 "forecast_id": case.specification.forecast_id,
-                "control_forecast_ids": list(
-                    case.specification.control_forecast_ids
-                ),
+                "control_forecast_ids": list(case.specification.control_forecast_ids),
                 "ade_m_by_beta": ade_by_beta,
                 "fde_m_by_beta": fde_by_beta,
                 "diagnostics": plain_json(diagnostics),
@@ -271,12 +263,7 @@ def _mean_metric_by_beta(
 ) -> tuple[float, ...]:
     return tuple(
         float(
-            np.mean(
-                [
-                    float(result[metric_key][_beta_key(beta)])
-                    for result in results
-                ]
-            )
+            np.mean([float(result[metric_key][_beta_key(beta)]) for result in results])
         )
         for beta in beta_candidates
     )
@@ -309,13 +296,9 @@ def _panel_summary(
     fde_case_harm = []
     for result in results:
         case_baseline_ade = float(result["ade_m_by_beta"][_beta_key(0.0)])
-        case_selected_ade = float(
-            result["ade_m_by_beta"][_beta_key(selected_beta)]
-        )
+        case_selected_ade = float(result["ade_m_by_beta"][_beta_key(selected_beta)])
         case_baseline_fde = float(result["fde_m_by_beta"][_beta_key(0.0)])
-        case_selected_fde = float(
-            result["fde_m_by_beta"][_beta_key(selected_beta)]
-        )
+        case_selected_fde = float(result["fde_m_by_beta"][_beta_key(selected_beta)])
         ade_harm = _relative_harm(case_selected_ade, case_baseline_ade)
         fde_harm = _relative_harm(case_selected_fde, case_baseline_fde)
         result["selected_beta_ade_m"] = case_selected_ade
@@ -338,9 +321,7 @@ def _panel_summary(
         },
         "physical_prior_mean_ade_m": baseline_ade,
         "selected_beta_mean_ade_m": selected_ade,
-        "relative_improvement": float(
-            1.0 - selected_ade / max(baseline_ade, 1e-12)
-        ),
+        "relative_improvement": float(1.0 - selected_ade / max(baseline_ade, 1e-12)),
         "physical_prior_mean_fde_m": baseline_fde,
         "selected_beta_mean_fde_m": selected_fde,
         "fde_relative_improvement": float(
@@ -364,9 +345,7 @@ def _derive_thresholds(
     ]
     anchor = [float(value["anchor_error_m"]) for value in diagnostics]
     motion = [float(value["semantic_motion_rms_m"]) for value in diagnostics]
-    ratio = [
-        float(value["semantic_to_physical_motion_ratio"]) for value in diagnostics
-    ]
+    ratio = [float(value["semantic_to_physical_motion_ratio"]) for value in diagnostics]
     valid_fraction = [
         float(value["valid_coordinate_fraction"]) for value in diagnostics
     ]
@@ -394,9 +373,8 @@ def _ood_reasons(
         reasons.append("bridge_doctor_warning")
     if bool(diagnostics.get("rollout_motion_zero", False)):
         reasons.append("physical_rollout_motion_zero")
-    if (
-        float(diagnostics["minimum_physical_support_distance_m"])
-        > float(thresholds["maximum_support_distance_m"])
+    if float(diagnostics["minimum_physical_support_distance_m"]) > float(
+        thresholds["maximum_support_distance_m"]
     ):
         reasons.append("outside_physical_support")
     if float(diagnostics["anchor_error_m"]) > float(

@@ -117,9 +117,7 @@ class ExternalBridgeTrustCalibration:
             >= normalized_thresholds["maximum_motion_ratio"]
         ):
             raise ValueError("motion-ratio thresholds must be ordered")
-        if not 0.0 <= normalized_thresholds[
-            "minimum_valid_coordinate_fraction"
-        ] <= 1.0:
+        if not 0.0 <= normalized_thresholds["minimum_valid_coordinate_fraction"] <= 1.0:
             raise ValueError("minimum_valid_coordinate_fraction must lie in [0, 1]")
         if type(normalized_thresholds["require_clean_doctor"]) is not bool:
             raise ValueError("require_clean_doctor must be Boolean")
@@ -209,9 +207,7 @@ class ExternalBridgeTrustCalibration:
                 )
                 _string_tuple(
                     record_mapping.get("control_forecast_ids", ()),
-                    name=(
-                        f"source_cases.{panel_name}[{index}].control_forecast_ids"
-                    ),
+                    name=(f"source_cases.{panel_name}[{index}].control_forecast_ids"),
                     allow_empty=True,
                 )
         source_cases = validated_json_mapping(
@@ -251,7 +247,9 @@ class ExternalBridgeTrustCalibration:
         if not self.confirmed and not reasons:
             raise ValueError("rejected calibration must contain at least one reason")
         if self.confirmed and not confirmation["passed"]:
-            raise ValueError("confirmed calibration requires a passed confirmation panel")
+            raise ValueError(
+                "confirmed calibration requires a passed confirmation panel"
+            )
         metadata = validated_json_mapping(
             self.metadata,
             error_message="trust calibration metadata must be finite JSON data",
