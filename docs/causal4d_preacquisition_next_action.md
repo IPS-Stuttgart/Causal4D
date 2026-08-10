@@ -1,14 +1,14 @@
 # Pre-acquisition next-action decision
 
-The registered physical experiment has several independent prerequisite,
-source-panel, approval, freeze, and software-lineage gates. The authoritative
-status commands remain the source of truth, but their complete blocker lists are
-not an operator runbook.
+The registered physical experiment has independent prerequisite, source-panel,
+approval, freeze, and software-lineage gates. The authoritative status commands
+remain the source of truth, but their complete blocker lists are not an operator
+runbook.
 
-`causal4d protocol readiness next-action` derives exactly one admissible next
-step from the current hash-verified readiness and source-panel status. It does
-not create evidence, repair invalid artifacts, choose scientific settings, or
-inspect target outcomes.
+`causal4d protocol readiness next-action` derives exactly one admissible next step
+from the current hash-verified readiness and source-panel status. It does not create
+physical evidence, repair invalid artifacts, choose scientific settings, or inspect
+target outcomes.
 
 ## Usage
 
@@ -29,27 +29,27 @@ collection. When all logical evidence is present, the resulting action remains
 
 The command returns:
 
-- exit code `0` only when the readiness decision already authorizes the first
-  confirmatory execution;
+- exit code `0` only when readiness already authorizes the first confirmatory
+  execution;
 - exit code `3` for a valid but incomplete state with one prescribed next action;
 - exit code `2` when present evidence is malformed, contradictory, out of order,
   or otherwise invalid.
 
 ## Deterministic action order
 
-The decision follows the registered information order. It emits the first
-applicable action from this sequence:
+The decision follows the registered information order and emits the first applicable
+action from this sequence:
 
-1. create the registered real-dataset scaffold when the dataset root is absent
-   or empty;
+1. create the registered real-dataset scaffold when the dataset root is absent or
+   empty;
 2. create the non-overwriting pre-acquisition gate and source-panel templates;
 3. scaffold and seal the operator identity registry;
 4. stop on malformed evidence, chronology violations, unexpected source-panel
    entries, or confirmatory collection that began before readiness;
 5. complete the fixed object registration, slip pilot, shared timebase, and
    independently reviewed contact registration;
-6. acquire, verify, independently review, and publish exactly the next
-   registered source-panel execution;
+6. acquire, safely stage, verify, independently review, and publish exactly the
+   next registered source-panel execution;
 7. seal source-panel completion, actuator synchronization, support/gravity, and
    nonconfirmatory end-to-end dry-run gates;
 8. seal the exact clean method freeze;
@@ -58,20 +58,22 @@ applicable action from this sequence:
 11. run the final hash-verified readiness gate; and
 12. validate the freeze and begin only the first registered confirmatory session.
 
-The source-panel action includes the exact execution ID, session ID, registered
-command profile, manifest template, staging destination, preflight-report path,
-and exactly-once publication command. It never skips ahead or selects a
-different source execution.
+The source-panel action includes the exact execution ID, session ID, command profile,
+manifest template, fixed staging destination, preflight path, review-receipt path,
+and exactly-once publication command. It never skips ahead or selects a different
+source execution.
 
 ## Source-panel publication sequence
 
 A physical source execution has an irreversible claim-bearing publication step.
-The next-action artifact therefore represents five explicit phases:
+The next-action artifact therefore represents six explicit phases:
 
 ```text
 acquire registered execution
         ↓
-verify staged manifest and every referenced artifact
+build the staging manifest from the registered template and actual artifact bytes
+        ↓
+verify the staged manifest and every referenced artifact
         ↓
 independently review the content-addressed preflight report
         ↓
@@ -80,59 +82,87 @@ publish the manifest exactly once
 recompute the next action
 ```
 
-The preflight command is emitted under
-`post_acquisition_verification_argv` and writes the path recorded in
-`preflight_report_path`. The publication command is separate under
+The staging command is emitted under `staged_manifest_build_argv` and
+`staged_manifest_build_text`. It contains placeholders for the exact UTC start/end
+times and one artifact path. Repeat `--artifact` for every ordinary file below the
+registered execution directory. The fixed destination is recorded under
+`staged_manifest_path`.
+
+The builder derives the current `next_execution`, copies the immutable registered
+worksheet, computes artifact SHA-256 values and byte counts, and refuses replacement.
+It does not verify, review, publish, or mutate the final claim-bearing manifest.
+
+The read-only preflight command is emitted under
+`post_acquisition_verification_argv` and writes the path in
+`preflight_report_path`. Independent review is emitted under `staged_review_argv`
+and produces `review_receipt_path`. Publication is separate under
 `claim_bearing_publication_argv`; it is never presented as the immediate
-post-acquisition command. `independent_review_required_before_publication=true`
-records the human decision boundary explicitly.
+post-acquisition command.
 
-Publication reruns all registered validation and hash checks. A preflight report
-is a snapshot and never reserves the next execution slot or counts as physical
-evidence.
-
-## Output contract
-
-The JSON report is content addressed and contains:
-
-- the protocol, design, pre-acquisition plan, and amendment identities;
-- the source readiness and source-panel evidence/status identities;
-- one `action` object with a stable `action_id` and category;
-- an argv representation and shell-rendered form for executable commands;
-- required inputs, outputs, and operator role;
-- explicit post-acquisition verification and claim-bearing publication commands
-  when applicable;
-- whether independent review is required before publication;
-- the completion check that should be run after the action sequence;
-- whether physical acquisition is required;
-- whether the action is mechanically automatable;
-- a portable `evidence_sha256` that normalizes repository and dataset mount
-  points; and
-- an exact host-local `status_sha256`.
-
-Every action records:
+These fields make the human boundary explicit:
 
 ```json
 {
+  "two_person_publication_required": true,
+  "independent_review_required_before_publication": true,
   "changes_registered_method": false,
   "target_outcomes_permitted": false
 }
 ```
 
+Publication reruns all registered identity, role, review, staging, and file-hash
+checks. Neither a staging file nor a preflight report reserves the next execution
+slot or counts as physical evidence.
+
+## Persisted-action freshness
+
+Before executing a persisted decision, validate it against the current filesystem:
+
+```bash
+causal4d protocol readiness next-action-validate \
+  /opt/causal4d-frozen \
+  /data/causal4d-sloth-multi-action-v1 \
+  /data/causal4d-sloth-multi-action-v1/operator/next-action.json \
+  --output-json \
+  /data/causal4d-sloth-multi-action-v1/operator/next-action-validation.json
+```
+
+Validation requires the current schema, exact content hashes, current repository and
+dataset mounts, the same logical evidence digest, and the same action/execution
+identity. Any intervening publication or evidence mutation makes the decision stale.
+
+## Output contract
+
+The JSON report is content addressed and contains:
+
+- protocol, design, pre-acquisition plan, and amendment identities;
+- readiness and source-panel evidence/status identities;
+- one `action` object with a stable `action_id` and category;
+- argv and shell-rendered forms for executable commands;
+- required inputs, outputs, and operator role;
+- explicit staging, verification, review, and claim-bearing publication commands
+  when applicable;
+- the completion check that follows the complete action sequence;
+- whether physical acquisition is required;
+- whether the action is mechanically automatable;
+- a portable `evidence_sha256` that normalizes repository and dataset mount points;
+  and
+- an exact host-local `status_sha256`.
+
 The Markdown report renders the same sequence for an acquisition operator. Both
-formats are derived artifacts and may be overwritten by a newer status
-snapshot; they are never counted as experimental evidence.
+formats are derived status artifacts and may be overwritten by a newer snapshot;
+they are never counted as experimental evidence.
 
 ## Invalid evidence
 
-An invalid state always yields `stop_and_repair_invalid_evidence`. The command
-lists the detected malformed prerequisites, invalid gates, chronology blockers,
-source-panel blockers, or premature-collection condition. It deliberately does
-not synthesize a repair command because a method-affecting defect may require a
-new protocol version rather than mutation of the current registration.
+An invalid state always yields `stop_and_repair_invalid_evidence`. The command lists
+the detected malformed prerequisites, invalid gates, chronology blockers,
+source-panel blockers, or premature-collection condition. It deliberately does not
+synthesize a repair command because a method-affecting defect may require a new
+protocol version rather than mutation of the current registration.
 
-The operator must resolve the first invalid boundary under the applicable
-runbook and independent-review policy, then rerun the decision command.
+Resolve the first invalid boundary under the applicable runbook and independent
+review policy, then rerun the decision command.
 
 ## Scientific boundary
 
@@ -148,6 +178,6 @@ This interface is operational provenance only. It does not modify:
   interventional prediction.
 
 A `begin_first_confirmatory_session` action is emitted only when the existing
-readiness status already has `ready=true`, all requested hashes were verified,
-and `first_confirmatory_execution_allowed=true` follows from the registered
-collection gate.
+readiness status already has `ready=true`, all requested hashes were verified, and
+`first_confirmatory_execution_allowed=true` follows from the registered collection
+gate.
