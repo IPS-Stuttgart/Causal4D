@@ -110,8 +110,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--overwrite-sbc-output",
         action="store_true",
         help=(
-            "replace an existing SBC JSON explicitly; default publication "
-            "is once-only"
+            "replace an existing SBC JSON explicitly; default publication is once-only"
         ),
     )
     parser.add_argument(
