@@ -316,10 +316,7 @@ def test_rejects_duplicate_payload_members(tmp_path: Path) -> None:
     manifest = _write_bundle(tmp_path)
     payload = tmp_path / "factors.npz"
     with zipfile.ZipFile(payload, mode="r") as source:
-        members = [
-            (entry.filename, source.read(entry))
-            for entry in source.infolist()
-        ]
+        members = [(entry.filename, source.read(entry)) for entry in source.infolist()]
     with pytest.warns(UserWarning, match="Duplicate name"):
         with zipfile.ZipFile(payload, mode="w") as target:
             for name, member in members:
