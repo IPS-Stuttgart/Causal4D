@@ -36,10 +36,7 @@ def _sha256_lines(values: Iterable[str]) -> str | None:
 
 def _contains_symlink_component(path: Path) -> bool:
     candidate = path.absolute()
-    return any(
-        component.is_symlink()
-        for component in (candidate, *candidate.parents)
-    )
+    return any(component.is_symlink() for component in (candidate, *candidate.parents))
 
 
 def _path_status(path: Path) -> dict[str, Any]:
@@ -47,9 +44,7 @@ def _path_status(path: Path) -> dict[str, Any]:
     contains_symlink_component = _contains_symlink_component(absolute)
     exists = absolute.exists()
     is_directory = absolute.is_dir() if exists else False
-    ordinary_directory = (
-        exists and is_directory and not contains_symlink_component
-    )
+    ordinary_directory = exists and is_directory and not contains_symlink_component
     result: dict[str, Any] = {
         "path": str(absolute),
         "exists": exists,
@@ -308,8 +303,7 @@ def build_report(
         selected_candidate = next(
             candidate
             for candidate in root_selection["candidates"]
-            if candidate["candidate_id"]
-            == root_selection["selected_candidate_id"]
+            if candidate["candidate_id"] == root_selection["selected_candidate_id"]
         )
         repository = selected_candidate["repository"]
         dataset = selected_candidate["dataset"]
@@ -427,9 +421,7 @@ def _root_candidates_from_arguments(
             "--repository-root and --dataset-root must be supplied together"
         )
     if explicit_supplied and candidate_records:
-        raise ValueError(
-            "explicit roots cannot be combined with --root-candidate"
-        )
+        raise ValueError("explicit roots cannot be combined with --root-candidate")
     if explicit_repository is not None and explicit_dataset is not None:
         return (("explicit", explicit_repository, explicit_dataset),)
     if candidate_records:
