@@ -1,0 +1,33 @@
+{
+  "schema": "causal4d.external_rollout_import",
+  "schema_version": 1,
+  "case_id": "single_lift_cloth",
+  "source": {
+    "simulator": "external-mpm",
+    "revision": "replace-with-simulator-revision",
+    "artifact_id": "replace-with-run-id"
+  },
+  "arrays": {
+    "node_ids": "node_ids",
+    "trajectories": "trajectories_world_m",
+    "frame_times_s": "frame_times_s",
+    "rollout_weights": "rollout_weights",
+    "rollout_ids": "rollout_ids",
+    "parameter_values": "parameter_values"
+  },
+  "layout": "RTNC",
+  "coordinate_frame": "world",
+  "position_unit": "m",
+  "anchor_time_s": 0.0,
+  "parameter_names": [
+    "young_modulus_pa",
+    "damping",
+    "table_friction",
+    "grasp_stiffness"
+  ],
+  "variance_floor_m2": 1e-6,
+  "confidence_level": 0.9,
+  "metadata": {
+    "action_setting": "known"
+  }
+}
