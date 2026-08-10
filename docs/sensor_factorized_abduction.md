@@ -135,10 +135,44 @@ residual ~ realized-intervention features
 residual ~ realized-intervention features + command identity
 ```
 
-The comparison is grouped by independent execution or session and uses a
-permutation diagnostic. A significant command-identity gain indicates that the
-chosen realization variables are incomplete. Failure to detect a gain is not a
-proof of conditional independence.
+Cross-fitting is by independent execution or session. The score first averages
+squared errors inside each cross-fit group and then gives every group equal
+weight, so a session with more executions cannot become a larger statistical
+unit merely because it contributes more rows. Ridge regression is solved as an
+augmented least-squares problem rather than through the normal equations.
+
+The randomization distribution must match the experimental design. Pass one
+`permutation_block_ids` value per execution to restrict command reassignment to
+the registered pair, session, or randomization block:
+
+```python
+result = assess_command_residual_sufficiency(
+    future_residual_targets,
+    realized_intervention_features,
+    command_ids,
+    group_ids=session_ids,
+    permutation_block_ids=registered_pair_ids,
+    permutation_count=9999,
+    maximum_exact_assignments=10000,
+)
+```
+
+The command multiset in every block is preserved exactly. If the number of
+distinct allowed assignments is at most `maximum_exact_assignments`, all of them
+are enumerated and an exact tail fraction is reported. Larger designs use the
+conservative plus-one Monte Carlo p-value. A block design that permits no label
+reassignment fails closed because it cannot support this randomization test.
+
+Omitting `permutation_block_ids` retains the historical global-shuffle behavior
+for backward compatibility. That mode is valid only when command labels were
+globally exchangeable under the registered design; it must not be substituted
+for paired or blocked randomization. The result metadata records the scheme,
+exact-versus-Monte-Carlo mode, block sizes, evaluated assignment count, p-value
+estimator, equal-group score unit, and ridge solver.
+
+A significant command-identity gain indicates that the chosen realization
+variables are incomplete. Failure to detect a gain is not proof of conditional
+independence.
 
 ## Integration boundary
 
