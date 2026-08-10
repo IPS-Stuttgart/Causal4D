@@ -51,9 +51,7 @@ def test_block_randomization_prevents_block_composition_false_positive() -> None
     for index in range(6):
         high_response_block = index < 3
         commands.extend(
-            ["b", "b", "b", "a"]
-            if high_response_block
-            else ["b", "a", "a", "a"]
+            ["b", "b", "b", "a"] if high_response_block else ["b", "a", "a", "a"]
         )
         groups.extend([f"session-{index}"] * 4)
         target_values.extend([3.0 if high_response_block else 0.0] * 4)
@@ -128,9 +126,7 @@ def test_exact_block_result_is_invariant_to_execution_order() -> None:
     assert reordered.relative_rmse_reduction == pytest.approx(
         reference.relative_rmse_reduction
     )
-    assert reordered.permutation_p_value == pytest.approx(
-        reference.permutation_p_value
-    )
+    assert reordered.permutation_p_value == pytest.approx(reference.permutation_p_value)
 
 
 def test_group_balanced_rmse_gives_each_session_equal_weight() -> None:
@@ -148,11 +144,7 @@ def test_ridge_solver_remains_stable_for_nearly_collinear_features() -> None:
     rng = np.random.default_rng(2872)
     base = rng.normal(size=20)
     features = np.column_stack(
-        [base]
-        + [
-            base + index * 1.0e-7 * rng.normal(size=20)
-            for index in range(1, 8)
-        ]
+        [base] + [base + index * 1.0e-7 * rng.normal(size=20) for index in range(1, 8)]
     )
     targets = (2.0 * base + 1.0e-8 * rng.normal(size=20))[:, None]
 
@@ -192,6 +184,4 @@ def test_positive_ridge_is_solved_as_an_augmented_least_squares_problem(
     )
 
     parameter_count = train_features.shape[1] + 1
-    assert observed_shapes == [
-        (len(train_features) + parameter_count, parameter_count)
-    ]
+    assert observed_shapes == [(len(train_features) + parameter_count, parameter_count)]
