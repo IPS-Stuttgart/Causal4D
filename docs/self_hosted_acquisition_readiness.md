@@ -1,9 +1,10 @@
 # Self-hosted acquisition readiness inspection
 
 The physical Causal4D campaign may use a self-hosted GitHub Actions runner as
-the orchestration host, but the runner must expose the registered frozen checkout,
-dataset mount, and local robot/sensor interfaces. GPU qualification alone does
-not establish those capabilities.
+the orchestration host, but the runner must expose one complete registered pair
+consisting of a frozen checkout and its matching dataset root, together with the
+local robot/sensor interfaces. GPU qualification alone does not establish those
+capabilities.
 
 The `Self-hosted acquisition readiness inspection` workflow performs a read-only
 qualification on the exact reviewed `main` revision. It can be dispatched
@@ -20,16 +21,40 @@ numeric account ID, on reviewed `main`, with the exact trigger title. Neither th
 issue body nor its labels reach the runner. The self-hosted job receives a
 read-only repository token and no GitHub secrets.
 
+## Registered root-pair selection
+
+The workflow currently inspects these complete pairs rather than testing or
+combining individual paths independently:
+
+| Candidate | Frozen checkout | Dataset root |
+| --- | --- | --- |
+| `canonical` | `/opt/causal4d-frozen` | `/data/causal4d-sloth-multi-action-v1` |
+| `workstation2-persistent` | `/mnt/lexar4tb/causal4d-physical/causal4d-frozen` | `/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1` |
+
+Selection is fail-closed:
+
+- exactly one complete pair of ordinary directories is selected;
+- repository and dataset roots from different candidates are never mixed;
+- a partial pair is reported but cannot be selected;
+- any symlink component or existing non-directory makes that candidate invalid;
+- no complete pair yields `runner_not_provisioned_with_registered_roots`; and
+- more than one complete pair yields `registered_root_selection_ambiguous` and
+  requires an explicit operator decision before readiness is derived.
+
+The probe also retains the explicit `--repository-root` and `--dataset-root`
+interface for controlled one-pair inspection. Both must be supplied together and
+cannot be combined with repeated `--root-candidate` arguments.
+
 The inspection records only sanitized capability evidence:
 
-- presence, readability, writability, and free space for
-  `/opt/causal4d-frozen` and
-  `/data/causal4d-sloth-multi-action-v1`;
+- candidate-pair state, selected candidate ID, presence, readability,
+  writability, symlink status, and free space for the selected roots;
 - counts and SHA-256 digests of candidate serial, video, HID, and input-device
   identities without publishing raw device names;
 - availability plus hashed output summaries for `ros2 topic list` and `lsusb`;
 - the hash-verified registered next-action category, operator role, physical
-  requirement, and automation flag when the registered roots are available; and
+  requirement, and automation flag when exactly one registered root pair is
+  available; and
 - exact runner, wheel, revision, and GPU identities.
 
 The inspection never opens a device node, sends a robot or sensor command,

@@ -18,6 +18,14 @@ from causal4d.preacquisition_operator_flow import (
 )
 
 
+RootCandidate = tuple[str, Path, Path]
+_CANONICAL_ROOT_CANDIDATE: RootCandidate = (
+    "canonical",
+    Path("/opt/causal4d-frozen"),
+    Path("/data/causal4d-sloth-multi-action-v1"),
+)
+
+
 def _sha256_lines(values: Iterable[str]) -> str | None:
     normalized = sorted(str(value) for value in values)
     if not normalized:
@@ -26,22 +34,118 @@ def _sha256_lines(values: Iterable[str]) -> str | None:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _contains_symlink_component(path: Path) -> bool:
+    candidate = path.absolute()
+    return any(component.is_symlink() for component in (candidate, *candidate.parents))
+
+
 def _path_status(path: Path) -> dict[str, Any]:
-    exists = path.exists()
-    is_directory = path.is_dir() if exists else False
+    absolute = path.absolute()
+    contains_symlink_component = _contains_symlink_component(absolute)
+    exists = absolute.exists()
+    is_directory = absolute.is_dir() if exists else False
+    ordinary_directory = exists and is_directory and not contains_symlink_component
     result: dict[str, Any] = {
-        "path": str(path),
+        "path": str(absolute),
         "exists": exists,
         "is_directory": is_directory,
-        "readable": os.access(path, os.R_OK) if exists else False,
-        "writable": os.access(path, os.W_OK) if exists else False,
-        "is_mount": os.path.ismount(path) if exists else False,
+        "ordinary_directory": ordinary_directory,
+        "contains_symlink_component": contains_symlink_component,
+        "readable": os.access(absolute, os.R_OK) if exists else False,
+        "writable": os.access(absolute, os.W_OK) if exists else False,
+        "is_mount": os.path.ismount(absolute) if exists else False,
     }
-    if is_directory:
-        usage = shutil.disk_usage(path)
+    if ordinary_directory:
+        usage = shutil.disk_usage(absolute)
         result["free_bytes"] = int(usage.free)
         result["total_bytes"] = int(usage.total)
     return result
+
+
+def _root_candidate_status(
+    candidate_id: str,
+    repository_root: Path,
+    dataset_root: Path,
+) -> dict[str, Any]:
+    if (
+        not candidate_id
+        or candidate_id.strip() != candidate_id
+        or any(character.isspace() for character in candidate_id)
+    ):
+        raise ValueError(
+            "root candidate IDs must be nonempty and contain no whitespace"
+        )
+    repository = _path_status(repository_root)
+    dataset = _path_status(dataset_root)
+    invalid = any(
+        status["contains_symlink_component"]
+        or (status["exists"] and not status["is_directory"])
+        for status in (repository, dataset)
+    )
+    if invalid:
+        pair_state = "invalid"
+    elif repository["ordinary_directory"] and dataset["ordinary_directory"]:
+        pair_state = "complete"
+    elif repository["exists"] or dataset["exists"]:
+        pair_state = "partial"
+    else:
+        pair_state = "absent"
+    return {
+        "candidate_id": candidate_id,
+        "pair_state": pair_state,
+        "repository": repository,
+        "dataset": dataset,
+    }
+
+
+def _select_registered_roots(
+    candidates: Iterable[RootCandidate],
+) -> dict[str, Any]:
+    normalized = tuple(candidates)
+    if not normalized:
+        raise ValueError("at least one registered root candidate is required")
+    identifiers = [candidate_id for candidate_id, _, _ in normalized]
+    if len(set(identifiers)) != len(identifiers):
+        raise ValueError("registered root candidate IDs must be unique")
+
+    inspected = [
+        _root_candidate_status(candidate_id, repository_root, dataset_root)
+        for candidate_id, repository_root, dataset_root in normalized
+    ]
+    complete = [
+        candidate for candidate in inspected if candidate["pair_state"] == "complete"
+    ]
+    selected = complete[0] if len(complete) == 1 else None
+    if selected is not None:
+        selection_status = "selected"
+        reason = "exactly one complete ordinary-directory root pair is available"
+    elif complete:
+        selection_status = "ambiguous"
+        reason = (
+            "multiple complete ordinary-directory root pairs are available; "
+            "selection is fail-closed"
+        )
+    else:
+        selection_status = "unavailable"
+        reason = "no complete ordinary-directory root pair is available"
+
+    return {
+        "schema_version": 1,
+        "selection_status": selection_status,
+        "reason": reason,
+        "candidate_count": len(inspected),
+        "complete_candidate_count": len(complete),
+        "selected_candidate_id": (
+            selected["candidate_id"] if selected is not None else None
+        ),
+        "selected_repository_root": (
+            selected["repository"]["path"] if selected is not None else None
+        ),
+        "selected_dataset_root": (
+            selected["dataset"]["path"] if selected is not None else None
+        ),
+        "candidates": inspected,
+    }
 
 
 def _inventory(paths: Iterable[Path]) -> dict[str, Any]:
@@ -175,24 +279,54 @@ def _next_action_summary(
     )
 
 
+def _unselected_path_status() -> dict[str, Any]:
+    return {
+        "path": None,
+        "exists": False,
+        "is_directory": False,
+        "ordinary_directory": False,
+        "contains_symlink_component": False,
+        "readable": False,
+        "writable": False,
+        "is_mount": False,
+    }
+
+
 def build_report(
     *,
-    repository_root: Path,
-    dataset_root: Path,
+    root_candidates: Iterable[RootCandidate],
     device_root: Path,
 ) -> dict[str, Any]:
-    repository = _path_status(repository_root)
-    dataset = _path_status(dataset_root)
+    root_selection = _select_registered_roots(root_candidates)
+    selected_candidate = None
+    if root_selection["selection_status"] == "selected":
+        selected_candidate = next(
+            candidate
+            for candidate in root_selection["candidates"]
+            if candidate["candidate_id"] == root_selection["selected_candidate_id"]
+        )
+        repository = selected_candidate["repository"]
+        dataset = selected_candidate["dataset"]
+        repository_root = Path(repository["path"])
+        dataset_root = Path(dataset["path"])
+        next_action, next_action_error = _next_action_summary(
+            repository_root,
+            dataset_root,
+        )
+    else:
+        repository = _unselected_path_status()
+        dataset = _unselected_path_status()
+        next_action = None
+        next_action_error = root_selection["reason"]
+
     devices = _glob_inventory(device_root)
     ros_topics = _command_summary("ros2", ["topic", "list"], timeout_seconds=8.0)
     usb = _command_summary("lsusb", [], timeout_seconds=5.0)
-    next_action, next_action_error = _next_action_summary(
-        repository_root,
-        dataset_root,
-    )
 
-    if not repository["exists"] or not dataset["exists"]:
+    if root_selection["selection_status"] == "unavailable":
         conclusion = "runner_not_provisioned_with_registered_roots"
+    elif root_selection["selection_status"] == "ambiguous":
+        conclusion = "registered_root_selection_ambiguous"
     elif next_action is None:
         conclusion = "registered_readiness_could_not_be_derived"
     elif next_action["physical_acquisition_required"]:
@@ -207,7 +341,7 @@ def build_report(
         conclusion = "next_action_requires_registered_human_role"
 
     report: dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "artifact_kind": "Causal4DSelfHostedAcquisitionReadinessProbe",
         "claim_boundary": (
             "Read-only runner qualification. No device node is opened, no robot "
@@ -224,7 +358,10 @@ def build_report(
             "python": platform.python_version(),
             "kernel": platform.release(),
         },
+        "registered_root_selection": root_selection,
         "registered_roots": {
+            "candidate_id": root_selection["selected_candidate_id"],
+            "selection_status": root_selection["selection_status"],
             "repository": repository,
             "dataset": dataset,
         },
@@ -255,28 +392,57 @@ def build_report(
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--repository-root", type=Path)
+    parser.add_argument("--dataset-root", type=Path)
     parser.add_argument(
-        "--repository-root",
-        type=Path,
-        default=Path("/opt/causal4d-frozen"),
-    )
-    parser.add_argument(
-        "--dataset-root",
-        type=Path,
-        default=Path("/data/causal4d-sloth-multi-action-v1"),
+        "--root-candidate",
+        action="append",
+        nargs=3,
+        metavar=("ID", "REPOSITORY_ROOT", "DATASET_ROOT"),
+        help=(
+            "candidate root pair; repeat for alternatives. Exactly one complete "
+            "ordinary-directory pair must exist"
+        ),
     )
     parser.add_argument("--device-root", type=Path, default=Path("/dev"))
     parser.add_argument("--output", type=Path, required=True)
     return parser
 
 
+def _root_candidates_from_arguments(
+    arguments: argparse.Namespace,
+) -> tuple[RootCandidate, ...]:
+    explicit_repository = arguments.repository_root
+    explicit_dataset = arguments.dataset_root
+    explicit_supplied = explicit_repository is not None or explicit_dataset is not None
+    candidate_records = arguments.root_candidate or []
+    if (explicit_repository is None) != (explicit_dataset is None):
+        raise ValueError(
+            "--repository-root and --dataset-root must be supplied together"
+        )
+    if explicit_supplied and candidate_records:
+        raise ValueError("explicit roots cannot be combined with --root-candidate")
+    if explicit_repository is not None and explicit_dataset is not None:
+        return (("explicit", explicit_repository, explicit_dataset),)
+    if candidate_records:
+        return tuple(
+            (candidate_id, Path(repository_root), Path(dataset_root))
+            for candidate_id, repository_root, dataset_root in candidate_records
+        )
+    return (_CANONICAL_ROOT_CANDIDATE,)
+
+
 def main() -> int:
-    arguments = _parser().parse_args()
-    report = build_report(
-        repository_root=arguments.repository_root,
-        dataset_root=arguments.dataset_root,
-        device_root=arguments.device_root,
-    )
+    parser = _parser()
+    arguments = parser.parse_args()
+    try:
+        root_candidates = _root_candidates_from_arguments(arguments)
+        report = build_report(
+            root_candidates=root_candidates,
+            device_root=arguments.device_root,
+        )
+    except ValueError as error:
+        parser.error(str(error))
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     arguments.output.write_text(
         json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n",
