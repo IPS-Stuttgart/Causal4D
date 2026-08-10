@@ -496,6 +496,7 @@ def assess_command_residual_sufficiency(
                 not use_exact_permutations
             ),
             "evaluated_assignment_count": int(evaluated_assignment_count),
+            "permutation_count": int(permutation_count),
             "requested_monte_carlo_permutation_count": int(permutation_count),
             "p_value_estimator": p_value_estimator,
             "tail_comparison_tolerance": float(comparison_tolerance),
