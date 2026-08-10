@@ -170,8 +170,7 @@ def _registered_action(
         "registered action changes the registered method",
     )
     _require(
-        action.get("command_argv")
-        == _expected_command(repository_root, dataset_root),
+        action.get("command_argv") == _expected_command(repository_root, dataset_root),
         "registered action command differs from the exact allowlisted command",
     )
     return action
