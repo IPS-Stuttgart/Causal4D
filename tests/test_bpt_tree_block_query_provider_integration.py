@@ -6,6 +6,11 @@ import os
 import numpy as np
 import pytest
 
+from causal4d.bpt_belief_handoff import (
+    bind_bayesian_phystwin_belief_handoff,
+    consumed_evidence_ledger_from_twin_belief,
+)
+from causal4d.contracts import TwinBelief, build_causal_context
 from causal4d.tree_block_belief_query import (
     RegisteredTreeBlockQueryV1,
     evaluate_registered_tree_block_query,
@@ -120,6 +125,54 @@ def _claim_bearing_update() -> object:
     )
 
 
+def _registered_query() -> RegisteredTreeBlockQueryV1:
+    return RegisteredTreeBlockQueryV1(
+        name="registered-endpoint-query",
+        description="A mixed state, gauge, and bias covariance query.",
+        row_labels=("state-x", "gauge-root", "bias"),
+        output_units=("m", "m", "m"),
+        query_matrix=np.asarray(
+            [
+                [1.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 1.0],
+            ],
+            dtype=np.float64,
+        ),
+        metadata={"protocol": "installed-wheel-integration-v1"},
+    )
+
+
+def _twin_belief(*, endpoint_offset_m: float) -> TwinBelief:
+    observations = np.zeros((6, 2, 3), dtype=np.float64)
+    actions = np.zeros((6, 1, 3), dtype=np.float64)
+    context = build_causal_context(
+        protocol_id="installed-wheel-handoff-v1",
+        case_id="case-001",
+        observations=observations,
+        observed_actions=actions,
+        counterfactual_actions=actions,
+        intervention_frame=3,
+    )
+    positions = np.full((2, 2, 3), endpoint_offset_m, dtype=np.float64)
+    velocities = np.zeros_like(positions)
+    theta = np.asarray([[0.1], [0.2]], dtype=np.float64)
+    discrepancy = np.zeros_like(positions)
+    discrepancy_variance = np.full_like(positions, 1.0e-4)
+    return TwinBelief(
+        context=context,
+        endpoint_frame=2,
+        particle_ids=("p0", "p1"),
+        theta_names=("spring_log_scale",),
+        endpoint_position_m=positions,
+        endpoint_velocity_mps=velocities,
+        theta=theta,
+        discrepancy_mean_m=discrepancy,
+        discrepancy_variance_m2=discrepancy_variance,
+        weights=np.asarray([0.4, 0.6], dtype=np.float64),
+    )
+
+
 def test_installed_provider_manifest_and_query_round_trip(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -137,21 +190,7 @@ def test_installed_provider_manifest_and_query_round_trip(
     )
     update = _claim_bearing_update()
     coefficient_dimension = update.result.covariance.dimension
-    query = RegisteredTreeBlockQueryV1(
-        name="registered-endpoint-query",
-        description="A mixed state, gauge, and bias covariance query.",
-        row_labels=("state-x", "gauge-root", "bias"),
-        output_units=("m", "m", "m"),
-        query_matrix=np.asarray(
-            [
-                [1.0, 0.0, 0.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0, 0.0, 1.0],
-            ],
-            dtype=np.float64,
-        ),
-        metadata={"protocol": "installed-wheel-integration-v1"},
-    )
+    query = _registered_query()
     assert query.coefficient_dimension == coefficient_dimension
     dense = update.result.covariance.materialize()
     expected = query.query_matrix @ dense @ query.query_matrix.T
@@ -178,3 +217,53 @@ def test_installed_provider_manifest_and_query_round_trip(
     assert evaluated.inference_reason == "inference-admissible"
     assert not evaluated.covariance.flags.writeable
     assert len(evaluated.result_id) == 64
+
+
+def test_installed_provider_update_binds_to_causal4d_belief() -> None:
+    _require_provider_installation()
+    expected_revision = os.environ.get(
+        "BAYESIAN_PHYSTWIN_REVISION",
+        "integration-provider-revision",
+    )
+    update = _claim_bearing_update()
+    evaluated = evaluate_registered_tree_block_query(
+        update,
+        _registered_query(),
+        provider_revision=expected_revision,
+    )
+    baseline = _twin_belief(endpoint_offset_m=0.0)
+    candidate = _twin_belief(endpoint_offset_m=0.01)
+
+    bound = bind_bayesian_phystwin_belief_handoff(
+        update,
+        baseline_belief=baseline,
+        candidate_belief=candidate,
+        query_covariance=evaluated,
+        prob4d_source_revision=os.environ.get(
+            "PROB4D_REVISION",
+            "integration-prob4d-revision",
+        ),
+        bpt_truncation_mass=0.05,
+        causal4d_support_reduction_mass=0.10,
+    )
+
+    assert bound.belief.artifact_id != baseline.artifact_id
+    assert bound.receipt.baseline_belief_id == baseline.artifact_id
+    assert bound.receipt.delivered_belief_id == bound.belief.artifact_id
+    assert bound.receipt.update_id == update.update_id
+    assert bound.receipt.tree_block_result_id == update.tree_block_result_id
+    assert bound.receipt.covariance_result_id == evaluated.result_id
+    assert bound.receipt.evidence_consumed_count == 1
+    assert bound.receipt.covariance_consumed_count == 1
+    assert not bound.receipt.exact_baseline_retained
+    assert not bound.receipt.raw_prob4d_reinterpreted
+    assert bound.receipt.bpt_truncation_mass == pytest.approx(0.05)
+    assert bound.receipt.causal4d_support_reduction_mass == pytest.approx(0.10)
+
+    embedded = consumed_evidence_ledger_from_twin_belief(bound.belief)
+    assert embedded.as_dict() == bound.evidence_ledger.as_dict()
+    assert len(embedded.entries) == 1
+    consumption = embedded.entries[0]
+    assert consumption.evidence_id == update.update_id
+    assert consumption.raw_factor_id == update.observation_artifact_id
+    assert consumption.role == "state_update"
