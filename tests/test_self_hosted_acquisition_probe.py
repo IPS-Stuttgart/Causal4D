@@ -63,12 +63,11 @@ def test_root_selection_uses_the_only_complete_pair(tmp_path: Path) -> None:
     assert selection["selected_repository_root"] == str(
         persistent_repository.absolute()
     )
-    assert selection["selected_dataset_root"] == str(
-        persistent_dataset.absolute()
-    )
-    assert [
-        candidate["pair_state"] for candidate in selection["candidates"]
-    ] == ["absent", "complete"]
+    assert selection["selected_dataset_root"] == str(persistent_dataset.absolute())
+    assert [candidate["pair_state"] for candidate in selection["candidates"]] == [
+        "absent",
+        "complete",
+    ]
 
 
 def test_root_selection_never_mixes_partial_pairs(tmp_path: Path) -> None:
@@ -95,9 +94,10 @@ def test_root_selection_never_mixes_partial_pairs(tmp_path: Path) -> None:
     assert selection["selection_status"] == "unavailable"
     assert selection["complete_candidate_count"] == 0
     assert selection["selected_candidate_id"] is None
-    assert [
-        candidate["pair_state"] for candidate in selection["candidates"]
-    ] == ["partial", "partial"]
+    assert [candidate["pair_state"] for candidate in selection["candidates"]] == [
+        "partial",
+        "partial",
+    ]
 
 
 def test_root_selection_fails_closed_when_multiple_pairs_are_complete(
