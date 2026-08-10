@@ -33,17 +33,101 @@ jobs:
           persist-credentials: true
           clean: true
 
-      - name: Apply the staged patch and remove temporary files
+      - name: Apply exact source substitutions and remove temporary files
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
           test -z "$(git status --porcelain=v1)"
-          patch=ci/temporary-readiness-hash-reporting.patch
-          git apply --check "${patch}"
-          git apply "${patch}"
+          python - <<'PY'
+          from pathlib import Path
+
+          probe_path = Path("scripts/ci/probe_self_hosted_acquisition.py")
+          probe = probe_path.read_text(encoding="utf-8")
+          old_call = '''    try:
+              decision = build_preacquisition_operator_next_action(
+                  repository_root,
+                  dataset_root,
+                  verify_file_hashes=True,
+              )
+          '''
+          new_call = '''    verify_file_hashes = True
+              try:
+                  decision = build_preacquisition_operator_next_action(
+                      repository_root,
+                      dataset_root,
+                      verify_file_hashes=verify_file_hashes,
+                  )
+          '''
+          old_field = '''            "verify_file_hashes": decision.get("verify_file_hashes") is True,
+          '''
+          new_field = '''            "verify_file_hashes": verify_file_hashes,
+          '''
+          if probe.count(old_call) != 1:
+              raise SystemExit("next-action call boundary is not unique")
+          if probe.count(old_field) != 1:
+              raise SystemExit("verification-report field boundary is not unique")
+          probe = probe.replace(old_call, new_call).replace(old_field, new_field)
+          probe_path.write_text(probe, encoding="utf-8")
+
+          test_path = Path("tests/test_self_hosted_acquisition_probe.py")
+          tests = test_path.read_text(encoding="utf-8")
+          marker = '''def test_build_report_derives_action_from_selected_pair(
+          '''
+          inserted = '''def test_next_action_summary_reports_the_requested_hash_verification(
+              tmp_path: Path,
+              monkeypatch: pytest.MonkeyPatch,
+          ) -> None:
+              repository, dataset = _complete_pair(tmp_path, "persistent")
+              observed: dict[str, object] = {}
+
+              def build_decision(
+                  repository_root: Path,
+                  dataset_root: Path,
+                  *,
+                  verify_file_hashes: bool,
+              ) -> dict[str, object]:
+                  observed["repository_root"] = repository_root
+                  observed["dataset_root"] = dataset_root
+                  observed["verify_file_hashes"] = verify_file_hashes
+                  return {
+                      "protocol_id": "protocol-v1",
+                      "valid": True,
+                      "ready": False,
+                      "action": {
+                          "action_id": "seal_operator_registry",
+                          "category": "manual_evidence",
+                          "operator_role": "principal_investigator",
+                          "physical_acquisition_required": False,
+                          "automatable": False,
+                          "target_outcomes_permitted": False,
+                          "blocking_items": [],
+                      },
+                  }
+
+              monkeypatch.setattr(
+                  probe,
+                  "build_preacquisition_operator_next_action",
+                  build_decision,
+              )
+
+              summary, error = probe._next_action_summary(repository, dataset)
+
+              assert error is None
+              assert observed["verify_file_hashes"] is True
+              assert summary is not None
+              assert summary["verify_file_hashes"] is True
+
+
+          '''
+          if inserted in tests:
+              raise SystemExit("hash-verification regression already exists")
+          if tests.count(marker) != 1:
+              raise SystemExit("test insertion boundary is not unique")
+          test_path.write_text(tests.replace(marker, inserted + marker), encoding="utf-8")
+          PY
           git rm \
-            "${patch}" \
+            ci/temporary-readiness-hash-reporting.patch \
             .github/workflows/temporary-apply-readiness-hash-reporting.yml
 
       - name: Set up Python 3.12
