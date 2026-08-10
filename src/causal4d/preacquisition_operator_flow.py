@@ -16,8 +16,8 @@ from causal4d.preacquisition_next_action import (
     next_action_status_sha256,
 )
 
-OPERATOR_FLOW_SCHEMA_VERSION = 1
-NEXT_ACTION_SCHEMA_VERSION = 2
+OPERATOR_FLOW_SCHEMA_VERSION = 2
+NEXT_ACTION_SCHEMA_VERSION = 3
 
 
 def _command_pair(argv: list[str]) -> tuple[list[str], str]:
@@ -43,7 +43,7 @@ def _expected_publication_command(
 def enrich_preacquisition_next_action(
     decision: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Insert staged verification and two-person review before publication."""
+    """Insert safe staging, verification, and two-person publication."""
 
     result = deepcopy(dict(decision))
     action_value = result.get("action")
@@ -82,6 +82,22 @@ def enrich_preacquisition_next_action(
                 "source action publication command differs from the registered path"
             )
 
+        staging_argv, staging_text = _command_pair(
+            [
+                "causal4d",
+                "protocol",
+                "readiness",
+                "source-panel-stage",
+                repository,
+                dataset,
+                "--started-at-utc",
+                "<execution-started-at-utc>",
+                "--ended-at-utc",
+                "<execution-ended-at-utc>",
+                "--artifact",
+                "<dataset-relative-artifact-path>",
+            ]
+        )
         verification_argv, verification_text = _command_pair(
             [
                 "causal4d",
@@ -119,6 +135,13 @@ def enrich_preacquisition_next_action(
         )
         action["after_completion_argv"] = None
         action["after_completion_text"] = None
+        action["staged_manifest_build_argv"] = staging_argv
+        action["staged_manifest_build_text"] = staging_text
+        action["staged_manifest_path"] = staging
+        action["staged_manifest_build_note"] = (
+            "Repeat --artifact once for every ordinary artifact file below the "
+            "registered execution directory."
+        )
         action["post_acquisition_verification_argv"] = verification_argv
         action["post_acquisition_verification_text"] = verification_text
         action["preflight_report_path"] = preflight
@@ -133,17 +156,23 @@ def enrich_preacquisition_next_action(
         action["claim_bearing_publication_text"] = publication_text
         action["operator_sequence"] = [
             "acquire_registered_source_execution",
+            "build_staged_manifest_from_registered_template_and_artifact_bytes",
             "verify_staged_manifest_and_artifacts",
             "independent_review_of_preflight_report",
             "publish_exactly_once",
             "recompute_next_action",
         ]
         outputs = list(action.get("output_paths", []))
-        for index, path in enumerate((preflight, receipt), start=1):
-            if path not in outputs:
-                outputs.insert(min(index, len(outputs)), path)
-        action["output_paths"] = outputs
+        staged_outputs = (staging, preflight, receipt)
+        action["output_paths"] = [
+            *staged_outputs,
+            *(path for path in outputs if path not in staged_outputs),
+        ]
     else:
+        action.setdefault("staged_manifest_build_argv", None)
+        action.setdefault("staged_manifest_build_text", None)
+        action.setdefault("staged_manifest_path", None)
+        action.setdefault("staged_manifest_build_note", None)
         action.setdefault("post_acquisition_verification_argv", None)
         action.setdefault("post_acquisition_verification_text", None)
         action.setdefault("preflight_report_path", None)
@@ -172,7 +201,7 @@ def build_preacquisition_operator_next_action(
     *,
     verify_file_hashes: bool = True,
 ) -> dict[str, Any]:
-    """Build one decision with explicit verification and publication stages."""
+    """Build one decision with explicit staging and publication boundaries."""
 
     return enrich_preacquisition_next_action(
         _build_next_action(
@@ -226,19 +255,27 @@ def render_preacquisition_operator_next_action_markdown(
         f"`{str(action['physical_acquisition_required']).lower()}`",
     ]
     sections = (
-        ("Command", "command_text"),
-        ("Verify staged evidence", "post_acquisition_verification_text"),
-        ("Review and seal receipt", "staged_review_text"),
+        ("Command", "command_text", None),
+        (
+            "Build staged manifest",
+            "staged_manifest_build_text",
+            "staged_manifest_build_note",
+        ),
+        ("Verify staged evidence", "post_acquisition_verification_text", None),
+        ("Review and seal receipt", "staged_review_text", None),
         (
             "Publish after independent review",
             "claim_bearing_publication_text",
+            None,
         ),
-        ("Completion check", "completion_check_text"),
+        ("Completion check", "completion_check_text", None),
     )
-    for heading, field in sections:
+    for heading, field, note_field in sections:
         value = action.get(field)
         if value:
             lines += ["", f"### {heading}", "", "```bash", str(value), "```"]
+            if note_field and action.get(note_field):
+                lines += ["", str(action[note_field])]
     if action.get("independent_review_required_before_publication") is True:
         lines += [
             "",
