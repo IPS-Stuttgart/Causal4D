@@ -70,11 +70,12 @@ def _prob4d_benchmark(
     component_chunk_size: int,
 ) -> dict[str, Any]:
     descriptor, arrays = _fixture()
+    rollout_frame_ids = (0, 1, 2, 3, 4, 5)
     prepared, preparation_seconds = _timed(
         lambda: prepare_prob4d_joint_observation(
             descriptor,
             arrays,
-            rollout_frame_ids=(1, 2, 3, 4, 5),
+            rollout_frame_ids=rollout_frame_ids,
             entity_to_node={0: 0, 1: 1},
             reliability_policy="record_only",
         )
@@ -82,20 +83,22 @@ def _prob4d_benchmark(
     rng = np.random.default_rng(20260812)
     components = rng.normal(
         scale=0.05,
-        size=(component_count, 5, 2, 3),
+        size=(component_count, len(rollout_frame_ids), 2, 3),
     )
     components[..., 2] += 1.0
+    components[:, 0] = 0.0
+    prefix_frame_count = len(rollout_frame_ids)
     (legacy_score, _), legacy_seconds = _timed(
         lambda: joint_component_log_likelihoods(
             components,
             prepared.evidence,
-            prefix_frame_count=5,
+            prefix_frame_count=prefix_frame_count,
         )
     )
     (prepared_score, diagnostics), prepared_seconds = _timed(
         lambda: prepared.log_likelihoods(
             components,
-            prefix_frame_count=5,
+            prefix_frame_count=prefix_frame_count,
             component_chunk_size=component_chunk_size,
         )
     )
@@ -115,7 +118,7 @@ def _prob4d_benchmark(
     for _ in range(repeat_count):
         score, repeated_diagnostics = prepared.log_likelihoods(
             components,
-            prefix_frame_count=5,
+            prefix_frame_count=prefix_frame_count,
             component_chunk_size=component_chunk_size,
         )
         checksum += float(np.sum(score))
@@ -130,6 +133,10 @@ def _prob4d_benchmark(
         "row_count": prepared.adapter_diagnostics.row_count,
         "observation_count": prepared.adapter_diagnostics.observation_count,
         "shared_rank": prepared.adapter_diagnostics.factor_rank,
+        "rollout_frame_ids": list(rollout_frame_ids),
+        "frame_mapping": [
+            list(item) for item in prepared.adapter_diagnostics.frame_mapping
+        ],
         "component_count": component_count,
         "repeat_count": repeat_count,
         "component_chunk_size": diagnostics.component_chunk_size,
