@@ -61,9 +61,47 @@ A covariance with leading shape `(particle, d, d)` broadcasts over a rollout
 bank with leading shape `(hypothesis, particle)`. This lets one discrepancy
 belief per physical particle be shared across its intervention hypotheses.
 
+## Structured covariance whitening
+
+`assess_intervention_identifiability` accepts either a dense positive-definite
+response covariance or a positive diagonal variance vector. The optional
+`covariance_factor` adds a shared positive-semidefinite term:
+
+```text
+Sigma = B + U U.T
+```
+
+where `B` is the dense or diagonal value supplied through `covariance`, and `U`
+is the response-by-rank `covariance_factor`. For a diagonal base, the diagnostic
+uses storage proportional to the response count times the low rank rather than
+forming a response-by-response covariance.
+
+The implementation whitens by the base covariance and then applies the exact
+inverse square root of the low-rank update through a thin singular-value
+decomposition. Consequently, the conditional information, nuisance projection,
+subspace angles, and query gate agree with an explicitly materialized dense
+`B + U U.T` covariance up to floating-point precision.
+
+```python
+result = assess_intervention_identifiability(
+    intervention_sensitivity,
+    nuisance_sensitivity,
+    covariance=response_variance,
+    covariance_factor=shared_camera_and_gauge_factor,
+    parameter_scales=parameter_scales,
+    query_sensitivity=query_sensitivity,
+)
+```
+
+The factor requires an explicit positive-definite base covariance. Nonpositive
+diagonal entries, nonfinite factors, mismatched response dimensions, and empty
+low-rank factors fail closed. This is an information-geometry diagnostic; richer
+covariance does not by itself establish calibration and should remain source-fit
+or preregistered before confirmatory evaluation.
+
 ## Standardized partial identifiability
 
-`assess_intervention_identifiability` now accepts positive
+`assess_intervention_identifiability` accepts positive
 `parameter_scales`. For physical intervention coordinates `z` and standardized
 coordinates `eta`, use
 
