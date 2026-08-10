@@ -9,6 +9,8 @@ from typing import Any, Sequence
 
 import numpy as np
 
+from causal4d.immutable_array import readonly_array
+
 
 POSTERIOR_SCORE_SCHEMA_VERSION = 1
 POSTERIOR_SCORE_CLAIM_BOUNDARY = (
@@ -41,9 +43,7 @@ def _array_sha256(values: np.ndarray) -> str:
 
 
 def _readonly_array(values: Any, *, dtype: Any) -> np.ndarray:
-    result = np.asarray(values, dtype=dtype).copy()
-    result.setflags(write=False)
-    return result
+    return readonly_array(values, dtype=dtype)
 
 
 def _require_nonempty_string(value: Any, *, name: str) -> str:
@@ -267,4 +267,3 @@ class TrajectoryScoreSpecificationV1:
     @property
     def specification_id(self) -> str:
         return _canonical_id(self.descriptor())
-
