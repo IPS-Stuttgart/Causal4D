@@ -11,7 +11,10 @@ import pickle
 from pathlib import Path
 from typing import Any
 
-from causal4d.artifact_io import ArtifactValidationError, read_regular_file_beneath
+from causal4d.artifact_io import (
+    ArtifactValidationError,
+    read_regular_file_no_symlinks,
+)
 
 _LOWER_HEX = frozenset("0123456789abcdef")
 
@@ -30,13 +33,9 @@ def _validated_sha256(value: str | None) -> str | None:
 
 def _snapshot_pickle(path: str | Path):
     supplied = Path(path)
-    absolute = supplied.absolute()
-    root = Path(absolute.anchor)
-    relative = "/".join(absolute.parts[1:])
     try:
-        return read_regular_file_beneath(
-            root,
-            relative,
+        return read_regular_file_no_symlinks(
+            supplied,
             name="trusted pickle",
         )
     except ArtifactValidationError as error:

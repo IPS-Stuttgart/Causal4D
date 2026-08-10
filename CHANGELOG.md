@@ -92,6 +92,11 @@ evidence. Source-panel executions remain source-only and cannot increment the
 
 ### Fixed
 
+- Route Prob4D observation-factor manifests and payload archives through one
+  symlink-free exact-byte snapshot, the shared strict JSON decoder, and the
+  bounded non-pickled NumPy archive decoder. Reject symlinked path components,
+  duplicate or unsafe members, object arrays, and inconsistent snapshot
+  identities before lineage validation.
 - Read trusted pickle and Bayesian-PhysTwin NumPy archives from one descriptor-bound, symlink-free snapshot; reject duplicate, unsafe, oversized, object-dtype, or digest-mismatched NPZ inputs before use.
 - Reject lossy Boolean, string, and floating-point coercion at sparse trajectory, observed-node, and Bayesian-PhysTwin grid-index boundaries.
 - Name the registered dense factual update explicitly as `update_from_observations_legacy_v1` while retaining the historical method as an exact compatibility alias.

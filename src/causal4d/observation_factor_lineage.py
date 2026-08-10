@@ -3,17 +3,22 @@
 from __future__ import annotations
 
 import hashlib
-import io
-import json
 import math
 from collections.abc import Mapping
+from contextlib import nullcontext
 from dataclasses import dataclass, replace
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 
+from .artifact_io import (
+    load_strict_json_object,
+    read_regular_file_beneath,
+    read_regular_file_no_symlinks,
+)
 from .contracts import TwinBelief
+from .numpy_archive import load_numpy_archive_snapshot
 
 OBSERVATION_FACTOR_SCHEMA = "prob4d.observation-factor-bundle"
 PREVIOUS_OBSERVATION_FACTOR_SCHEMA_VERSION = 3
@@ -87,18 +92,13 @@ _GAUGE_COVARIANCE_FIELDS = frozenset(
 )
 
 
-class _StrictJsonValueError(ValueError):
-    """Internal marker for already contextualized strict-JSON failures."""
-
-
 def file_sha256(path: str | Path) -> str:
-    """Hash one artifact file without loading it fully into memory."""
+    """Hash one ordinary artifact without following any path symlink."""
 
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+    return read_regular_file_no_symlinks(
+        path,
+        name="observation-factor artifact",
+    ).sha256
 
 
 def _require_mapping(value: Any, *, name: str) -> Mapping[str, Any]:
@@ -110,49 +110,15 @@ def _require_mapping(value: Any, *, name: str) -> Mapping[str, Any]:
 
 
 def _require_exact_fields(
-    value: Mapping[str, Any], expected: frozenset[str], *, name: str
+    value: Mapping[str, Any],
+    expected: frozenset[str],
+    *,
+    name: str,
 ) -> None:
     missing = sorted(expected - value.keys())
     extra = sorted(value.keys() - expected)
     if missing or extra:
         raise ValueError(f"{name} fields changed; missing={missing}, extra={extra}")
-
-
-def _load_json_bytes(payload: bytes, *, name: str) -> dict[str, Any]:
-    def object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        for key, item in pairs:
-            if key in result:
-                raise _StrictJsonValueError(
-                    f"{name} contains duplicate JSON object key {key!r}"
-                )
-            result[key] = item
-        return result
-
-    def reject_constant(token: str) -> Any:
-        raise _StrictJsonValueError(f"{name} contains non-finite JSON number {token!r}")
-
-    try:
-        value = json.loads(
-            payload.decode("utf-8"),
-            object_pairs_hook=object_pairs,
-            parse_constant=reject_constant,
-        )
-    except _StrictJsonValueError:
-        raise
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise ValueError(f"{name} is not valid UTF-8 JSON") from error
-    if not isinstance(value, dict):
-        raise ValueError(f"{name} must contain one JSON object")
-    return value
-
-
-def _load_json_object(path: Path, *, name: str) -> dict[str, Any]:
-    try:
-        payload = path.read_bytes()
-    except OSError as error:
-        raise ValueError(f"{name} is not readable") from error
-    return _load_json_bytes(payload, name=name)
 
 
 def _validate_sha256(value: Any, *, name: str) -> str:
@@ -255,29 +221,6 @@ def _require_psd(
     eigenvalues = np.linalg.eigvalsh(symmetric)
     if np.any(eigenvalues < -tolerance):
         raise ValueError(f"{name} must be positive semidefinite")
-
-
-def _safe_payload_path(manifest: Path, relative: Any) -> Path:
-    if type(relative) is not str or not relative or "\\" in relative:
-        raise ValueError(
-            "factor-bundle payload path must be a safe POSIX relative path"
-        )
-    pure = PurePosixPath(relative)
-    if pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts):
-        raise ValueError(
-            "factor-bundle payload path must be a safe POSIX relative path"
-        )
-    root = manifest.parent.resolve()
-    payload = (root / Path(*pure.parts)).resolve()
-    try:
-        payload.relative_to(root)
-    except ValueError as error:
-        raise ValueError(
-            "factor-bundle payload path escapes the manifest directory"
-        ) from error
-    if not payload.is_file():
-        raise ValueError("factor-bundle payload file is missing")
-    return payload
 
 
 def _block_diagonal(values: list[np.ndarray]) -> np.ndarray:
@@ -408,16 +351,14 @@ def load_observation_factor_lineage(
 ) -> ObservationFactorLineage:
     """Validate a Prob4D schema-v3/v4 bundle without importing its producer."""
 
-    manifest = Path(manifest_path)
-    if not manifest.is_file():
-        raise ValueError("factor-bundle manifest file is missing")
-    try:
-        manifest_bytes = manifest.read_bytes()
-    except OSError as error:
-        raise ValueError("factor-bundle manifest is not readable") from error
-    manifest_sha = hashlib.sha256(manifest_bytes).hexdigest()
-    record = _load_json_bytes(
-        manifest_bytes,
+    manifest_snapshot = read_regular_file_no_symlinks(
+        manifest_path,
+        name="factor-bundle manifest",
+    )
+    manifest = manifest_snapshot.path
+    manifest_sha = manifest_snapshot.sha256
+    record = load_strict_json_object(
+        manifest_snapshot.payload,
         name="factor-bundle manifest",
     )
     if record.get("schema") != OBSERVATION_FACTOR_SCHEMA:
@@ -463,14 +404,19 @@ def load_observation_factor_lineage(
         payload_record["sha256"],
         name="payload sha256",
     )
-    payload = _safe_payload_path(manifest, payload_record["path"])
-    try:
-        payload_bytes = payload.read_bytes()
-    except OSError as error:
-        raise ValueError("factor-bundle payload is not readable") from error
-    actual_payload_sha = hashlib.sha256(payload_bytes).hexdigest()
+    payload_snapshot = read_regular_file_beneath(
+        manifest.parent,
+        payload_record["path"],
+        name="factor-bundle payload",
+    )
+    actual_payload_sha = payload_snapshot.sha256
     if actual_payload_sha != declared_payload_sha:
         raise ValueError("factor-bundle payload checksum mismatch")
+    payload_archive = load_numpy_archive_snapshot(
+        payload_snapshot,
+        expected_sha256=declared_payload_sha,
+        name="factor-bundle payload",
+    )
 
     gauge_records = record["gauges"]
     factor_records = record["factors"]
@@ -490,13 +436,7 @@ def load_observation_factor_lineage(
     covariance_semantics = MARGINAL_GAUGE_COVARIANCE
     cross_window_preserved = False
 
-    try:
-        archive = np.load(io.BytesIO(payload_bytes), allow_pickle=False)
-    except (OSError, ValueError) as error:
-        raise ValueError(
-            "factor-bundle payload is not a valid non-pickled NPZ"
-        ) from error
-    with archive as arrays:
+    with nullcontext(payload_archive.arrays) as arrays:
         for position, raw_gauge_record in enumerate(gauge_records):
             gauge_record = _require_mapping(
                 raw_gauge_record,
@@ -768,7 +708,7 @@ def load_observation_factor_lineage(
         if len(expected_array_names) != len(set(expected_array_names)):
             raise ValueError("factor-bundle payload array keys are reused")
         expected_arrays = set(expected_array_names)
-        actual_arrays = set(arrays.files)
+        actual_arrays = set(arrays)
         missing_arrays = expected_arrays - actual_arrays
         extra_arrays = actual_arrays - expected_arrays
         if missing_arrays or extra_arrays:

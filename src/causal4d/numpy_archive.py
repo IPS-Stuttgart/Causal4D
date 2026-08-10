@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import zipfile
 from dataclasses import dataclass
@@ -14,7 +15,7 @@ import numpy as np
 from causal4d.artifact_io import (
     ArtifactFileSnapshot,
     ArtifactValidationError,
-    read_regular_file_beneath,
+    read_regular_file_no_symlinks,
 )
 from causal4d.immutable_array import readonly_array
 
@@ -47,14 +48,6 @@ def _validated_sha256(value: str | None) -> str | None:
     ):
         raise ValueError("expected_sha256 must be a lowercase SHA-256 digest")
     return value
-
-
-def _snapshot_archive(path: str | Path, *, name: str) -> ArtifactFileSnapshot:
-    supplied = Path(path)
-    absolute = supplied.absolute()
-    root = Path(absolute.anchor)
-    relative = "/".join(absolute.parts[1:])
-    return read_regular_file_beneath(root, relative, name=name)
 
 
 def _member_keys(payload: bytes, *, max_expanded_bytes: int) -> tuple[str, ...]:
@@ -98,16 +91,18 @@ def _member_keys(payload: bytes, *, max_expanded_bytes: int) -> tuple[str, ...]:
     return tuple(keys)
 
 
-def load_numpy_archive(
-    path: str | Path,
+def load_numpy_archive_snapshot(
+    snapshot: ArtifactFileSnapshot,
     *,
     expected_sha256: str | None = None,
     name: str = "NumPy archive",
     max_archive_bytes: int = _DEFAULT_MAX_ARCHIVE_BYTES,
     max_expanded_bytes: int = _DEFAULT_MAX_EXPANDED_BYTES,
 ) -> NumpyArchiveSnapshot:
-    """Load immutable arrays from one exact, symlink-free archive snapshot."""
+    """Decode immutable arrays from one already-opened exact file snapshot."""
 
+    if not isinstance(snapshot, ArtifactFileSnapshot):
+        raise TypeError("snapshot must be an ArtifactFileSnapshot")
     archive_limit = _require_positive_integer(
         max_archive_bytes,
         name="max_archive_bytes",
@@ -117,7 +112,9 @@ def load_numpy_archive(
         name="max_expanded_bytes",
     )
     expected = _validated_sha256(expected_sha256)
-    snapshot = _snapshot_archive(path, name=name)
+    actual_sha256 = hashlib.sha256(snapshot.payload).hexdigest()
+    if snapshot.byte_count != len(snapshot.payload) or snapshot.sha256 != actual_sha256:
+        raise ArtifactValidationError("NumPy archive snapshot identity is inconsistent")
     if snapshot.byte_count > archive_limit:
         raise ArtifactValidationError(
             "NumPy archive byte count exceeds the configured limit"
@@ -151,4 +148,28 @@ def load_numpy_archive(
     )
 
 
-__all__ = ["NumpyArchiveSnapshot", "load_numpy_archive"]
+def load_numpy_archive(
+    path: str | Path,
+    *,
+    expected_sha256: str | None = None,
+    name: str = "NumPy archive",
+    max_archive_bytes: int = _DEFAULT_MAX_ARCHIVE_BYTES,
+    max_expanded_bytes: int = _DEFAULT_MAX_EXPANDED_BYTES,
+) -> NumpyArchiveSnapshot:
+    """Load immutable arrays from one exact, symlink-free archive snapshot."""
+
+    snapshot = read_regular_file_no_symlinks(path, name=name)
+    return load_numpy_archive_snapshot(
+        snapshot,
+        expected_sha256=expected_sha256,
+        name=name,
+        max_archive_bytes=max_archive_bytes,
+        max_expanded_bytes=max_expanded_bytes,
+    )
+
+
+__all__ = [
+    "NumpyArchiveSnapshot",
+    "load_numpy_archive",
+    "load_numpy_archive_snapshot",
+]

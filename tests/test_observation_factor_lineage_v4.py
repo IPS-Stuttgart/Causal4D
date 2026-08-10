@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import zipfile
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+import causal4d.numpy_archive as archive_module
 import causal4d.observation_factor_lineage as lineage_module
 
 from causal4d.observation_factor_lineage import (
@@ -240,7 +242,7 @@ def test_manifest_validation_uses_the_exact_hashed_bytes(
 ) -> None:
     manifest = _write_bundle(tmp_path)
     expected_manifest_bytes = manifest.read_bytes()
-    real_loader = lineage_module._load_json_bytes
+    real_loader = lineage_module.load_strict_json_object
 
     def replacing_loader(
         payload: bytes,
@@ -250,7 +252,7 @@ def test_manifest_validation_uses_the_exact_hashed_bytes(
         manifest.write_text("{}\n", encoding="utf-8")
         return real_loader(payload, name=name)
 
-    monkeypatch.setattr(lineage_module, "_load_json_bytes", replacing_loader)
+    monkeypatch.setattr(lineage_module, "load_strict_json_object", replacing_loader)
     lineage = load_observation_factor_lineage(manifest)
 
     assert (
@@ -265,7 +267,7 @@ def test_payload_validation_uses_the_exact_hashed_bytes(
     manifest = _write_bundle(tmp_path)
     payload = tmp_path / "factors.npz"
     expected_payload_bytes = payload.read_bytes()
-    real_load = lineage_module.np.load
+    real_load = archive_module.np.load
 
     def replacing_load(
         source: object,
@@ -276,7 +278,81 @@ def test_payload_validation_uses_the_exact_hashed_bytes(
         assert not isinstance(source, (str, Path))
         return real_load(source, *args, **kwargs)
 
-    monkeypatch.setattr(lineage_module.np, "load", replacing_load)
+    monkeypatch.setattr(archive_module.np, "load", replacing_load)
     lineage = load_observation_factor_lineage(manifest)
 
     assert lineage.payload_sha256 == hashlib.sha256(expected_payload_bytes).hexdigest()
+
+
+def test_rejects_symlinked_manifest_parent(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    _write_bundle(source)
+    linked = tmp_path / "linked"
+    try:
+        linked.symlink_to(source, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlinks are unavailable on this platform")
+
+    with pytest.raises(ValueError, match="ordinary readable file"):
+        load_observation_factor_lineage(linked / "factors.json")
+
+
+def test_rejects_symlinked_payload(tmp_path: Path) -> None:
+    manifest = _write_bundle(tmp_path)
+    payload = tmp_path / "factors.npz"
+    actual = tmp_path / "actual-factors.npz"
+    payload.rename(actual)
+    try:
+        payload.symlink_to(actual.name)
+    except OSError:
+        pytest.skip("symlinks are unavailable on this platform")
+
+    with pytest.raises(ValueError, match="ordinary readable file"):
+        load_observation_factor_lineage(manifest)
+
+
+def test_rejects_duplicate_payload_members(tmp_path: Path) -> None:
+    manifest = _write_bundle(tmp_path)
+    payload = tmp_path / "factors.npz"
+    with zipfile.ZipFile(payload, mode="r") as source:
+        members = [(entry.filename, source.read(entry)) for entry in source.infolist()]
+    with pytest.warns(UserWarning, match="Duplicate name"):
+        with zipfile.ZipFile(payload, mode="w") as target:
+            for name, member in members:
+                target.writestr(name, member)
+            target.writestr(members[0][0], members[0][1])
+    record = json.loads(manifest.read_text(encoding="utf-8"))
+    record["payload"]["sha256"] = _sha(payload)
+    manifest.write_text(json.dumps(record), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="duplicate ZIP members"):
+        load_observation_factor_lineage(manifest)
+
+
+def test_rejects_object_dtype_payload_member(tmp_path: Path) -> None:
+    manifest = _write_bundle(tmp_path)
+    payload = tmp_path / "factors.npz"
+    with np.load(payload, allow_pickle=False) as archive:
+        arrays = {name: np.array(archive[name], copy=True) for name in archive.files}
+    arrays["factor_0000__points_local_m"] = np.asarray(
+        [[{"unsafe": True}, 0.0, 1.0], [{"unsafe": True}, 0.0, 1.0]],
+        dtype=object,
+    )
+    np.savez_compressed(payload, **arrays)
+    record = json.loads(manifest.read_text(encoding="utf-8"))
+    record["payload"]["sha256"] = _sha(payload)
+    manifest.write_text(json.dumps(record), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="without pickle support"):
+        load_observation_factor_lineage(manifest)
+
+
+def test_rejects_payload_path_traversal(tmp_path: Path) -> None:
+    manifest = _write_bundle(tmp_path)
+    record = json.loads(manifest.read_text(encoding="utf-8"))
+    record["payload"]["path"] = "../factors.npz"
+    manifest.write_text(json.dumps(record), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="safe POSIX relative path"):
+        load_observation_factor_lineage(manifest)
