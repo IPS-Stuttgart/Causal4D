@@ -54,7 +54,9 @@ The inspection records only sanitized capability evidence:
 - availability plus hashed output summaries for `ros2 topic list` and `lsusb`;
 - the hash-verified registered next-action category, operator role, physical
   requirement, and automation flag when exactly one registered root pair is
-  available; and
+  available;
+- the exact hash-verification policy supplied to the next-action builder, rather
+  than an inferred field from the returned decision artifact; and
 - exact runner, wheel, revision, and GPU identities.
 
 The inspection never opens a device node, sends a robot or sensor command,
