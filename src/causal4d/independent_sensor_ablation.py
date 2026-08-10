@@ -26,9 +26,7 @@ from causal4d.sensor_factorized_abduction import (
 )
 
 INDEPENDENT_SENSOR_ABLATION_SCHEMA_VERSION = 1
-INDEPENDENT_SENSOR_ABLATION_ARTIFACT_KIND = (
-    "IndependentSensorAblationReportV1"
-)
+INDEPENDENT_SENSOR_ABLATION_ARTIFACT_KIND = "IndependentSensorAblationReportV1"
 INDEPENDENT_SENSOR_ABLATION_ARMS = (
     "object_prefix",
     "actuator_only",
@@ -378,8 +376,7 @@ class IndependentSensorAblationReport:
             )
         if (
             type(payload["schema_version"]) is not int
-            or payload["schema_version"]
-            != INDEPENDENT_SENSOR_ABLATION_SCHEMA_VERSION
+            or payload["schema_version"] != INDEPENDENT_SENSOR_ABLATION_SCHEMA_VERSION
         ):
             raise ArtifactValidationError(
                 "unsupported independent-sensor ablation schema version"
@@ -393,9 +390,7 @@ class IndependentSensorAblationReport:
                 "independent-sensor ablation arm order changed"
             )
         report = cls(
-            source_factual_intervention_id=payload[
-                "source_factual_intervention_id"
-            ],
+            source_factual_intervention_id=payload["source_factual_intervention_id"],
             arm_summaries=payload["arms"],
             attribution=payload["attribution"],
             evidence=payload["evidence"],

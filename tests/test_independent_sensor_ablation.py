@@ -128,9 +128,7 @@ def _build() -> object:
         predicted_actuator_positions_m=actuator_predictions,
         wrench_evidence=wrench,
         predicted_contact_wrench=wrench_predictions,
-        component_metrics={
-            "trajectory_error_mm": np.asarray([0.0, 5.0, 10.0, 15.0])
-        },
+        component_metrics={"trajectory_error_mm": np.asarray([0.0, 5.0, 10.0, 15.0])},
         metric_units={"trajectory_error_mm": "mm"},
         metadata={"diagnostic_only": True},
     )
@@ -168,20 +166,16 @@ def test_component_metrics_are_bound_and_attributed() -> None:
     result = _build()
     arms = result.report.arm_summaries
     source = arms["object_prefix"]["component_metrics"]["trajectory_error_mm"]
-    combined = arms["actuator_and_wrench"]["component_metrics"][
-        "trajectory_error_mm"
-    ]
+    combined = arms["actuator_and_wrench"]["component_metrics"]["trajectory_error_mm"]
     assert source["posterior_expected_value"] == pytest.approx(7.5)
     assert combined["posterior_expected_value"] < 0.01
     assert len(source["component_values_sha256"]) == 64
 
-    metric = result.report.attribution["component_metrics"][
-        "trajectory_error_mm"
-    ]
+    metric = result.report.attribution["component_metrics"]["trajectory_error_mm"]
     assert metric["unit"] == "mm"
-    assert metric["expected_improvement_over_object_prefix"][
-        "actuator_and_wrench"
-    ] > 7.49
+    assert (
+        metric["expected_improvement_over_object_prefix"]["actuator_and_wrench"] > 7.49
+    )
     assert metric["combined_increment_over_best_single"] > 2.49
 
 
@@ -190,9 +184,7 @@ def test_absent_evidence_preserves_every_arm_exactly() -> None:
     result = build_independent_sensor_ablation(factual)
     for arm_name in INDEPENDENT_SENSOR_ABLATION_ARMS:
         assert result.posterior(arm_name) is factual
-        assert result.report.arm_summaries[arm_name][
-            "exact_source_fallback"
-        ] is True
+        assert result.report.arm_summaries[arm_name]["exact_source_fallback"] is True
     with pytest.raises(KeyError, match="unknown independent-sensor"):
         result.posterior("not-an-arm")
 
