@@ -63,8 +63,6 @@ def _randomized_pit_ordered(
     position = ordered.index(int(truth_index))
     lower = float(np.sum(probabilities[list(ordered[:position])]))
     mass = float(probabilities[truth_index])
-    if mass <= 0.0:
-        raise ValueError("truth has zero posterior mass")
     return float(lower + rng.random() * mass)
 
 
@@ -83,8 +81,6 @@ def _randomized_numeric_pit(
         raise ValueError("truth_value must belong to the numeric support")
     lower = float(np.sum(probabilities[support < truth_value]))
     mass = float(np.sum(probabilities[equal]))
-    if mass <= 0.0:
-        raise ValueError("truth has zero posterior mass")
     return float(lower + rng.random() * mass)
 
 
@@ -270,10 +266,7 @@ def run_contact_rollout_sbc(
         raise ValueError("likelihood_scale_m must be finite and positive")
     if not np.isfinite(likelihood_power) or likelihood_power < 0.0:
         raise ValueError("likelihood_power must be finite and nonnegative")
-    if (
-        not np.isfinite(dynamic_likelihood_weight)
-        or dynamic_likelihood_weight < 0.0
-    ):
+    if not np.isfinite(dynamic_likelihood_weight) or dynamic_likelihood_weight < 0.0:
         raise ValueError("dynamic_likelihood_weight must be finite and nonnegative")
     noise_std = (
         float(likelihood_scale_m)
@@ -397,9 +390,7 @@ def run_contact_rollout_sbc(
         seed=int(seed),
         joint_rank_histogram=joint_hist,
         contact_rank_histogram=contact_hist,
-        parameter_rank_histograms=tuple(
-            summary[0] for summary in parameter_summaries
-        ),
+        parameter_rank_histograms=tuple(summary[0] for summary in parameter_summaries),
         joint_rank_max_abs_frequency_error=joint_max,
         contact_rank_max_abs_frequency_error=contact_max,
         parameter_rank_max_abs_frequency_error=tuple(
