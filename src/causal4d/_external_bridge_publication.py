@@ -63,6 +63,25 @@ def _summary_markdown(report: Mapping[str, Any]) -> str:
         lines.extend(["## Preflight warnings", ""])
         lines.extend(f"- {warning}" for warning in report["doctor"]["warnings"])
         lines.append("")
+    trust = report.get("trust")
+    if trust is not None:
+        lines.extend(
+            [
+                "## Frozen trust decision",
+                "",
+                f"- Calibration: `{trust['calibration_id']}`",
+                f"- Decision: `{trust['decision_id']}`",
+                f"- Admitted beta: `{trust['admitted_beta']:g}`",
+                f"- Applied beta: `{trust['applied_beta']:g}`",
+                f"- Accepted: `{str(trust['accepted']).lower()}`",
+            ]
+        )
+        if trust["reasons"]:
+            lines.append(
+                "- Reasons: "
+                + ", ".join(f"`{value}`" for value in trust["reasons"])
+            )
+        lines.append("")
     metrics = report["metrics"]
     if metrics:
         lines.extend(
