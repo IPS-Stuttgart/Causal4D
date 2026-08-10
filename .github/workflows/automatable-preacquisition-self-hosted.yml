@@ -1,0 +1,299 @@
+name: Self-hosted automatable pre-acquisition action
+
+on:
+  workflow_dispatch:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: automatable-preacquisition-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  execute:
+    name: Execute one registered nonphysical action on workstation2
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'issues' &&
+          github.event.action == 'opened' &&
+          github.event.issue.user.login == 'FlorianPfaff' &&
+          github.event.issue.user.id == 6773539 &&
+          github.event.issue.title ==
+            '[self-hosted] execute Causal4D automatable next action'
+        )
+      )
+    runs-on: [self-hosted, Linux, X64, nvidia-smi]
+    timeout-minutes: 45
+    outputs:
+      selected_root_candidate: ${{ steps.summary.outputs.selected_root_candidate }}
+      executed_action: ${{ steps.summary.outputs.executed_action }}
+      created_path: ${{ steps.summary.outputs.created_path }}
+      next_action: ${{ steps.summary.outputs.next_action }}
+      next_automatable: ${{ steps.summary.outputs.next_automatable }}
+      next_physical: ${{ steps.summary.outputs.next_physical }}
+      physical_evidence_increment: ${{ steps.summary.outputs.physical_evidence_increment }}
+    steps:
+      - name: Check out exact reviewed main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          clean: true
+
+      - name: Verify reviewed main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Build and install the exact Causal4D wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p outputs/automatable-preacquisition/wheels
+          python -m venv .automatable-preacquisition-venv
+          .automatable-preacquisition-venv/bin/python -m pip install \
+            --upgrade pip "build>=1.2"
+          .automatable-preacquisition-venv/bin/python -m build --wheel \
+            --outdir outputs/automatable-preacquisition/wheels .
+          wheel="$(
+            find outputs/automatable-preacquisition/wheels -maxdepth 1 \
+              -name 'causal4d-*.whl' -print -quit
+          )"
+          test -n "${wheel}"
+          sha256sum "${wheel}" \
+            | tee outputs/automatable-preacquisition/wheel-sha256.txt
+          .automatable-preacquisition-venv/bin/python -m pip install "${wheel}"
+          .automatable-preacquisition-venv/bin/python -m pip check
+          .automatable-preacquisition-venv/bin/python - <<'PY'
+          from pathlib import Path
+
+          import causal4d
+
+          source_root = (Path.cwd() / "src").resolve()
+          origin = Path(causal4d.__file__).resolve()
+          print("installed import", origin)
+          if origin.is_relative_to(source_root):
+              raise SystemExit(
+                  "Causal4D resolved from the checkout instead of the wheel"
+              )
+          PY
+
+      - name: Derive the exact registered pre-action state
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="" .automatable-preacquisition-venv/bin/python \
+            scripts/ci/probe_self_hosted_acquisition.py \
+            --root-candidate \
+              canonical \
+              /opt/causal4d-frozen \
+              /data/causal4d-sloth-multi-action-v1 \
+            --root-candidate \
+              workstation2-persistent \
+              /mnt/lexar4tb/causal4d-physical/causal4d-frozen \
+              /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1 \
+            --output \
+              outputs/automatable-preacquisition/before-readiness.json \
+            | tee outputs/automatable-preacquisition/before-readiness.txt
+
+      - name: Require the allowlisted nonphysical action
+        shell: bash
+        run: |
+          set -euo pipefail
+          .automatable-preacquisition-venv/bin/python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(
+                  "outputs/automatable-preacquisition/before-readiness.json"
+              ).read_text(encoding="utf-8")
+          )
+          selection = report["registered_root_selection"]
+          action = report.get("next_action") or {}
+          assert selection["selection_status"] == "selected"
+          assert selection["selected_candidate_id"] == "workstation2-persistent"
+          assert report["conclusion"] == "software_next_action_dispatchable"
+          assert action.get("action_id") == "scaffold_operator_registry"
+          assert action.get("automatable") is True
+          assert action.get("can_run_unattended_on_runner") is True
+          assert action.get("physical_acquisition_required") is False
+          assert action.get("target_outcomes_permitted") is False
+          assert report.get("target_outcomes_used") is False
+          assert report.get("dataset_modified") is False
+          assert report.get("physical_evidence_increment") == 0
+          PY
+
+      - name: Execute the exact allowlisted action
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="" .automatable-preacquisition-venv/bin/python \
+            scripts/ci/execute_self_hosted_preacquisition_action.py \
+            --repository-root \
+              /mnt/lexar4tb/causal4d-physical/causal4d-frozen \
+            --dataset-root \
+              /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1 \
+            --expected-action-id scaffold_operator_registry \
+            --output outputs/automatable-preacquisition/execution.json \
+            | tee outputs/automatable-preacquisition/execution.txt
+
+      - name: Derive the exact registered post-action state
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="" .automatable-preacquisition-venv/bin/python \
+            scripts/ci/probe_self_hosted_acquisition.py \
+            --root-candidate \
+              canonical \
+              /opt/causal4d-frozen \
+              /data/causal4d-sloth-multi-action-v1 \
+            --root-candidate \
+              workstation2-persistent \
+              /mnt/lexar4tb/causal4d-physical/causal4d-frozen \
+              /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1 \
+            --output outputs/automatable-preacquisition/after-readiness.json \
+            | tee outputs/automatable-preacquisition/after-readiness.txt
+
+      - name: Require the human-governed sealing boundary
+        id: summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          .automatable-preacquisition-venv/bin/python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+
+          execution = json.loads(
+              Path(
+                  "outputs/automatable-preacquisition/execution.json"
+              ).read_text(encoding="utf-8")
+          )
+          after = json.loads(
+              Path(
+                  "outputs/automatable-preacquisition/after-readiness.json"
+              ).read_text(encoding="utf-8")
+          )
+          selection = after["registered_root_selection"]
+          action = after.get("next_action") or {}
+          assert selection["selection_status"] == "selected"
+          assert selection["selected_candidate_id"] == "workstation2-persistent"
+          assert after["conclusion"] == "next_action_requires_registered_human_role"
+          assert action.get("action_id") == "seal_operator_registry"
+          assert action.get("automatable") is False
+          assert action.get("physical_acquisition_required") is False
+          assert action.get("target_outcomes_permitted") is False
+          assert execution.get("target_outcomes_used") is False
+          assert execution.get("physical_command_sent") is False
+          assert execution.get("physical_evidence_increment") == 0
+          print("selected_root_candidate=workstation2-persistent")
+          print("executed_action=scaffold_operator_registry")
+          print(
+              "created_path="
+              f"{execution['created_template']['relative_path']}"
+          )
+          print("next_action=seal_operator_registry")
+          print("next_automatable=false")
+          print("next_physical=false")
+          print("physical_evidence_increment=0")
+          PY
+
+      - name: Record runner and GPU identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "commit=${GITHUB_SHA}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            uname -a
+          } | tee outputs/automatable-preacquisition/runner.txt
+          nvidia-smi -L \
+            | tee outputs/automatable-preacquisition/nvidia-smi-L.txt
+
+      - name: Upload the action evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: causal4d-automatable-preacquisition-action
+          path: outputs/automatable-preacquisition/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove isolated environment and wheel
+        if: always()
+        shell: bash
+        run: |
+          rm -rf \
+            .automatable-preacquisition-venv \
+            outputs/automatable-preacquisition/wheels
+
+  report:
+    name: Report the automatable action to the trigger issue
+    if: >-
+      always() &&
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.issue.user.login == 'FlorianPfaff' &&
+      github.event.issue.user.id == 6773539 &&
+      github.event.issue.title ==
+        '[self-hosted] execute Causal4D automatable next action'
+    needs: execute
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      EXECUTION_RESULT: ${{ needs.execute.result }}
+      SELECTED_ROOT_CANDIDATE: ${{ needs.execute.outputs.selected_root_candidate }}
+      EXECUTED_ACTION: ${{ needs.execute.outputs.executed_action }}
+      CREATED_PATH: ${{ needs.execute.outputs.created_path }}
+      NEXT_ACTION: ${{ needs.execute.outputs.next_action }}
+      NEXT_AUTOMATABLE: ${{ needs.execute.outputs.next_automatable }}
+      NEXT_PHYSICAL: ${{ needs.execute.outputs.next_physical }}
+      PHYSICAL_EVIDENCE_INCREMENT: ${{ needs.execute.outputs.physical_evidence_increment }}
+    steps:
+      - name: Comment with the sanitized execution result
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/"
+          run_url+="${GITHUB_RUN_ID}"
+          body="$(cat <<EOF
+          Self-hosted Causal4D automatable pre-acquisition action: **${EXECUTION_RESULT}**
+
+          - Exact reviewed main commit: \`${GITHUB_SHA}\`
+          - Selected root candidate: \`${SELECTED_ROOT_CANDIDATE:-unavailable}\`
+          - Executed action: \`${EXECUTED_ACTION:-unavailable}\`
+          - Created path: \`${CREATED_PATH:-unavailable}\`
+          - Derived next action: \`${NEXT_ACTION:-unavailable}\`
+          - Next action automatable: \`${NEXT_AUTOMATABLE:-unknown}\`
+          - Next action physical: \`${NEXT_PHYSICAL:-unknown}\`
+          - Workflow run: ${run_url}
+          - Artifact: \`causal4d-automatable-preacquisition-action\`
+          - Physical evidence increment: \`${PHYSICAL_EVIDENCE_INCREMENT:-0}\`
+          EOF
+          )"
+          gh issue comment "${ISSUE_NUMBER}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --body "${body}"
