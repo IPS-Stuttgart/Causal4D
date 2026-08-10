@@ -11,6 +11,8 @@ _COMMANDS = {
     "doctor": "causal4d.cli.external_bridge_doctor:main",
     "map-nodes": "causal4d.cli.external_node_mapping:main",
     "run": "causal4d.cli.external_bridge_run:main",
+    "fit-trust": "causal4d.cli.external_bridge_fit_trust:main",
+    "apply-trust": "causal4d.cli.external_bridge_apply_trust:main",
 }
 
 
@@ -18,7 +20,8 @@ def _help() -> str:
     return "\n".join(
         (
             "usage: python -m causal4d.cli.external_bridge_workflow ",
-            "       {import-forecast,import-rollouts,doctor,map-nodes,run} ...",
+            "       {import-forecast,import-rollouts,doctor,map-nodes,run,",
+            "        fit-trust,apply-trust} ...",
             "",
             "Portable MolmoMotion/external-simulator bridge commands:",
             "  import-forecast  Normalize a sparse external forecast.",
@@ -26,6 +29,8 @@ def _help() -> str:
             "  doctor           Validate node, time, anchor, and scale alignment.",
             "  map-nodes        Audit a one-to-one geometric node assignment.",
             "  run              Sweep semantic weights and publish a report bundle.",
+            "  fit-trust        Select beta on source cases and confirm independently.",
+            "  apply-trust      Apply the frozen label-free target admission gate.",
             "",
             "Append --help after a subcommand for its detailed arguments.",
         )

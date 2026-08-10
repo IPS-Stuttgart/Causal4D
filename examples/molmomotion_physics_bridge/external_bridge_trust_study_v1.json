@@ -1,0 +1,32 @@
+{
+  "schema": "causal4d.external_bridge_trust_study",
+  "schema_version": 1,
+  "selection_cases": [
+    {
+      "case_id": "cloth_source_01",
+      "forecast": "cloth_source_01/canonical_forecast.npz",
+      "rollouts": "cloth_source_01/canonical_rollout_bank.npz",
+      "reference": "cloth_source_01/reference.npz",
+      "forecast_id": "instruction",
+      "control_forecast_ids": [
+        "negative"
+      ]
+    }
+  ],
+  "confirmation_cases": [
+    {
+      "case_id": "cloth_confirmation_01",
+      "forecast": "cloth_confirmation_01/canonical_forecast.npz",
+      "rollouts": "cloth_confirmation_01/canonical_rollout_bank.npz",
+      "reference": "cloth_confirmation_01/reference.npz",
+      "forecast_id": "instruction",
+      "control_forecast_ids": [
+        "negative"
+      ]
+    }
+  ],
+  "metadata": {
+    "selection_and_confirmation_must_be_disjoint": true,
+    "target_future_must_not_be_used_for_admission": true
+  }
+}

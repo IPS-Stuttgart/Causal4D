@@ -166,6 +166,97 @@ also reports:
 Use `--require-clean-doctor` to return exit status `3` after publishing the
 complete report when preflight warnings remain.
 
+## Freeze trust before target deployment
+
+The exploratory beta sweep deliberately cannot authorize a positive deployment
+weight. A positive beta must first be selected on source executions and then
+confirmed on a disjoint independent panel.
+
+Create a study manifest using the example
+`examples/molmomotion_physics_bridge/external_bridge_trust_study_v1.json`:
+
+```json
+{
+  "schema": "causal4d.external_bridge_trust_study",
+  "schema_version": 1,
+  "selection_cases": [
+    {
+      "case_id": "cloth_source_01",
+      "forecast": "cloth_source_01/canonical_forecast.npz",
+      "rollouts": "cloth_source_01/canonical_rollout_bank.npz",
+      "reference": "cloth_source_01/reference.npz",
+      "forecast_id": "instruction",
+      "control_forecast_ids": ["negative"]
+    }
+  ],
+  "confirmation_cases": [
+    {
+      "case_id": "cloth_confirmation_01",
+      "forecast": "cloth_confirmation_01/canonical_forecast.npz",
+      "rollouts": "cloth_confirmation_01/canonical_rollout_bank.npz",
+      "reference": "cloth_confirmation_01/reference.npz",
+      "forecast_id": "instruction",
+      "control_forecast_ids": ["negative"]
+    }
+  ]
+}
+```
+
+All paths are safe POSIX paths relative to the study manifest. Case IDs must be
+globally unique, and selection and confirmation may not reuse the same reference
+artifact.
+
+Fit and confirm the frozen calibration:
+
+```bash
+python -m causal4d.cli.external_bridge_workflow fit-trust \
+  external_bridge_trust_study.json \
+  external_bridge_trust_calibration.json \
+  --beta 0 --beta 1 --beta 3 --beta 6 --beta 12 \
+  --scale-m 0.05 \
+  --minimum-selection-relative-improvement 0.01 \
+  --minimum-confirmation-relative-improvement 0.01 \
+  --maximum-case-relative-harm 0.05 \
+  --require-controls \
+  --require-admission
+```
+
+The fit has three distinct stages:
+
+1. select beta on the selection cases using mean ADE, then mean FDE and smaller
+   beta as deterministic tie breakers;
+2. freeze support-distance, anchor, motion-scale, validity, and doctor
+   thresholds from those selection cases; and
+3. evaluate only beta zero and the selected beta on the independent
+   confirmation panel.
+
+A positive beta is admitted only when the selection and confirmation improvement,
+per-case harm, optional caption-control, and label-free support gates all pass.
+Missing or unsuccessful confirmation produces a valid content-addressed
+calibration with `admitted_beta=0` and explicit rejection reasons.
+
+Apply the frozen calibration to a new target without reading its future:
+
+```bash
+python -m causal4d.cli.external_bridge_workflow apply-trust \
+  target_forecast.npz \
+  target_rollout_bank.npz \
+  instruction \
+  external_bridge_trust_calibration.json \
+  target_results \
+  --require-acceptance
+```
+
+An optional `--reference target_reference.npz` adds target evaluation after the
+admission decision. It cannot change the applied beta. The target is rejected
+when it reuses any source/confirmation case, forecast, or rollout artifact, or
+when its label-free OOD diagnostics fail. Every rejection publishes the complete
+decision and preserves the physical weights byte-for-byte at beta zero.
+
+The trusted report records the calibration ID, decision ID, admitted and applied
+beta, acceptance state, and reasons. Any `evaluation_only_best_beta` in the same
+report remains non-deployable because it uses the optional target future.
+
 ## Trust and claim boundary
 
 The beta sweep is exploratory. Import compatibility, a clean doctor report, or
