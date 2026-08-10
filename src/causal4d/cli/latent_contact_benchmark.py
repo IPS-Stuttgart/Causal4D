@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from importlib import metadata
 from pathlib import Path
 
+from causal4d.artifact_io import read_regular_file
 from causal4d.atomic_io import atomic_write_json
 from causal4d.benchmark import CounterfactualBenchmarkConfig
 from causal4d.contact_evaluation import (
@@ -177,8 +178,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         except FileExistsError:
             return _report_existing_sbc_output(sbc_path)
+        sbc_snapshot = read_regular_file(sbc_path, name="SBC result")
         summary["sbc"] = {
             "path": str(sbc_path.resolve()),
+            "sha256": sbc_snapshot.sha256,
+            "byte_count": sbc_snapshot.byte_count,
+            "configuration": {
+                "seeds": seeds,
+                "trials_per_fold": args.sbc_trials_per_fold,
+                "bin_count": args.sbc_bins,
+                "benchmark": benchmark_config.as_dict(),
+                "contact": contact_config.as_dict(),
+            },
             "aggregate": sbc["aggregate"],
             "interpretation": sbc["interpretation"],
             "producer": sbc["producer"],

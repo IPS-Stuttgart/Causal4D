@@ -17,15 +17,17 @@ from causal4d.acquisition_flight_recorder import (
     validate_acquisition_journal,
     validate_acquisition_journal_seal,
 )
+from causal4d.artifact_io import (
+    load_strict_json_object,
+    read_regular_file_no_symlinks,
+)
 from causal4d.atomic_io import atomic_write_json
 from causal4d.real_protocol import validate_protocol
 
 
 def _json_object(path: Path, *, name: str) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"{name} must contain a JSON object")
-    return payload
+    snapshot = read_regular_file_no_symlinks(path, name=name)
+    return load_strict_json_object(snapshot.payload, name=name)
 
 
 def _gib(value: str | float) -> int:
