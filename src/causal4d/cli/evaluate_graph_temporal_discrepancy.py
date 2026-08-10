@@ -23,6 +23,8 @@ def _load_runtime_dependencies() -> None:
     global fit_graph_temporal_discrepancy
     global forecast_graph_temporal_discrepancy
     global graph_laplacian_basis
+    global fit_modewise_graph_discrepancy
+    global forecast_modewise_graph_discrepancy
     global physical_posterior_moments
     global RealCalibrationCase
     global evaluate_real_prediction_case
@@ -33,6 +35,10 @@ def _load_runtime_dependencies() -> None:
     )
     from bayesian_phystwin.causal4d_provider_v1 import target_validity
     from causal4d.contracts import PhysicalPosterior, load_contract
+    from causal4d.graph_modewise_discrepancy import (
+        fit_modewise_graph_discrepancy,
+        forecast_modewise_graph_discrepancy,
+    )
     from causal4d.graph_temporal_discrepancy import (
         fit_graph_temporal_discrepancy,
         forecast_graph_temporal_discrepancy,
@@ -168,6 +174,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--o-plus-prefix-frames", type=int, default=6)
     parser.add_argument("--variance-floor-m2", type=float, default=2.5e-5)
     parser.add_argument("--confidence-level", type=float, default=0.90)
+    parser.add_argument(
+        "--modewise-persistence-prior-weight",
+        type=float,
+        default=0.25,
+        help="source-only shrinkage of per-mode AR retention toward persistence",
+    )
+    parser.add_argument(
+        "--modewise-minimum-retention",
+        type=float,
+        default=0.0,
+    )
+    parser.add_argument(
+        "--modewise-maximum-retention",
+        type=float,
+        default=1.0,
+    )
     return parser
 
 
@@ -224,6 +246,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         eigenvalues,
         rank_candidates=args.rank_candidates,
     )
+    modewise = fit_modewise_graph_discrepancy(
+        model,
+        o_minus_residual,
+        o_minus_valid,
+        persistence_prior_weight=args.modewise_persistence_prior_weight,
+        minimum_retention=args.modewise_minimum_retention,
+        maximum_retention=args.modewise_maximum_retention,
+    )
 
     state_mean, state_variance = _state_moments(
         artifact,
@@ -249,10 +279,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         total_frame_count=len(state_mean),
         dynamics="persistence",
     )
+    modewise_mean, modewise_variance = forecast_modewise_graph_discrepancy(
+        model,
+        modewise,
+        prefix_residual,
+        prefix_valid,
+        total_frame_count=len(state_mean),
+    )
     graph_mean = graph_mean[:, : state_mean.shape[1]]
     graph_variance = graph_variance[:, : state_mean.shape[1]]
     persistent_mean = persistent_mean[:, : state_mean.shape[1]]
     persistent_variance = persistent_variance[:, : state_mean.shape[1]]
+    modewise_mean = modewise_mean[:, : state_mean.shape[1]]
+    modewise_variance = modewise_variance[:, : state_mean.shape[1]]
     labels = _graph_region_labels(
         graph.springs,
         object_spring_count=graph.num_object_springs,
@@ -288,6 +327,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             "graph_persistence",
             state_mean + persistent_mean,
             state_variance + persistent_variance,
+            truth,
+            target_valid,
+            case_id=artifact.context.case_id,
+            action_id=artifact.context.u_cf.action_id,
+            start_frame=prefix_frame_count,
+            labels=labels,
+            confidence_level=args.confidence_level,
+        ),
+        _evaluate_variant(
+            "graph_modewise",
+            state_mean + modewise_mean,
+            state_variance + modewise_variance,
             truth,
             target_valid,
             case_id=artifact.context.case_id,
@@ -334,6 +385,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         transition=model.transition,
         innovation_covariance=model.innovation_covariance,
         projection_variance_m2=model.projection_variance_m2,
+        modewise_retention=modewise.retention,
+        modewise_innovation_variance_m2=modewise.innovation_variance_m2,
+        modewise_persistence_prior_weight=np.asarray(
+            modewise.persistence_prior_weight, dtype=float
+        ),
+        modewise_minimum_retention=np.asarray(modewise.minimum_retention, dtype=float),
+        modewise_maximum_retention=np.asarray(modewise.maximum_retention, dtype=float),
     )
     np.savez_compressed(
         moments_path,
@@ -349,6 +407,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         "current_random_walk_readout",
                         "state_only",
                         "graph_persistence",
+                        "graph_modewise",
                         "graph_temporal",
                     ],
                     "future_labels_stored": False,
@@ -362,6 +421,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         state_only_variance_m2=state_variance,
         graph_persistence_mean_m=state_mean + persistent_mean,
         graph_persistence_variance_m2=state_variance + persistent_variance,
+        graph_modewise_mean_m=state_mean + modewise_mean,
+        graph_modewise_variance_m2=state_variance + modewise_variance,
         graph_temporal_mean_m=state_mean + graph_mean,
         graph_temporal_variance_m2=state_variance + graph_variance,
     )
@@ -373,6 +434,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "label_use": {
             "basis_and_dynamics_fit": "O-minus only",
             "rank_selection": "O-minus validation suffix only",
+            "modewise_fit": "O-minus only with source-frozen shrinkage settings",
             "target_initialization": f"first {args.o_plus_prefix_frames} O-plus frames",
             "future": "evaluation only",
         },
@@ -386,6 +448,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "spectral_radius": model.spectral_radius,
             "projection_variance_m2": model.projection_variance_m2.tolist(),
             "fit_frame_count": model.fit_frame_count,
+            "modewise": modewise.as_dict(),
             "model_npz": str(model_path.resolve()),
             "model_sha256": _sha256(model_path),
             "moments_npz": str(moments_path.resolve()),
