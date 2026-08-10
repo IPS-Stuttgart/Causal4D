@@ -10,6 +10,20 @@
   },
   "jobs": [
     {
+      "workflow": "acquisition-readiness-self-hosted.yml",
+      "job": "inspect",
+      "authorization_model": "main-only",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi"
+      ],
+      "purpose": "Read-only registered acquisition readiness and interface qualification",
+      "dataset_access": "registered-local-preacquisition-read-only",
+      "secrets_allowed": false
+    },
+    {
       "workflow": "contact-posterior-concentration.yml",
       "job": "evaluate",
       "authorization_model": "main-only",
