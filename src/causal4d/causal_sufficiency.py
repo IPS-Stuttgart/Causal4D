@@ -262,11 +262,7 @@ def _exact_command_assignments(
     blocks: tuple[tuple[int, ...], ...],
 ) -> Iterator[tuple[str, ...]]:
     block_assignments = tuple(
-        tuple(
-            _distinct_permutations(
-                tuple(commands[index] for index in block_indices)
-            )
-        )
+        tuple(_distinct_permutations(tuple(commands[index] for index in block_indices)))
         for block_indices in blocks
     )
     for assignment_by_block in product(*block_assignments):
@@ -299,9 +295,7 @@ def _tail_count(
         float(np.max(np.abs(null_improvements))),
     )
     tolerance = 64.0 * np.finfo(float).eps * comparison_scale
-    count = int(
-        np.sum(null_improvements >= observed_improvement - tolerance)
-    )
+    count = int(np.sum(null_improvements >= observed_improvement - tolerance))
     return count, tolerance
 
 
@@ -450,9 +444,7 @@ def assess_command_residual_sufficiency(
         p_value = float(extreme_count / evaluated_assignment_count)
         p_value_estimator = "exact_tail_fraction"
     else:
-        p_value = float(
-            (1 + extreme_count) / (evaluated_assignment_count + 1)
-        )
+        p_value = float((1 + extreme_count) / (evaluated_assignment_count + 1))
         p_value_estimator = "plus_one_monte_carlo"
     detected = bool(
         observed_improvement >= minimum_relative_improvement
@@ -473,13 +465,9 @@ def assess_command_residual_sufficiency(
             "ridge": float(ridge),
             "ridge_solver": "augmented_least_squares",
             "permutation_scheme": (
-                "global"
-                if permutation_blocks is None
-                else "within_registered_block"
+                "global" if permutation_blocks is None else "within_registered_block"
             ),
-            "permutation_mode": (
-                "exact" if use_exact_permutations else "monte_carlo"
-            ),
+            "permutation_mode": ("exact" if use_exact_permutations else "monte_carlo"),
             "permutation_block_count": len(block_indices),
             "permutation_block_sizes": [len(indices) for indices in block_indices],
             "fixed_permutation_block_count": sum(
@@ -488,9 +476,7 @@ def assess_command_residual_sufficiency(
             ),
             "maximum_exact_assignments": int(maximum_exact_assignments),
             "distinct_assignment_count": (
-                int(bounded_assignment_count)
-                if use_exact_permutations
-                else None
+                int(bounded_assignment_count) if use_exact_permutations else None
             ),
             "distinct_assignment_count_exceeds_exact_limit": bool(
                 not use_exact_permutations
