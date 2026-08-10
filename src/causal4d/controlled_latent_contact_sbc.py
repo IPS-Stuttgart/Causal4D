@@ -33,16 +33,42 @@ from causal4d.simulation_calibration import (
 )
 
 
+_UNIFORMITY_FAMILYWISE_ALPHA = 0.05
+_UNIFORMITY_MONTE_CARLO_REPLICATES = 20_000
+_UNIFORMITY_MONTE_CARLO_SEED = 2_026_081_007
+_UNIFORMITY_MONTE_CARLO_BATCH_SIZE = 256
+
+
 @dataclass(frozen=True)
 class _FittedObject:
     protocol: ObjectProtocol
     baselines: FittedBaselines
 
 
+def _validated_histogram_counts(
+    counts: np.ndarray,
+    *,
+    name: str,
+) -> np.ndarray:
+    raw = np.asarray(counts)
+    if raw.ndim != 1 or len(raw) < 2:
+        raise ValueError(f"{name} must contain at least two bins")
+    if not np.issubdtype(raw.dtype, np.integer):
+        raise ValueError(f"{name} must contain integer counts")
+    values = np.asarray(raw, dtype=np.int64)
+    if np.any(values < 0) or int(np.sum(values)) <= 0:
+        raise ValueError(f"{name} must contain nonnegative counts with positive mass")
+    return values
+
+
+def _pearson_uniformity_statistic(counts: np.ndarray) -> float:
+    values = _validated_histogram_counts(counts, name="rank histogram")
+    expected = float(np.sum(values)) / len(values)
+    return float(np.sum(np.square(values - expected) / expected))
+
+
 def _histogram_uniformity(counts: np.ndarray) -> dict[str, float]:
-    values = np.asarray(counts, dtype=float)
-    if values.ndim != 1 or len(values) < 2 or np.sum(values) <= 0.0:
-        raise ValueError("rank histogram must contain at least two nonempty bins")
+    values = _validated_histogram_counts(counts, name="rank histogram")
     frequencies = values / np.sum(values)
     expected = 1.0 / len(values)
     return {
@@ -50,6 +76,84 @@ def _histogram_uniformity(counts: np.ndarray) -> dict[str, float]:
         "rms_frequency_error": float(
             np.sqrt(np.mean(np.square(frequencies - expected)))
         ),
+        "pearson_statistic": _pearson_uniformity_statistic(values),
+    }
+
+
+def _global_uniformity_test(
+    histograms: Sequence[tuple[str, np.ndarray]],
+) -> dict[str, Any]:
+    """Run one fixed max-Pearson multinomial test across all rank histograms."""
+
+    selected = tuple(
+        (name, _validated_histogram_counts(counts, name=name))
+        for name, counts in histograms
+    )
+    if not selected:
+        raise ValueError("at least one rank histogram is required")
+    bin_counts = {len(counts) for _, counts in selected}
+    trial_counts = {int(np.sum(counts)) for _, counts in selected}
+    if len(bin_counts) != 1 or len(trial_counts) != 1:
+        raise ValueError("global uniformity histograms must share bins and trials")
+
+    bin_count = len(selected[0][1])
+    trial_count = int(np.sum(selected[0][1]))
+    observed_by_histogram = {
+        name: _pearson_uniformity_statistic(counts) for name, counts in selected
+    }
+    observed_maximum = max(observed_by_histogram.values())
+
+    rng = np.random.default_rng(_UNIFORMITY_MONTE_CARLO_SEED)
+    probabilities = np.full(bin_count, 1.0 / bin_count, dtype=float)
+    null_maxima = np.zeros(_UNIFORMITY_MONTE_CARLO_REPLICATES, dtype=float)
+    expected = trial_count / bin_count
+    for _name, _counts in selected:
+        for start in range(
+            0,
+            _UNIFORMITY_MONTE_CARLO_REPLICATES,
+            _UNIFORMITY_MONTE_CARLO_BATCH_SIZE,
+        ):
+            stop = min(
+                start + _UNIFORMITY_MONTE_CARLO_BATCH_SIZE,
+                _UNIFORMITY_MONTE_CARLO_REPLICATES,
+            )
+            draws = rng.multinomial(
+                trial_count,
+                probabilities,
+                size=stop - start,
+            )
+            statistics = np.sum(
+                np.square(draws - expected) / expected,
+                axis=1,
+            )
+            null_maxima[start:stop] = np.maximum(
+                null_maxima[start:stop],
+                statistics,
+            )
+
+    critical = float(
+        np.quantile(
+            null_maxima,
+            1.0 - _UNIFORMITY_FAMILYWISE_ALPHA,
+            method="higher",
+        )
+    )
+    exceedance_count = int(np.count_nonzero(null_maxima >= observed_maximum))
+    p_value = float((exceedance_count + 1) / (_UNIFORMITY_MONTE_CARLO_REPLICATES + 1))
+    return {
+        "method": "fixed Monte Carlo max-Pearson multinomial test",
+        "null_hypothesis": "all randomized-rank histograms are uniform",
+        "histogram_count": len(selected),
+        "trial_count_per_histogram": trial_count,
+        "bin_count": bin_count,
+        "familywise_alpha": _UNIFORMITY_FAMILYWISE_ALPHA,
+        "monte_carlo_replicates": _UNIFORMITY_MONTE_CARLO_REPLICATES,
+        "monte_carlo_seed": _UNIFORMITY_MONTE_CARLO_SEED,
+        "pearson_statistic_by_histogram": observed_by_histogram,
+        "observed_max_pearson_statistic": observed_maximum,
+        "critical_max_pearson_statistic": critical,
+        "monte_carlo_p_value": p_value,
+        "passed": bool(observed_maximum <= critical),
     }
 
 
@@ -107,9 +211,23 @@ def aggregate_controlled_sbc(
         axis=0,
     )
     total_trials = int(sum(result.trial_count for result in selected))
+    if joint.shape != (bin_count,) or contact.shape != (bin_count,):
+        raise ValueError("aggregate joint/contact histograms changed bin count")
+    if parameters.shape != (parameter_count, bin_count):
+        raise ValueError("aggregate parameter histograms changed dimensions")
     if int(np.sum(joint)) != total_trials or int(np.sum(contact)) != total_trials:
         raise ValueError("aggregate rank histograms lost SBC trials")
+    if np.any(np.sum(parameters, axis=1) != total_trials):
+        raise ValueError("aggregate parameter rank histograms lost SBC trials")
 
+    named_histograms = (
+        ("joint", joint),
+        ("contact", contact),
+        *(
+            (f"parameter_{index}", parameters[index])
+            for index in range(parameter_count)
+        ),
+    )
     return {
         "fold_count": len(selected),
         "trial_count": total_trials,
@@ -126,6 +244,7 @@ def aggregate_controlled_sbc(
                 _histogram_uniformity(parameters[index])
                 for index in range(parameter_count)
             ],
+            "global_test": _global_uniformity_test(named_histograms),
         },
         "posterior": {
             "mean_true_joint_mass": _weighted_mean(
@@ -151,6 +270,23 @@ def aggregate_controlled_sbc(
     }
 
 
+def _validated_seeds(seeds: Sequence[int]) -> tuple[int, ...]:
+    if isinstance(seeds, (str, bytes)) or not isinstance(seeds, Sequence):
+        raise ValueError("seeds must be a sequence of integers")
+    normalized: list[int] = []
+    for index, seed in enumerate(seeds):
+        if isinstance(seed, (bool, np.bool_)) or not isinstance(
+            seed,
+            (int, np.integer),
+        ):
+            raise ValueError(f"seeds[{index}] must be an integer")
+        normalized.append(int(seed))
+    result = tuple(normalized)
+    if not result or len(set(result)) != len(result):
+        raise ValueError("seeds must be nonempty and unique")
+    return result
+
+
 def run_controlled_latent_contact_sbc(
     *,
     seeds: Sequence[int],
@@ -172,9 +308,7 @@ def run_controlled_latent_contact_sbc(
         raise ValueError("trials_per_fold must be a positive integer")
     if type(bin_count) is not int or bin_count < 2:
         raise ValueError("bin_count must be an integer of at least two")
-    normalized_seeds = tuple(int(seed) for seed in seeds)
-    if not normalized_seeds or len(set(normalized_seeds)) != len(normalized_seeds):
-        raise ValueError("seeds must be nonempty and unique")
+    normalized_seeds = _validated_seeds(seeds)
 
     cfg = benchmark_config or CounterfactualBenchmarkConfig()
     latent_cfg = contact_config or LatentContactConfig(

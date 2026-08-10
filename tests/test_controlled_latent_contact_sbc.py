@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from causal4d.benchmark import CounterfactualBenchmarkConfig
 from causal4d.contact_inference import LatentContactConfig
@@ -48,7 +49,34 @@ def test_aggregate_controlled_sbc_sums_trials_and_histograms() -> None:
     assert aggregate["rank_histograms"]["joint"] == [15, 15]
     assert aggregate["rank_histograms"]["contact"] == [15, 15]
     assert aggregate["uniformity"]["joint"]["max_abs_frequency_error"] == 0.0
+    assert aggregate["uniformity"]["global_test"]["passed"] is True
+    assert aggregate["uniformity"]["global_test"]["monte_carlo_p_value"] == 1.0
     assert np.isclose(aggregate["posterior"]["mean_entropy_reduction"], 0.2)
+
+
+def test_aggregate_controlled_sbc_rejects_lost_parameter_trials() -> None:
+    result = _result(trials=10, seed=1, counts=(4, 6))
+    object.__setattr__(
+        result,
+        "parameter_rank_histograms",
+        ((4, 6), (4, 5), (4, 6)),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="parameter rank histograms lost SBC trials",
+    ):
+        aggregate_controlled_sbc((result,))
+
+
+@pytest.mark.parametrize("seed", [True, 3.5, "3"])
+def test_controlled_sbc_rejects_coercive_seeds(seed: object) -> None:
+    with pytest.raises(ValueError, match=r"seeds\[0\] must be an integer"):
+        run_controlled_latent_contact_sbc(
+            seeds=(seed,),  # type: ignore[arg-type]
+            trials_per_fold=1,
+            bin_count=2,
+        )
 
 
 def test_controlled_sbc_builds_all_held_out_topology_folds() -> None:
@@ -82,6 +110,7 @@ def test_controlled_sbc_builds_all_held_out_topology_folds() -> None:
     assert "not real-data calibration" in result["interpretation"]
     assert result["aggregate"]["fold_count"] == 3
     assert result["aggregate"]["trial_count"] == 36
+    assert result["aggregate"]["uniformity"]["global_test"]["histogram_count"] == 5
     assert {fold["held_out_object"] for fold in result["folds"]} == {
         "rope",
         "cloth",
