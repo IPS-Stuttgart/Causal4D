@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from collections.abc import Sequence
+from pathlib import Path
 
 from causal4d.benchmark import CounterfactualBenchmarkConfig
 from causal4d.contact_evaluation import (
@@ -12,6 +13,7 @@ from causal4d.contact_evaluation import (
     write_latent_contact_artifacts,
 )
 from causal4d.contact_inference import LatentContactConfig
+from causal4d.controlled_latent_contact_sbc import run_controlled_latent_contact_sbc
 
 
 def _parse_seeds(value: str) -> list[int]:
@@ -48,6 +50,25 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--observation-fraction", type=float, default=0.20)
     parser.add_argument("--observation-noise-mm", type=float, default=1.5)
     parser.add_argument(
+        "--sbc-trials-per-fold",
+        type=int,
+        default=0,
+        help=(
+            "also run exact finite-support simulation-based calibration; zero "
+            "disables the diagnostic"
+        ),
+    )
+    parser.add_argument(
+        "--sbc-bins",
+        type=int,
+        default=10,
+        help="rank-histogram bins for the optional SBC diagnostic",
+    )
+    parser.add_argument(
+        "--sbc-output-json",
+        help="optional SBC JSON path; defaults to OUTPUT_DIR/sbc.json",
+    )
+    parser.add_argument(
         "--require-gates",
         action="store_true",
         help="return status 2 when any pre-registered milestone gate fails",
@@ -57,6 +78,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.sbc_trials_per_fold < 0:
+        raise ValueError("sbc-trials-per-fold must be nonnegative")
     benchmark_config = CounterfactualBenchmarkConfig(
         frame_count=args.frames,
         training_repeats=args.training_repeats,
@@ -69,23 +92,42 @@ def main(argv: Sequence[str] | None = None) -> int:
         observation_noise_std_m=args.observation_noise_mm / 1000.0,
         confidence_level=benchmark_config.confidence_level,
     )
+    seeds = _parse_seeds(args.seeds)
     result = run_latent_contact_benchmark(
-        seeds=_parse_seeds(args.seeds),
+        seeds=seeds,
         benchmark_config=benchmark_config,
         contact_config=contact_config,
     )
     paths = write_latent_contact_artifacts(result, args.output_dir)
-    print(
-        json.dumps(
-            {
-                "success_gates": result["success_gates"],
-                "aggregate": result["aggregate"],
-                "artifacts": paths,
-            },
-            indent=2,
-            sort_keys=True,
+    summary: dict[str, object] = {
+        "success_gates": result["success_gates"],
+        "aggregate": result["aggregate"],
+        "artifacts": paths,
+    }
+    if args.sbc_trials_per_fold:
+        sbc = run_controlled_latent_contact_sbc(
+            seeds=seeds,
+            trials_per_fold=args.sbc_trials_per_fold,
+            bin_count=args.sbc_bins,
+            benchmark_config=benchmark_config,
+            contact_config=contact_config,
         )
-    )
+        sbc_path = (
+            Path(args.sbc_output_json)
+            if args.sbc_output_json
+            else Path(args.output_dir) / "sbc.json"
+        )
+        sbc_path.parent.mkdir(parents=True, exist_ok=True)
+        sbc_path.write_text(
+            json.dumps(sbc, indent=2, sort_keys=True, allow_nan=False) + "\n",
+            encoding="utf-8",
+        )
+        summary["sbc"] = {
+            "path": str(sbc_path.resolve()),
+            "aggregate": sbc["aggregate"],
+            "interpretation": sbc["interpretation"],
+        }
+    print(json.dumps(summary, indent=2, sort_keys=True))
     if args.require_gates and not result["success_gates"]["overall_passed"]:
         return 2
     return 0
