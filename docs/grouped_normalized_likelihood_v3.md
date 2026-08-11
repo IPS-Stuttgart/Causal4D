@@ -11,7 +11,8 @@ unchanged for frozen and historical analyses.
 cases where the number and dimension of admitted groups vary across providers or
 prefixes. It does not change the registered 18-session/36-execution physical
 estimator, authorize confirmatory collection, or establish calibration or
-physical benefit.
+physical benefit. The score is never selected implicitly from evidence shape,
+covariance representation, or provider identity.
 
 ## Score
 
