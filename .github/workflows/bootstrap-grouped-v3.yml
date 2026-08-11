@@ -1,4 +1,4 @@
-name: Publish rebased grouped normalized likelihood v3
+name: Publish grouped normalized likelihood v3 on current main
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: grouped-v3-rebased-publisher
+  group: grouped-v3-current-main-publisher
   cancel-in-progress: true
 
 jobs:
@@ -26,13 +26,13 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify and publish the exact combined implementation
+      - name: Verify and publish the exact current-main implementation
         env:
-          BASE_SHA: de5116f0bd7e6c04c1ccd4af6b5f4cc8b089f65f
-          EXPECTED_TARGET_SHA: de5116f0bd7e6c04c1ccd4af6b5f4cc8b089f65f
+          BASE_SHA: a82f7ca093b71d1480e52e2b11b8b77c3b007620
+          EXPECTED_TARGET_SHA: 4aa560ab74066c13efb5ae7d73102de4c244561e
           GH_TOKEN: ${{ github.token }}
-          PATCH_SHA256: 4712e2415882409cc8b292d5c3addc1fa612de37b39f26d66d56c094f8299fb2
-          TARGET_BRANCH: agent/grouped-normalized-v3
+          PATCH_SHA256: 7cfb45840626a31a590d249fd2cfa3ab70c6b220188f458c6535a95dc83c55a9
+          TARGET_BRANCH: agent/grouped-normalized-v3-review
         run: |
           set -euo pipefail
 
@@ -46,17 +46,17 @@ jobs:
           test "$remote_target" = "$EXPECTED_TARGET_SHA"
           git cat-file -e "$BASE_SHA^{commit}"
 
-          base64 --decode .agent/grouped-v3-rebased.patch.gz.b64 > \
-            "$RUNNER_TEMP/grouped-v3-rebased.patch.gz"
-          echo "$PATCH_SHA256  $RUNNER_TEMP/grouped-v3-rebased.patch.gz" | \
+          base64 --decode .agent/grouped-v3-a82.patch.gz.b64 > \
+            "$RUNNER_TEMP/grouped-v3-a82.patch.gz"
+          echo "$PATCH_SHA256  $RUNNER_TEMP/grouped-v3-a82.patch.gz" | \
             sha256sum --check --strict
           gzip --decompress --stdout \
-            "$RUNNER_TEMP/grouped-v3-rebased.patch.gz" > \
-            "$RUNNER_TEMP/grouped-v3-rebased.patch"
+            "$RUNNER_TEMP/grouped-v3-a82.patch.gz" > \
+            "$RUNNER_TEMP/grouped-v3-a82.patch"
 
           git checkout -B "$TARGET_BRANCH" "$BASE_SHA"
           git apply --index --whitespace=error-all \
-            "$RUNNER_TEMP/grouped-v3-rebased.patch"
+            "$RUNNER_TEMP/grouped-v3-a82.patch"
 
           actual="$(git diff --cached --name-only | LC_ALL=C sort)"
           expected="$(printf '%s\n' \
@@ -78,13 +78,13 @@ jobs:
             test "$actual_blob" = "$expected_blob"
           }
           verify_postimage \
-            e61c3118fc42b151689814d19b05ddc4ce6c2505 \
+            b60a5bed04cf5ebb18d53c42f2dc4589ce5050fc \
             docs/grouped_normalized_likelihood_v3.md
           verify_postimage \
-            0b3bccffa6701f21bdac06edea07fa87059196d6 \
+            a37e80a14d836c5b0bb0e93a1b576fe2f343fd25 \
             docs/structured_grouped_likelihood.md
           verify_postimage \
-            94cf4810176ca842d3a0e266ebf06cc77e4dff9a \
+            f3e3c60ba1659b07dbf5314fd5590250b0529dfc \
             src/causal4d/__init__.py
           verify_postimage \
             08c127d8d36595aa2eef8c332222716cdd26cd2f \
@@ -112,12 +112,17 @@ jobs:
           git config user.email \
             41898282+github-actions[bot]@users.noreply.github.com
           git commit -m "Add grouped covariance-normalized likelihood v3" \
-            -m "Rebase the opt-in grouped full-covariance normalized score onto registered-query structured factual abduction. Add contributor caps, reliability tempering, explicit likelihood power, source-covariance conditioning diagnostics, and invariant tests while preserving legacy defaults and the registered physical-study artifact identity."
+            -m "Rebase the opt-in grouped full-covariance normalized score onto registered-query structured factual abduction and the interventional-contrast API. Add contributor caps, reliability tempering, explicit likelihood power, source-covariance conditioning diagnostics, and invariant tests while preserving legacy defaults and the registered physical-study artifact identity."
 
+          remote_main_after_build="$(
+            git ls-remote origin refs/heads/main | awk '{print $1}'
+          )"
           remote_target_after_build="$(
             git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}'
           )"
+          test "$remote_main_after_build" = "$BASE_SHA"
           test "$remote_target_after_build" = "$EXPECTED_TARGET_SHA"
+
           auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           git -c http.extraheader="AUTHORIZATION: basic $auth" push \
             --force origin "HEAD:refs/heads/$TARGET_BRANCH"
