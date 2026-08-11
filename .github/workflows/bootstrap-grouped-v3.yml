@@ -31,6 +31,7 @@ jobs:
           BASE_SHA: a82f7ca093b71d1480e52e2b11b8b77c3b007620
           EXPECTED_TARGET_SHA: 4aa560ab74066c13efb5ae7d73102de4c244561e
           GH_TOKEN: ${{ github.token }}
+          PATCH_BASE64_SHA256: 19aa47cd39ed18f993bc03fa24cd0466f31565dc4a735ff7030d59db33d89284
           PATCH_SHA256: 7cfb45840626a31a590d249fd2cfa3ab70c6b220188f458c6535a95dc83c55a9
           TARGET_BRANCH: agent/grouped-normalized-v3-review
         run: |
@@ -46,7 +47,11 @@ jobs:
           test "$remote_target" = "$EXPECTED_TARGET_SHA"
           git cat-file -e "$BASE_SHA^{commit}"
 
-          base64 --decode .agent/grouped-v3-a82.patch.gz.b64 > \
+          cat .agent/grouped-v3-a82.patch.gz.b64.part{00..07} > \
+            "$RUNNER_TEMP/grouped-v3-a82.patch.gz.b64"
+          echo "$PATCH_BASE64_SHA256  $RUNNER_TEMP/grouped-v3-a82.patch.gz.b64" | \
+            sha256sum --check --strict
+          base64 --decode "$RUNNER_TEMP/grouped-v3-a82.patch.gz.b64" > \
             "$RUNNER_TEMP/grouped-v3-a82.patch.gz"
           echo "$PATCH_SHA256  $RUNNER_TEMP/grouped-v3-a82.patch.gz" | \
             sha256sum --check --strict
