@@ -12,8 +12,7 @@ jobs:
   apply:
     if: >-
       github.repository == 'IPS-Stuttgart/Causal4D' &&
-      github.actor == 'FlorianPfaff' &&
-      github.event.head_commit.message == 'Bootstrap bounded stable-core typing repairs'
+      github.event.head_commit.message == 'Run bounded stable-core typing repairs'
     runs-on: ubuntu-latest
     steps:
       - name: Check out the exact branch head
