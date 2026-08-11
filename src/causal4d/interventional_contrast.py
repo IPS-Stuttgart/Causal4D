@@ -3,6 +3,8 @@
 from causal4d._interventional_contrast_bounds import (
     INTERVENTIONAL_CONTRAST_BOUNDS_SCHEMA_VERSION,
     InterventionalContrastBoundsV1,
+)
+from causal4d._interventional_contrast_bounds_build import (
     build_interventional_contrast_bounds,
 )
 from causal4d._interventional_contrast_bounds_io import (
