@@ -49,3 +49,12 @@ semantics, registered protocols, target access, or evidence counts.
 Expansion requires an intentional change to the runner inventory and policy
 test. Strict mode is not enabled repository-wide merely to create unrelated
 migration work.
+
+## Acquisition and merge-base independence
+
+The strict tranche does not own pre-acquisition readiness or operator identity.
+Those paths continue to inherit the current fail-closed behavior from `main`,
+including the requirement for a genuinely distinct independent verifier. A
+typing-only pull request must therefore pass the complete merge-result suite
+against the current base; it cannot freeze, bypass, or reinterpret an older
+acquisition fixture merely to satisfy static analysis.
