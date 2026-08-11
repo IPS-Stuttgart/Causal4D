@@ -1,238 +1,376 @@
-"""Controlled counterfactual benchmarks for intervention-ready world models."""
+"""Public Causal4D exports with compatibility-preserving lazy loading.
 
-from causal4d.action_conditioned_counterfactual import (
-    ActionConditionedPhysicalPosterior,
-    apply_action_conditioned_counterfactual_operator,
+Importing the package root defines the historical export inventory without
+eagerly importing research, protocol, provider, or optional integration
+modules. Each public attribute is loaded from its owning module on first
+access and then cached in this module. New downstream code should prefer
+``causal4d.api.v1`` for the explicit compatibility promise.
+"""
+
+from __future__ import annotations
+
+from importlib import import_module
+from typing import Final
+
+
+_LAZY_EXPORT_GROUPS: Final = (
+    (
+        "causal4d.action_conditioned_counterfactual",
+        (
+            "ActionConditionedPhysicalPosterior",
+            "apply_action_conditioned_counterfactual_operator",
+        ),
+    ),
+    (
+        "causal4d.action_conditioned_discrepancy",
+        (
+            "ActionConditionedDiscrepancyFeatures",
+            "ActionConditionedDiscrepancyForecast",
+            "ActionConditionedDiscrepancyModel",
+            "build_action_conditioned_features",
+            "forecast_action_conditioned_persistence",
+        ),
+    ),
+    (
+        "causal4d.action_support",
+        (
+            "ACTION_SUPPORT_SCHEMA_VERSION",
+            "ActionSupportCalibration",
+            "ActionSupportDecision",
+            "ActionSupportSelection",
+            "ActionSupportSourceCase",
+            "evaluate_action_support",
+            "fit_action_support_calibration",
+            "load_action_support_calibration",
+            "load_claim_bearing_action_support_calibration",
+            "select_action_supported_candidate",
+            "write_action_support_calibration",
+        ),
+    ),
+    (
+        "causal4d.action_support_counterfactual",
+        ("apply_guarded_action_conditioned_counterfactual_operator",),
+    ),
+    (
+        "causal4d.counterfactual_regret",
+        (
+            "COUNTERFACTUAL_REGRET_ENDPOINTS",
+            "COUNTERFACTUAL_REGRET_SCHEMA_VERSION",
+            "CounterfactualRegretCertificate",
+            "CounterfactualRegretDecision",
+            "CounterfactualRegretFeatures",
+            "CounterfactualRegretPrerequisite",
+            "CounterfactualRegretSelection",
+            "CounterfactualRegretSourceCase",
+            "CounterfactualRegretTarget",
+            "evaluate_counterfactual_regret",
+            "fit_counterfactual_regret_certificate",
+            "load_claim_bearing_counterfactual_regret_certificate",
+            "load_counterfactual_regret_certificate",
+            "select_counterfactual_regret_candidate",
+            "write_counterfactual_regret_certificate",
+            "write_counterfactual_regret_decision",
+        ),
+    ),
+    (
+        "causal4d.latent_contact_v2",
+        (
+            "LATENT_CONTACT_V2_SCHEMA_VERSION",
+            "ContactEffectPosteriorV2",
+            "ContactEndpoint",
+            "ContactLikelihoodV2Diagnostics",
+            "ContactObservationEvidenceV2",
+            "ContactPatchHypothesisSupportV2",
+            "ContactPatchRolloutBankV2",
+            "ContactPatchStateV2",
+            "ContactV2Selection",
+            "ContactV2SupportDecision",
+            "ContactV2SupportPolicy",
+            "ContactV2SupportRejectedError",
+            "GraphContactPatchModelV2",
+            "LinearContactObservationGroup",
+            "SparseContactPatch",
+            "build_contact_patch_rollout_bank_v2",
+            "contact_component_log_likelihoods_v2",
+            "evaluate_contact_v2_support",
+            "gaussian_mixture_quantiles",
+            "posterior_weights_from_contact_evidence_v2",
+            "select_contact_v2_candidate",
+        ),
+    ),
+    (
+        "causal4d.decision_trace",
+        (
+            "DECISION_TRACE_ENDPOINTS",
+            "DECISION_TRACE_PIPELINE",
+            "DECISION_TRACE_SCHEMA_NAME",
+            "DECISION_TRACE_SCHEMA_VERSION",
+            "DECISION_TRACE_STAGE_KINDS",
+            "DecisionTraceArtifact",
+            "DecisionTraceBuildResult",
+            "DecisionTraceDecision",
+            "DecisionTraceSelection",
+            "DecisionTraceStage",
+            "UnifiedDecisionTrace",
+            "build_unified_decision_trace",
+            "load_claim_bearing_decision_trace",
+            "load_decision_trace",
+            "require_decision_trace_stack_lock",
+            "write_decision_trace",
+        ),
+    ),
+    (
+        "causal4d.benchmark",
+        (
+            "CounterfactualBenchmarkConfig",
+            "build_protocol",
+        ),
+    ),
+    (
+        "causal4d.causal_sufficiency",
+        (
+            "CausalSufficiencyResult",
+            "assess_command_residual_sufficiency",
+        ),
+    ),
+    (
+        "causal4d.claim_bearing_observation_lineage",
+        (
+            "load_claim_bearing_prob4d_observation_lineage",
+            "require_claim_bearing_prob4d_lineage",
+        ),
+    ),
+    (
+        "causal4d.contact_evaluation",
+        ("run_latent_contact_benchmark",),
+    ),
+    (
+        "causal4d.contact_inference",
+        ("LatentContactConfig",),
+    ),
+    (
+        "causal4d.contact_traction",
+        (
+            "graph_traction_field",
+            "integrate_contact_wrench",
+        ),
+    ),
+    (
+        "causal4d.contracts",
+        (
+            "CounterfactualQuery",
+            "FactualIntervention",
+            "PhysicalPosterior",
+            "TaskPosterior",
+            "TwinBelief",
+        ),
+    ),
+    (
+        "causal4d.counterfactual",
+        (
+            "apply_counterfactual_operator",
+            "project_physical_posterior",
+        ),
+    ),
+    (
+        "causal4d.discrepancy_belief",
+        (
+            "GraphDiscrepancyBelief",
+            "graph_discrepancy_group_covariances",
+            "load_graph_discrepancy_belief",
+            "write_graph_discrepancy_belief",
+        ),
+    ),
+    (
+        "causal4d.evaluation",
+        ("run_counterfactual_benchmark",),
+    ),
+    (
+        "causal4d.factual_abduction_uncertainty",
+        (
+            "FACTUAL_ABDUCTION_UNCERTAINTY_SCHEMA_VERSION",
+            "FactualAbductionUncertaintyV1",
+            "load_factual_abduction_uncertainty_npz",
+            "save_factual_abduction_uncertainty_npz",
+        ),
+    ),
+    (
+        "causal4d.finite_query_ambiguity",
+        (
+            "FiniteQueryAmbiguityConfig",
+            "FiniteQueryAmbiguityResult",
+            "assess_finite_query_ambiguity",
+        ),
+    ),
+    (
+        "causal4d.graph_mode_abduction",
+        (
+            "GraphModeAbductionConfig",
+            "abduct_factual_intervention_graph_mode",
+            "graph_mode_joint_weights",
+        ),
+    ),
+    (
+        "causal4d.grouped_likelihood",
+        (
+            "GroupLikelihoodDiagnostics",
+            "GroupedScoreSemantics",
+            "grouped_component_log_likelihoods",
+            "posterior_weights_from_grouped_evidence",
+        ),
+    ),
+    (
+        "causal4d.hierarchical_abduction",
+        (
+            "HierarchicalAbductionResult",
+            "abduct_hierarchical_interventions",
+        ),
+    ),
+    (
+        "causal4d.identifiability",
+        (
+            "IdentifiabilityConfig",
+            "InterventionIdentifiabilityResult",
+            "assess_intervention_identifiability",
+            "finite_response_sensitivity",
+            "project_identifiable_intervention_update",
+        ),
+    ),
+    (
+        "causal4d.interventional_contrast",
+        (
+            "INTERVENTIONAL_CONTRAST_SCHEMA_VERSION",
+            "ContrastConditionalVariancePolicy",
+            "ContrastCouplingPolicy",
+            "InterventionalContrastPosteriorV1",
+            "InterventionalContrastQueryV1",
+            "build_interventional_contrast",
+            "load_interventional_contrast",
+            "save_interventional_contrast",
+        ),
+    ),
+    (
+        "causal4d.joint_observation",
+        (
+            "JOINT_OBSERVATION_SCHEMA_VERSION",
+            "CovarianceRepresentation",
+            "JointGaussianLikelihoodDiagnostics",
+            "LinearJointObservationEvidence",
+            "block_diagonalize_covariance",
+            "joint_component_log_likelihoods",
+            "posterior_weights_from_joint_observation",
+        ),
+    ),
+    (
+        "causal4d.observation_evidence",
+        (
+            "GroupedObservationEvidence",
+            "ObservationGroup",
+        ),
+    ),
+    (
+        "causal4d.observation_factor_lineage",
+        (
+            "OBSERVATION_FACTOR_SCHEMA",
+            "OBSERVATION_FACTOR_SCHEMA_VERSION",
+            "ObservationFactorLineage",
+            "bind_twin_belief_observation_factor_lineage",
+            "load_observation_factor_lineage",
+            "validate_twin_belief_observation_factor_lineage",
+        ),
+    ),
+    (
+        "causal4d.partial_identifiability",
+        ("preserve_prior_within_unidentified_subspace",),
+    ),
+    (
+        "causal4d.prefix_likelihood",
+        (
+            "PrefixLikelihoodConfig",
+            "prefix_component_log_likelihood",
+            "update_joint_weights_from_prefix",
+        ),
+    ),
+    (
+        "causal4d.prob4d_joint_observation",
+        (
+            "PROB4D_JOINT_ADAPTER_SCHEMA_VERSION",
+            "Prob4DJointObservationDiagnostics",
+            "Prob4DReliabilityPolicy",
+            "joint_observation_from_prob4d",
+        ),
+    ),
+    (
+        "causal4d.prob4d_observation_lineage",
+        (
+            "validate_claim_bearing_prob4d_observation_metadata",
+            "validate_prob4d_causal_observation_metadata",
+        ),
+    ),
+    (
+        "causal4d.provider_contract",
+        (
+            "BASE_CAUSAL4D_PROVIDER_CAPABILITIES",
+            "BAYESIAN_PHYSTWIN_ARTIFACT_SCHEMA_VERSIONS",
+            "BAYESIAN_PHYSTWIN_COMPATIBILITY_RANGE",
+            "BAYESIAN_PHYSTWIN_PROVIDER_CAPABILITIES",
+            "PHYSICAL_BELIEF_PROVIDER_SCHEMA_VERSION",
+            "PhysicalBeliefProviderManifest",
+            "ProviderCompatibilityResult",
+            "load_bayesian_phystwin_provider_manifest",
+            "require_bayesian_phystwin_provider",
+            "validate_bayesian_phystwin_provider",
+            "validate_provider_compatibility",
+        ),
+    ),
+    (
+        "causal4d.rollout_bank",
+        (
+            "JointRolloutBank",
+            "SparseTrajectoryEvidence",
+        ),
+    ),
+    (
+        "causal4d.semantic_freshness",
+        (
+            "SEMANTIC_TIMING_SCHEMA_VERSION",
+            "SEMANTIC_TIMING_SCOPE",
+            "SemanticFreshnessDecision",
+            "SemanticFreshnessLimits",
+            "SemanticTimingMetadata",
+            "apply_semantic_freshness_gate",
+        ),
+    ),
+    (
+        "causal4d.sensor_evidence",
+        (
+            "INDEPENDENT_SENSOR_SCHEMA_VERSION",
+            "ActuatorEvidence",
+            "ContactWrenchEvidence",
+            "load_independent_sensor_evidence",
+            "save_independent_sensor_evidence",
+        ),
+    ),
+    (
+        "causal4d.sensor_factorized_abduction",
+        (
+            "IndependentSensorAbductionConfig",
+            "predict_affine_actuator_realizations",
+            "reweight_factual_intervention_with_independent_sensors",
+        ),
+    ),
+    (
+        "causal4d.stable_discrepancy_dynamics",
+        (
+            "StableDiscrepancyTransitionModel",
+            "forecast_action_conditioned_dynamics",
+        ),
+    ),
 )
-from causal4d.action_conditioned_discrepancy import (
-    ActionConditionedDiscrepancyFeatures,
-    ActionConditionedDiscrepancyForecast,
-    ActionConditionedDiscrepancyModel,
-    build_action_conditioned_features,
-    forecast_action_conditioned_persistence,
-)
-from causal4d.action_support import (
-    ACTION_SUPPORT_SCHEMA_VERSION,
-    ActionSupportCalibration,
-    ActionSupportDecision,
-    ActionSupportSelection,
-    ActionSupportSourceCase,
-    evaluate_action_support,
-    fit_action_support_calibration,
-    load_action_support_calibration,
-    load_claim_bearing_action_support_calibration,
-    select_action_supported_candidate,
-    write_action_support_calibration,
-)
-from causal4d.action_support_counterfactual import (
-    apply_guarded_action_conditioned_counterfactual_operator,
-)
-from causal4d.counterfactual_regret import (
-    COUNTERFACTUAL_REGRET_ENDPOINTS,
-    COUNTERFACTUAL_REGRET_SCHEMA_VERSION,
-    CounterfactualRegretCertificate,
-    CounterfactualRegretDecision,
-    CounterfactualRegretFeatures,
-    CounterfactualRegretPrerequisite,
-    CounterfactualRegretSelection,
-    CounterfactualRegretSourceCase,
-    CounterfactualRegretTarget,
-    evaluate_counterfactual_regret,
-    fit_counterfactual_regret_certificate,
-    load_claim_bearing_counterfactual_regret_certificate,
-    load_counterfactual_regret_certificate,
-    select_counterfactual_regret_candidate,
-    write_counterfactual_regret_certificate,
-    write_counterfactual_regret_decision,
-)
-from causal4d.latent_contact_v2 import (
-    LATENT_CONTACT_V2_SCHEMA_VERSION,
-    ContactEffectPosteriorV2,
-    ContactEndpoint,
-    ContactLikelihoodV2Diagnostics,
-    ContactObservationEvidenceV2,
-    ContactPatchHypothesisSupportV2,
-    ContactPatchRolloutBankV2,
-    ContactPatchStateV2,
-    ContactV2Selection,
-    ContactV2SupportDecision,
-    ContactV2SupportPolicy,
-    ContactV2SupportRejectedError,
-    GraphContactPatchModelV2,
-    LinearContactObservationGroup,
-    SparseContactPatch,
-    build_contact_patch_rollout_bank_v2,
-    contact_component_log_likelihoods_v2,
-    evaluate_contact_v2_support,
-    gaussian_mixture_quantiles,
-    posterior_weights_from_contact_evidence_v2,
-    select_contact_v2_candidate,
-)
-from causal4d.decision_trace import (
-    DECISION_TRACE_ENDPOINTS,
-    DECISION_TRACE_PIPELINE,
-    DECISION_TRACE_SCHEMA_NAME,
-    DECISION_TRACE_SCHEMA_VERSION,
-    DECISION_TRACE_STAGE_KINDS,
-    DecisionTraceArtifact,
-    DecisionTraceBuildResult,
-    DecisionTraceDecision,
-    DecisionTraceSelection,
-    DecisionTraceStage,
-    UnifiedDecisionTrace,
-    build_unified_decision_trace,
-    load_claim_bearing_decision_trace,
-    load_decision_trace,
-    require_decision_trace_stack_lock,
-    write_decision_trace,
-)
-from causal4d.benchmark import CounterfactualBenchmarkConfig, build_protocol
-from causal4d.causal_sufficiency import (
-    CausalSufficiencyResult,
-    assess_command_residual_sufficiency,
-)
-from causal4d.claim_bearing_observation_lineage import (
-    load_claim_bearing_prob4d_observation_lineage,
-    require_claim_bearing_prob4d_lineage,
-)
-from causal4d.contact_evaluation import run_latent_contact_benchmark
-from causal4d.contact_inference import LatentContactConfig
-from causal4d.contact_traction import graph_traction_field, integrate_contact_wrench
-from causal4d.contracts import (
-    CounterfactualQuery,
-    FactualIntervention,
-    PhysicalPosterior,
-    TaskPosterior,
-    TwinBelief,
-)
-from causal4d.counterfactual import apply_counterfactual_operator
-from causal4d.discrepancy_belief import (
-    GraphDiscrepancyBelief,
-    graph_discrepancy_group_covariances,
-    load_graph_discrepancy_belief,
-    write_graph_discrepancy_belief,
-)
-from causal4d.evaluation import run_counterfactual_benchmark
-from causal4d.factual_abduction_uncertainty import (
-    FACTUAL_ABDUCTION_UNCERTAINTY_SCHEMA_VERSION,
-    FactualAbductionUncertaintyV1,
-    load_factual_abduction_uncertainty_npz,
-    save_factual_abduction_uncertainty_npz,
-)
-from causal4d.finite_query_ambiguity import (
-    FiniteQueryAmbiguityConfig,
-    FiniteQueryAmbiguityResult,
-    assess_finite_query_ambiguity,
-)
-from causal4d.graph_mode_abduction import (
-    GraphModeAbductionConfig,
-    abduct_factual_intervention_graph_mode,
-    graph_mode_joint_weights,
-)
-from causal4d.grouped_likelihood import (
-    GroupLikelihoodDiagnostics,
-    GroupedScoreSemantics,
-    grouped_component_log_likelihoods,
-    posterior_weights_from_grouped_evidence,
-)
-from causal4d.hierarchical_abduction import (
-    HierarchicalAbductionResult,
-    abduct_hierarchical_interventions,
-)
-from causal4d.identifiability import (
-    IdentifiabilityConfig,
-    InterventionIdentifiabilityResult,
-    assess_intervention_identifiability,
-    finite_response_sensitivity,
-    project_identifiable_intervention_update,
-)
-from causal4d.interventional_contrast import (
-    INTERVENTIONAL_CONTRAST_SCHEMA_VERSION,
-    ContrastConditionalVariancePolicy,
-    ContrastCouplingPolicy,
-    InterventionalContrastPosteriorV1,
-    InterventionalContrastQueryV1,
-    build_interventional_contrast,
-    load_interventional_contrast,
-    save_interventional_contrast,
-)
-from causal4d.joint_observation import (
-    JOINT_OBSERVATION_SCHEMA_VERSION,
-    CovarianceRepresentation,
-    JointGaussianLikelihoodDiagnostics,
-    LinearJointObservationEvidence,
-    block_diagonalize_covariance,
-    joint_component_log_likelihoods,
-    posterior_weights_from_joint_observation,
-)
-from causal4d.observation_evidence import (
-    GroupedObservationEvidence,
-    ObservationGroup,
-)
-from causal4d.observation_factor_lineage import (
-    OBSERVATION_FACTOR_SCHEMA,
-    OBSERVATION_FACTOR_SCHEMA_VERSION,
-    ObservationFactorLineage,
-    bind_twin_belief_observation_factor_lineage,
-    load_observation_factor_lineage,
-    validate_twin_belief_observation_factor_lineage,
-)
-from causal4d.partial_identifiability import (
-    preserve_prior_within_unidentified_subspace,
-)
-from causal4d.prefix_likelihood import (
-    PrefixLikelihoodConfig,
-    prefix_component_log_likelihood,
-    update_joint_weights_from_prefix,
-)
-from causal4d.prob4d_joint_observation import (
-    PROB4D_JOINT_ADAPTER_SCHEMA_VERSION,
-    Prob4DJointObservationDiagnostics,
-    Prob4DReliabilityPolicy,
-    joint_observation_from_prob4d,
-)
-from causal4d.prob4d_observation_lineage import (
-    validate_claim_bearing_prob4d_observation_metadata,
-    validate_prob4d_causal_observation_metadata,
-)
-from causal4d.provider_contract import (
-    BASE_CAUSAL4D_PROVIDER_CAPABILITIES,
-    BAYESIAN_PHYSTWIN_ARTIFACT_SCHEMA_VERSIONS,
-    BAYESIAN_PHYSTWIN_COMPATIBILITY_RANGE,
-    BAYESIAN_PHYSTWIN_PROVIDER_CAPABILITIES,
-    PHYSICAL_BELIEF_PROVIDER_SCHEMA_VERSION,
-    PhysicalBeliefProviderManifest,
-    ProviderCompatibilityResult,
-    load_bayesian_phystwin_provider_manifest,
-    require_bayesian_phystwin_provider,
-    validate_bayesian_phystwin_provider,
-    validate_provider_compatibility,
-)
-from causal4d.rollout_bank import JointRolloutBank, SparseTrajectoryEvidence
-from causal4d.semantic_freshness import (
-    SEMANTIC_TIMING_SCHEMA_VERSION,
-    SEMANTIC_TIMING_SCOPE,
-    SemanticFreshnessDecision,
-    SemanticFreshnessLimits,
-    SemanticTimingMetadata,
-    apply_semantic_freshness_gate,
-)
-from causal4d.sensor_evidence import (
-    INDEPENDENT_SENSOR_SCHEMA_VERSION,
-    ActuatorEvidence,
-    ContactWrenchEvidence,
-    load_independent_sensor_evidence,
-    save_independent_sensor_evidence,
-)
-from causal4d.sensor_factorized_abduction import (
-    IndependentSensorAbductionConfig,
-    predict_affine_actuator_realizations,
-    reweight_factual_intervention_with_independent_sensors,
-)
-from causal4d.stable_discrepancy_dynamics import (
-    StableDiscrepancyTransitionModel,
-    forecast_action_conditioned_dynamics,
-)
+
+_LAZY_EXPORTS: Final = {
+    name: module_name for module_name, names in _LAZY_EXPORT_GROUPS for name in names
+}
 
 __all__ = [
     "DECISION_TRACE_ENDPOINTS",
@@ -394,6 +532,7 @@ __all__ = [
     "prefix_component_log_likelihood",
     "preserve_prior_within_unidentified_subspace",
     "project_identifiable_intervention_update",
+    "project_physical_posterior",
     "require_bayesian_phystwin_provider",
     "require_claim_bearing_prob4d_lineage",
     "reweight_factual_intervention_with_independent_sensors",
@@ -412,5 +551,28 @@ __all__ = [
     "write_action_support_calibration",
     "write_graph_discrepancy_belief",
 ]
+
+if len(_LAZY_EXPORTS) != sum(len(names) for _, names in _LAZY_EXPORT_GROUPS):
+    raise RuntimeError("duplicate Causal4D lazy export")
+if set(__all__) != set(_LAZY_EXPORTS):
+    raise RuntimeError("Causal4D lazy exports and __all__ differ")
+
+
+def __getattr__(name: str) -> object:
+    """Load one historical top-level export from its owning module."""
+
+    module_name = _LAZY_EXPORTS.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(module_name), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    """Include lazy public exports in module introspection."""
+
+    return sorted(set(globals()) | set(__all__))
+
 
 __version__ = "0.5.0"
