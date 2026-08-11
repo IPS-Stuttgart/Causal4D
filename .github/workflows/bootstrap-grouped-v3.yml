@@ -1,69 +1,58 @@
-name: Bootstrap grouped normalized likelihood v3
+name: Publish rebased grouped normalized likelihood v3
 
 on:
-  pull_request:
-    branches: [main]
+  push:
+    branches:
+      - agent/grouped-v3-bootstrap
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: grouped-v3-publisher-${{ github.event.pull_request.number || github.ref }}
+  group: grouped-v3-rebased-publisher
   cancel-in-progress: true
 
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/grouped-v3-bootstrap'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out the content-addressed publisher
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify and prepare the content-addressed patch
+      - name: Verify and publish the exact combined implementation
         env:
-          BASE_SHA: 70b5e630c50b1a3702e1b5dc2d0309f530973c7d
-          PATCH_SHA256: d657c132d8bd0515f2ed5bb33fcf96e8ba1ea33e8db0a112d74537f51f83dfd3
-        run: |
-          set -euo pipefail
-          git merge-base --is-ancestor "$BASE_SHA" HEAD
-          echo "$PATCH_SHA256  .agent/grouped-v3.patch.gz" | \
-            sha256sum --check --strict
-          mkdir -p build/grouped-v3-bootstrap
-          gzip --decompress --stdout .agent/grouped-v3.patch.gz > \
-            build/grouped-v3-bootstrap/grouped-v3.patch
-
-      - name: Upload the verified patch for bootstrap diagnostics
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: grouped-v3-verified-patch-${{ github.run_id }}-${{ github.run_attempt }}
-          path: build/grouped-v3-bootstrap/grouped-v3.patch
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Reconstruct, validate, and publish the exact implementation tree
-        env:
-          BASE_SHA: 70b5e630c50b1a3702e1b5dc2d0309f530973c7d
+          BASE_SHA: de5116f0bd7e6c04c1ccd4af6b5f4cc8b089f65f
+          EXPECTED_TARGET_SHA: de5116f0bd7e6c04c1ccd4af6b5f4cc8b089f65f
           GH_TOKEN: ${{ github.token }}
+          PATCH_SHA256: 4712e2415882409cc8b292d5c3addc1fa612de37b39f26d66d56c094f8299fb2
           TARGET_BRANCH: agent/grouped-normalized-v3
         run: |
           set -euo pipefail
-          patch_file="$PWD/build/grouped-v3-bootstrap/grouped-v3.patch"
+
+          remote_main="$(
+            git ls-remote origin refs/heads/main | awk '{print $1}'
+          )"
+          test "$remote_main" = "$BASE_SHA"
+          git cat-file -e "$BASE_SHA^{commit}"
+
+          base64 --decode .agent/grouped-v3-rebased.patch.gz.b64 > \
+            "$RUNNER_TEMP/grouped-v3-rebased.patch.gz"
+          echo "$PATCH_SHA256  $RUNNER_TEMP/grouped-v3-rebased.patch.gz" | \
+            sha256sum --check --strict
+          gzip --decompress --stdout \
+            "$RUNNER_TEMP/grouped-v3-rebased.patch.gz" > \
+            "$RUNNER_TEMP/grouped-v3-rebased.patch"
+
           git checkout -B "$TARGET_BRANCH" "$BASE_SHA"
+          git apply --index --whitespace=error-all \
+            "$RUNNER_TEMP/grouped-v3-rebased.patch"
 
-          # The payload was produced from byte-identical postimages but carries
-          # three stale preimage indexes. GNU patch may relocate those hunks;
-          # the exact postimage blob checks below make that reconstruction
-          # fail closed rather than accepting an ambiguous fuzzy result.
-          patch --batch --forward --fuzz=3 -p1 < "$patch_file"
-          if find . -name '*.rej' -print -quit | grep -q .; then
-            find . -name '*.rej' -print -exec cat {} \;
-            exit 1
-          fi
-
+          actual="$(git diff --cached --name-only | LC_ALL=C sort)"
           expected="$(printf '%s\n' \
             docs/grouped_normalized_likelihood_v3.md \
             docs/structured_grouped_likelihood.md \
@@ -74,31 +63,41 @@ jobs:
             src/causal4d/observation_evidence.py \
             tests/test_factual_likelihood_semantics.py \
             tests/test_grouped_normalized_v3.py | LC_ALL=C sort)"
-          git add -- $expected
-          actual="$(git diff --cached --name-only | LC_ALL=C sort)"
           test "$actual" = "$expected"
 
           verify_postimage() {
-            expected_prefix="$1"
+            expected_blob="$1"
             path="$2"
             actual_blob="$(git hash-object "$path")"
-            case "$actual_blob" in
-              "$expected_prefix"*) ;;
-              *)
-                echo "Unexpected postimage for $path: $actual_blob (expected $expected_prefix...)" >&2
-                exit 1
-                ;;
-            esac
+            test "$actual_blob" = "$expected_blob"
           }
-          verify_postimage e61c311 docs/grouped_normalized_likelihood_v3.md
-          verify_postimage 0b3bccf docs/structured_grouped_likelihood.md
-          verify_postimage d94de5f src/causal4d/__init__.py
-          verify_postimage 65aadb3 src/causal4d/cli/abduct_phystwin_intervention.py
-          verify_postimage a72f896 src/causal4d/grouped_likelihood.py
-          verify_postimage 3f3d7ca src/causal4d/intervention_abduction.py
-          verify_postimage 6d92d80 src/causal4d/observation_evidence.py
-          verify_postimage 6cf63ad tests/test_factual_likelihood_semantics.py
-          verify_postimage 031e110 tests/test_grouped_normalized_v3.py
+          verify_postimage \
+            e61c3118fc42b151689814d19b05ddc4ce6c2505 \
+            docs/grouped_normalized_likelihood_v3.md
+          verify_postimage \
+            0b3bccffa6701f21bdac06edea07fa87059196d6 \
+            docs/structured_grouped_likelihood.md
+          verify_postimage \
+            94cf4810176ca842d3a0e266ebf06cc77e4dff9a \
+            src/causal4d/__init__.py
+          verify_postimage \
+            08c127d8d36595aa2eef8c332222716cdd26cd2f \
+            src/causal4d/cli/abduct_phystwin_intervention.py
+          verify_postimage \
+            8e6bb0081201e080bf7717a8411fe1ad4912cde6 \
+            src/causal4d/grouped_likelihood.py
+          verify_postimage \
+            9c006c00f07e793683e828a5b5a7ee93eedf5f7e \
+            src/causal4d/intervention_abduction.py
+          verify_postimage \
+            6d92d8063e2123441a7f3a534a371ef5c46b2da7 \
+            src/causal4d/observation_evidence.py
+          verify_postimage \
+            0f8ff6268326afdc4547e4b59f6003dffa7a1d5a \
+            tests/test_factual_likelihood_semantics.py
+          verify_postimage \
+            031e110e3d04021607651b70f2f801b9cd1c1604 \
+            tests/test_grouped_normalized_v3.py
 
           git diff --cached --check
           python -m compileall -q src tests
@@ -107,7 +106,9 @@ jobs:
           git config user.email \
             41898282+github-actions[bot]@users.noreply.github.com
           git commit -m "Add grouped covariance-normalized likelihood v3" \
-            -m "Introduce an opt-in grouped full-covariance normalized score with contributor caps, reliability tempering, explicit likelihood power, source-covariance conditioning diagnostics, and invariant tests. Preserve legacy semantics and the registered physical-study artifact identity."
+            -m "Rebase the opt-in grouped full-covariance normalized score onto registered-query structured factual abduction. Add contributor caps, reliability tempering, explicit likelihood power, source-covariance conditioning diagnostics, and invariant tests while preserving legacy defaults and the registered physical-study artifact identity."
+
           auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           git -c http.extraheader="AUTHORIZATION: basic $auth" push \
-            --force-with-lease origin "HEAD:refs/heads/$TARGET_BRANCH"
+            --force-with-lease="refs/heads/$TARGET_BRANCH:$EXPECTED_TARGET_SHA" \
+            origin "HEAD:refs/heads/$TARGET_BRANCH"
