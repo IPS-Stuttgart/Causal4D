@@ -1,9 +1,13 @@
 name: Temporary provider-v2 factor formatter
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/prob4d-provider-v2-factor-conformance
+      - main
+    paths:
+      - .github/workflows/provider-v2-factor-contract-format.yml
+      - src/causal4d/provider_v2_factor_contract_bundle.py
+      - tests/test_provider_v2_factor_contract_bundle.py
 
 permissions:
   contents: read
@@ -13,7 +17,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: Check out exact branch head
+      - name: Check out exact pull-request merge
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           persist-credentials: false
