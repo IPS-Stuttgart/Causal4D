@@ -40,33 +40,28 @@ jobs:
 
           source = Path("src/causal4d/evidence_decision_v1.py")
           text = source.read_text(encoding="utf-8")
-          old_admission = '''    validated = require_authorized_evidence_decision_v1(
-              decision,
-              claim_id=claim_id,
-              protocol_id=protocol_id,
-              minimum_evidence_level=minimum_evidence_level,
+          admission_anchor = (
+              "    validated = require_authorized_evidence_decision_v1(\n"
+              "        decision,\n"
+              "        claim_id=claim_id,\n"
+              "        protocol_id=protocol_id,\n"
+              "        minimum_evidence_level=minimum_evidence_level,\n"
+              "    )\n"
           )
-          bayesian_phystwin = require_bayesian_phystwin_evidence_binding_v1(
-          '''.replace("          ", "")
-          new_admission = '''    validated = require_authorized_evidence_decision_v1(
-              decision,
-              claim_id=claim_id,
-              protocol_id=protocol_id,
-              minimum_evidence_level=minimum_evidence_level,
+          admission_replacement = admission_anchor + (
+              "    require_prob4d = _require_bool(\n"
+              "        require_prob4d_binding,\n"
+              "        name=\"require_prob4d_binding\",\n"
+              "    )\n"
+              "    if require_prob4d and expected_prob4d_revision is None:\n"
+              "        raise ValueError(\n"
+              "            \"require_prob4d_binding requires \"
+              "\"expected_prob4d_revision\"\n"
+              "        )\n"
           )
-          require_prob4d = _require_bool(
-              require_prob4d_binding,
-              name="require_prob4d_binding",
-          )
-          if require_prob4d and expected_prob4d_revision is None:
-              raise ValueError(
-                  "require_prob4d_binding requires expected_prob4d_revision"
-              )
-          bayesian_phystwin = require_bayesian_phystwin_evidence_binding_v1(
-          '''.replace("          ", "")
-          if text.count(old_admission) != 1:
+          if text.count(admission_anchor) != 1:
               raise SystemExit("admission insertion point changed")
-          text = text.replace(old_admission, new_admission, 1)
+          text = text.replace(admission_anchor, admission_replacement, 1)
 
           old_condition = (
               "    if expected_prob4d_revision is not None or "
@@ -84,45 +79,43 @@ jobs:
 
           tests = Path("tests/test_evidence_decision_v1.py")
           test_text = tests.read_text(encoding="utf-8")
-          old_test = '''def test_admission_and_repository_binding_errors() -> None:
-              payload = _authorized()
-
-              with pytest.raises(ValueError, match="claim_id"):
-          '''.replace("              ", "")
-          new_test = '''def test_admission_and_repository_binding_errors() -> None:
-              payload = _authorized()
-
-              with pytest.raises(
-                  ValueError,
-                  match="require_prob4d_binding requires expected_prob4d_revision",
-              ):
-                  admit_causal_claim_v1(
-                      payload,
-                      claim_id=CLAIM_ID,
-                      protocol_id=PROTOCOL_ID,
-                      expected_bayesian_phystwin_revision=BPT_REVISION,
-                      expected_causal4d_revision=CAUSAL4D_REVISION,
-                      require_prob4d_binding=True,
-                  )
-              with pytest.raises(
-                  ValueError,
-                  match="require_prob4d_binding must be boolean",
-              ):
-                  admit_causal_claim_v1(
-                      payload,
-                      claim_id=CLAIM_ID,
-                      protocol_id=PROTOCOL_ID,
-                      expected_bayesian_phystwin_revision=BPT_REVISION,
-                      expected_causal4d_revision=CAUSAL4D_REVISION,
-                      require_prob4d_binding=1,  # type: ignore[arg-type]
-                  )
-
-              with pytest.raises(ValueError, match="claim_id"):
-          '''.replace("              ", "")
-          if test_text.count(old_test) != 1:
+          test_anchor = (
+              "def test_admission_and_repository_binding_errors() -> None:\n"
+              "    payload = _authorized()\n\n"
+          )
+          test_replacement = test_anchor + (
+              "    with pytest.raises(\n"
+              "        ValueError,\n"
+              "        match=(\n"
+              "            \"require_prob4d_binding requires \"
+              "\"expected_prob4d_revision\"\n"
+              "        ),\n"
+              "    ):\n"
+              "        admit_causal_claim_v1(\n"
+              "            payload,\n"
+              "            claim_id=CLAIM_ID,\n"
+              "            protocol_id=PROTOCOL_ID,\n"
+              "            expected_bayesian_phystwin_revision=BPT_REVISION,\n"
+              "            expected_causal4d_revision=CAUSAL4D_REVISION,\n"
+              "            require_prob4d_binding=True,\n"
+              "        )\n"
+              "    with pytest.raises(\n"
+              "        ValueError,\n"
+              "        match=\"require_prob4d_binding must be boolean\",\n"
+              "    ):\n"
+              "        admit_causal_claim_v1(\n"
+              "            payload,\n"
+              "            claim_id=CLAIM_ID,\n"
+              "            protocol_id=PROTOCOL_ID,\n"
+              "            expected_bayesian_phystwin_revision=BPT_REVISION,\n"
+              "            expected_causal4d_revision=CAUSAL4D_REVISION,\n"
+              "            require_prob4d_binding=1,  # type: ignore[arg-type]\n"
+              "        )\n\n"
+          )
+          if test_text.count(test_anchor) != 1:
               raise SystemExit("admission test insertion point changed")
           tests.write_text(
-              test_text.replace(old_test, new_test, 1),
+              test_text.replace(test_anchor, test_replacement, 1),
               encoding="utf-8",
           )
 
