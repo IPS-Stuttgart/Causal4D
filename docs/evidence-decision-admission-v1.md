@@ -52,13 +52,20 @@ A Prob4D binding is optional for decisions whose evidence path genuinely does
 not use Prob4D. When one is present, it is still validated. Set
 `require_prob4d_binding=True` to make it mandatory for a registered lane.
 
-## Source lock
+## Source and integration locks
 
-The generated validator is locked to the BayesianPhysTwin contract merged at
-revision `4ee702f5130cfedbea7bce6be5e72483c92f63da` and JSON Schema SHA-256
+The generated Causal4D validator is locked to the BayesianPhysTwin contract
+merged at revision `4ee702f5130cfedbea7bce6be5e72483c92f63da` and JSON
+Schema SHA-256
 `d5615258c6cf666d0ed9684a87930989adf91817fe99b0387e83a31479dcd465`.
-The installed-boundary workflow checks those bytes and admits a real decision
-emitted by that pinned package.
+
+The installed-boundary workflow also pins the independent Prob4D consumer at
+merge revision `c9273e8a55f812c532105a86c885a5a7627d3df3`. It checks out the
+exact Causal4D head under review, installs all three packages, emits a real
+version-1 decision through BayesianPhysTwin, and requires both independent
+consumers to agree on the decision ID, authorization, schema digest, and exact
+Prob4D repository binding. The admission receipt is retained as a workflow
+artifact.
 
 ## Command line
 
