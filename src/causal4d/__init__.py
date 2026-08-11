@@ -113,6 +113,12 @@ from causal4d.discrepancy_belief import (
     write_graph_discrepancy_belief,
 )
 from causal4d.evaluation import run_counterfactual_benchmark
+from causal4d.factual_abduction_uncertainty import (
+    FACTUAL_ABDUCTION_UNCERTAINTY_SCHEMA_VERSION,
+    FactualAbductionUncertaintyV1,
+    load_factual_abduction_uncertainty_npz,
+    save_factual_abduction_uncertainty_npz,
+)
 from causal4d.finite_query_ambiguity import (
     FiniteQueryAmbiguityConfig,
     FiniteQueryAmbiguityResult,
@@ -139,6 +145,16 @@ from causal4d.identifiability import (
     assess_intervention_identifiability,
     finite_response_sensitivity,
     project_identifiable_intervention_update,
+)
+from causal4d.interventional_contrast import (
+    INTERVENTIONAL_CONTRAST_SCHEMA_VERSION,
+    ContrastConditionalVariancePolicy,
+    ContrastCouplingPolicy,
+    InterventionalContrastPosteriorV1,
+    InterventionalContrastQueryV1,
+    build_interventional_contrast,
+    load_interventional_contrast,
+    save_interventional_contrast,
 )
 from causal4d.joint_observation import (
     JOINT_OBSERVATION_SCHEMA_VERSION,
@@ -288,9 +304,13 @@ __all__ = [
     "BAYESIAN_PHYSTWIN_PROVIDER_CAPABILITIES",
     "CausalSufficiencyResult",
     "ContactWrenchEvidence",
+    "ContrastConditionalVariancePolicy",
+    "ContrastCouplingPolicy",
     "CounterfactualBenchmarkConfig",
     "CounterfactualQuery",
     "CovarianceRepresentation",
+    "FACTUAL_ABDUCTION_UNCERTAINTY_SCHEMA_VERSION",
+    "FactualAbductionUncertaintyV1",
     "FactualIntervention",
     "FiniteQueryAmbiguityConfig",
     "FiniteQueryAmbiguityResult",
@@ -301,6 +321,9 @@ __all__ = [
     "GroupedScoreSemantics",
     "HierarchicalAbductionResult",
     "INDEPENDENT_SENSOR_SCHEMA_VERSION",
+    "INTERVENTIONAL_CONTRAST_SCHEMA_VERSION",
+    "InterventionalContrastPosteriorV1",
+    "InterventionalContrastQueryV1",
     "IdentifiabilityConfig",
     "IndependentSensorAbductionConfig",
     "InterventionIdentifiabilityResult",
@@ -342,6 +365,7 @@ __all__ = [
     "bind_twin_belief_observation_factor_lineage",
     "block_diagonalize_covariance",
     "build_action_conditioned_features",
+    "build_interventional_contrast",
     "build_protocol",
     "evaluate_action_support",
     "finite_response_sensitivity",
@@ -359,8 +383,10 @@ __all__ = [
     "load_bayesian_phystwin_provider_manifest",
     "load_claim_bearing_action_support_calibration",
     "load_claim_bearing_prob4d_observation_lineage",
+    "load_factual_abduction_uncertainty_npz",
     "load_graph_discrepancy_belief",
     "load_independent_sensor_evidence",
+    "load_interventional_contrast",
     "load_observation_factor_lineage",
     "posterior_weights_from_grouped_evidence",
     "posterior_weights_from_joint_observation",
@@ -373,7 +399,9 @@ __all__ = [
     "reweight_factual_intervention_with_independent_sensors",
     "run_counterfactual_benchmark",
     "run_latent_contact_benchmark",
+    "save_factual_abduction_uncertainty_npz",
     "save_independent_sensor_evidence",
+    "save_interventional_contrast",
     "select_action_supported_candidate",
     "update_joint_weights_from_prefix",
     "validate_bayesian_phystwin_provider",
