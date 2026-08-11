@@ -1,0 +1,259 @@
+name: Self-hosted operator registry seal
+
+on:
+  workflow_dispatch:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seal-operator-registry-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  seal:
+    name: Seal the registered operator roster on workstation2
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'issues' &&
+          github.event.action == 'opened' &&
+          github.event.issue.user.login == 'FlorianPfaff' &&
+          github.event.issue.user.id == 6773539 &&
+          github.event.issue.title ==
+            '[self-hosted] seal Causal4D operator registry'
+        )
+      )
+    runs-on: [self-hosted, Linux, X64, nvidia-smi]
+    timeout-minutes: 45
+    outputs:
+      already_sealed: ${{ steps.summary.outputs.already_sealed }}
+      dataset_modified: ${{ steps.summary.outputs.dataset_modified }}
+      registry_artifact_sha256: >-
+        ${{ steps.summary.outputs.registry_artifact_sha256 }}
+      registry_file_sha256: ${{ steps.summary.outputs.registry_file_sha256 }}
+      operator_count: ${{ steps.summary.outputs.operator_count }}
+      next_action: ${{ steps.summary.outputs.next_action }}
+      next_physical: ${{ steps.summary.outputs.next_physical }}
+      next_automatable: ${{ steps.summary.outputs.next_automatable }}
+      key_created: ${{ steps.summary.outputs.key_created }}
+      roster_created: ${{ steps.summary.outputs.roster_created }}
+      physical_evidence_increment: >-
+        ${{ steps.summary.outputs.physical_evidence_increment }}
+    steps:
+      - name: Check out exact reviewed main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Verify reviewed main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Build and install the exact Causal4D wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p outputs/operator-registry-seal/wheels
+          python -m venv .operator-registry-seal-venv
+          .operator-registry-seal-venv/bin/python -m pip install \
+            --upgrade pip "build>=1.2"
+          .operator-registry-seal-venv/bin/python -m build --wheel \
+            --outdir outputs/operator-registry-seal/wheels .
+          wheel="$(
+            find outputs/operator-registry-seal/wheels -maxdepth 1 \
+              -name 'causal4d-*.whl' -print -quit
+          )"
+          test -n "${wheel}"
+          sha256sum "${wheel}" \
+            | tee outputs/operator-registry-seal/wheel-sha256.txt
+          .operator-registry-seal-venv/bin/python -m pip install "${wheel}"
+          .operator-registry-seal-venv/bin/python -m pip check
+          .operator-registry-seal-venv/bin/python - <<'PY'
+          from pathlib import Path
+
+          import causal4d
+
+          source_root = (Path.cwd() / "src").resolve()
+          origin = Path(causal4d.__file__).resolve()
+          print("installed import", origin)
+          if origin.is_relative_to(source_root):
+              raise SystemExit(
+                  "Causal4D resolved from the checkout instead of the wheel"
+              )
+          PY
+
+      - name: Populate and seal the fixed operator roster
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="" .operator-registry-seal-venv/bin/python \
+            scripts/ci/seal_self_hosted_operator_registry.py \
+            --repository-root \
+              /mnt/lexar4tb/causal4d-physical/causal4d-frozen \
+            --dataset-root \
+              /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1 \
+            --private-root \
+              /mnt/lexar4tb/causal4d-physical/private/operator-registry-v1 \
+            --output outputs/operator-registry-seal/report.json \
+            | tee outputs/operator-registry-seal/report.txt
+
+      - name: Export sanitized result fields
+        id: summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          .operator-registry-seal-venv/bin/python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path("outputs/operator-registry-seal/report.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          private = report["private_material"]
+          next_action = report["next_action"]
+          print(f"already_sealed={str(report['already_sealed']).lower()}")
+          print(f"dataset_modified={str(report['dataset_modified']).lower()}")
+          print(
+              "registry_artifact_sha256="
+              f"{report['registry_artifact_sha256']}"
+          )
+          print(f"registry_file_sha256={report['registry_file_sha256']}")
+          print(f"operator_count={len(report['operator_ids'])}")
+          print(f"next_action={next_action['action_id']}")
+          print(
+              "next_physical="
+              f"{str(next_action['physical_acquisition_required']).lower()}"
+          )
+          print(
+              "next_automatable="
+              f"{str(next_action['automatable']).lower()}"
+          )
+          print(f"key_created={str(private['key_created']).lower()}")
+          print(f"roster_created={str(private['roster_created']).lower()}")
+          print(
+              "physical_evidence_increment="
+              f"{report['physical_evidence_increment']}"
+          )
+          PY
+
+      - name: Record runner and GPU identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "commit=${GITHUB_SHA}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            uname -a
+          } | tee outputs/operator-registry-seal/runner.txt
+          nvidia-smi -L \
+            | tee outputs/operator-registry-seal/nvidia-smi-L.txt
+
+      - name: Upload sanitized seal evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: causal4d-operator-registry-seal
+          path: |
+            outputs/operator-registry-seal/report.json
+            outputs/operator-registry-seal/report.txt
+            outputs/operator-registry-seal/runner.txt
+            outputs/operator-registry-seal/nvidia-smi-L.txt
+            outputs/operator-registry-seal/wheel-sha256.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove isolated environment and wheel
+        if: always()
+        shell: bash
+        run: |
+          rm -rf \
+            .operator-registry-seal-venv \
+            outputs/operator-registry-seal/wheels
+
+  report:
+    name: Report the operator registry seal to the trigger issue
+    if: >-
+      always() &&
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.issue.user.login == 'FlorianPfaff' &&
+      github.event.issue.user.id == 6773539 &&
+      github.event.issue.title ==
+        '[self-hosted] seal Causal4D operator registry'
+    needs: seal
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      SEAL_RESULT: ${{ needs.seal.result }}
+      ALREADY_SEALED: ${{ needs.seal.outputs.already_sealed }}
+      DATASET_MODIFIED: ${{ needs.seal.outputs.dataset_modified }}
+      REGISTRY_ARTIFACT_SHA256: >-
+        ${{ needs.seal.outputs.registry_artifact_sha256 }}
+      REGISTRY_FILE_SHA256: ${{ needs.seal.outputs.registry_file_sha256 }}
+      OPERATOR_COUNT: ${{ needs.seal.outputs.operator_count }}
+      NEXT_ACTION: ${{ needs.seal.outputs.next_action }}
+      NEXT_PHYSICAL: ${{ needs.seal.outputs.next_physical }}
+      NEXT_AUTOMATABLE: ${{ needs.seal.outputs.next_automatable }}
+      KEY_CREATED: ${{ needs.seal.outputs.key_created }}
+      ROSTER_CREATED: ${{ needs.seal.outputs.roster_created }}
+      PHYSICAL_EVIDENCE_INCREMENT: >-
+        ${{ needs.seal.outputs.physical_evidence_increment }}
+    steps:
+      - name: Comment with the sanitized seal result
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/"
+          run_url+="${GITHUB_RUN_ID}"
+          body="$(cat <<EOF
+          Self-hosted Causal4D operator registry seal: **${SEAL_RESULT}**
+
+          - Exact reviewed main commit: \`${GITHUB_SHA}\`
+          - Already sealed before this run: \`${ALREADY_SEALED:-unknown}\`
+          - Registered dataset modified: \`${DATASET_MODIFIED:-unknown}\`
+          - Operator count: \`${OPERATOR_COUNT:-unknown}\`
+          - Registry artifact SHA-256: \`${REGISTRY_ARTIFACT_SHA256:-unavailable}\`
+          - Registry file SHA-256: \`${REGISTRY_FILE_SHA256:-unavailable}\`
+          - Workstation-private HMAC key created: \`${KEY_CREATED:-unknown}\`
+          - Workstation-private principal roster created: \`${ROSTER_CREATED:-unknown}\`
+          - Derived next action: \`${NEXT_ACTION:-unavailable}\`
+          - Next action automatable: \`${NEXT_AUTOMATABLE:-unknown}\`
+          - Next action physical: \`${NEXT_PHYSICAL:-unknown}\`
+          - Workflow run: ${run_url}
+          - Artifact: \`causal4d-operator-registry-seal\`
+          - Target outcomes used: \`false\`
+          - Device nodes opened: \`false\`
+          - Physical command sent: \`false\`
+          - Physical evidence increment: \`${PHYSICAL_EVIDENCE_INCREMENT:-0}\`
+          EOF
+          )"
+          gh issue comment "${ISSUE_NUMBER}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --body "${body}"
