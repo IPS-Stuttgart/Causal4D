@@ -125,3 +125,15 @@ def test_ratchet_covers_the_stable_counterfactual_core() -> None:
     }
     assert expected_targets.issubset(set(_GATE.STABLE_CORE_TARGETS))
     assert len(_GATE.STABLE_CORE_TARGETS) == len(set(_GATE.STABLE_CORE_TARGETS))
+
+
+def test_current_python312_mypy_output_matches_the_exact_debt() -> None:
+    if sys.version_info[:2] != (3, 12):
+        pytest.skip("the authoritative stable-core MyPy environment is Python 3.12")
+    accepted = _GATE.run_stable_core_mypy(
+        repository_root=_REPOSITORY_ROOT,
+        python_version="3.12",
+    )
+    assert tuple(value.key for value in accepted) == tuple(
+        sorted(_GATE.EXPECTED_DEBT)
+    )
