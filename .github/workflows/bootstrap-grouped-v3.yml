@@ -44,21 +44,26 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Apply, validate, and publish the clean implementation branch
+      - name: Reconstruct, validate, and publish the exact implementation tree
         env:
           BASE_SHA: 70b5e630c50b1a3702e1b5dc2d0309f530973c7d
           GH_TOKEN: ${{ github.token }}
           TARGET_BRANCH: agent/grouped-normalized-v3
         run: |
           set -euo pipefail
-          patch="$PWD/build/grouped-v3-bootstrap/grouped-v3.patch"
+          patch_file="$PWD/build/grouped-v3-bootstrap/grouped-v3.patch"
           git checkout -B "$TARGET_BRANCH" "$BASE_SHA"
-          git apply --check --whitespace=error-all "$patch"
-          git apply --index --whitespace=error-all "$patch"
-          git diff --cached --check
-          python -m compileall -q src tests
 
-          actual="$(git diff --cached --name-only | LC_ALL=C sort)"
+          # The payload was produced from byte-identical postimages but carries
+          # three stale preimage indexes. GNU patch may relocate those hunks;
+          # the exact postimage blob checks below make that reconstruction
+          # fail closed rather than accepting an ambiguous fuzzy result.
+          patch --batch --forward --fuzz=3 -p1 < "$patch_file"
+          if find . -name '*.rej' -print -quit | grep -q .; then
+            find . -name '*.rej' -print -exec cat {} \;
+            exit 1
+          fi
+
           expected="$(printf '%s\n' \
             docs/grouped_normalized_likelihood_v3.md \
             docs/structured_grouped_likelihood.md \
@@ -69,7 +74,34 @@ jobs:
             src/causal4d/observation_evidence.py \
             tests/test_factual_likelihood_semantics.py \
             tests/test_grouped_normalized_v3.py | LC_ALL=C sort)"
+          git add -- $expected
+          actual="$(git diff --cached --name-only | LC_ALL=C sort)"
           test "$actual" = "$expected"
+
+          verify_postimage() {
+            expected_prefix="$1"
+            path="$2"
+            actual_blob="$(git hash-object "$path")"
+            case "$actual_blob" in
+              "$expected_prefix"*) ;;
+              *)
+                echo "Unexpected postimage for $path: $actual_blob (expected $expected_prefix...)" >&2
+                exit 1
+                ;;
+            esac
+          }
+          verify_postimage e61c311 docs/grouped_normalized_likelihood_v3.md
+          verify_postimage 0b3bccf docs/structured_grouped_likelihood.md
+          verify_postimage d94de5f src/causal4d/__init__.py
+          verify_postimage 65aadb3 src/causal4d/cli/abduct_phystwin_intervention.py
+          verify_postimage a72f896 src/causal4d/grouped_likelihood.py
+          verify_postimage 3f3d7ca src/causal4d/intervention_abduction.py
+          verify_postimage 6d92d80 src/causal4d/observation_evidence.py
+          verify_postimage 6cf63ad tests/test_factual_likelihood_semantics.py
+          verify_postimage 031e110 tests/test_grouped_normalized_v3.py
+
+          git diff --cached --check
+          python -m compileall -q src tests
 
           git config user.name github-actions[bot]
           git config user.email \
