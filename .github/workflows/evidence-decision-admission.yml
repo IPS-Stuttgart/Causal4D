@@ -27,18 +27,19 @@ concurrency:
 env:
   BPT_CONTRACT_REVISION: 4ee702f5130cfedbea7bce6be5e72483c92f63da
   BPT_SCHEMA_SHA256: d5615258c6cf666d0ed9684a87930989adf91817fe99b0387e83a31479dcd465
-  SYNTHETIC_CAUSAL4D_REVISION: "2222222222222222222222222222222222222222"
-  SYNTHETIC_PROB4D_REVISION: "3333333333333333333333333333333333333333"
+  CAUSAL4D_CONSUMER_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+  PROB4D_CONSUMER_REVISION: c9273e8a55f812c532105a86c885a5a7627d3df3
 
 jobs:
   installed-boundary:
-    name: Pinned producer and installed Causal4D admission
+    name: Pinned three-repository installed admission
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Check out Causal4D
+      - name: Check out exact Causal4D consumer revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ env.CAUSAL4D_CONSUMER_REVISION }}
           persist-credentials: false
       - name: Check out exact BayesianPhysTwin contract source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -46,6 +47,13 @@ jobs:
           repository: IPS-Stuttgart/BayesianPhysTwin
           ref: ${{ env.BPT_CONTRACT_REVISION }}
           path: vendor/BayesianPhysTwin
+          persist-credentials: false
+      - name: Check out exact Prob4D consumer source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: IPS-Stuttgart/Prob4D
+          ref: ${{ env.PROB4D_CONSUMER_REVISION }}
+          path: vendor/Prob4D
           persist-credentials: false
       - name: Set up Python 3.12
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -55,9 +63,14 @@ jobs:
           cache-dependency-path: |
             pyproject.toml
             vendor/BayesianPhysTwin/pyproject.toml
-      - name: Install both wheel boundaries
-        run: python -m pip install . ./vendor/BayesianPhysTwin
-      - name: Verify schema bytes and generated admission
+            vendor/Prob4D/pyproject.toml
+      - name: Install all three wheel boundaries
+        run: >-
+          python -m pip install
+          .
+          ./vendor/BayesianPhysTwin
+          ./vendor/Prob4D
+      - name: Verify schema bytes and independent consumer agreement
         working-directory: ${{ runner.temp }}
         run: |
           python - <<'PY'
@@ -79,6 +92,12 @@ jobs:
               admit_causal_claim_v1,
               load_evidence_decision_v1,
           )
+          from prob4d.api.evidence_decision_v1 import (
+              EVIDENCE_DECISION_JSON_SCHEMA_SHA256 as PROB4D_SCHEMA_SHA256,
+              load_evidence_decision_v1 as load_prob4d_evidence_decision_v1,
+              require_authorized_evidence_decision_v1 as require_prob4d_authorized,
+              require_prob4d_evidence_binding_v1,
+          )
 
           schema = files("bayesian_phystwin").joinpath(
               "contract_data",
@@ -89,10 +108,11 @@ jobs:
           expected_schema_sha256 = os.environ["BPT_SCHEMA_SHA256"]
           assert schema_sha256 == expected_schema_sha256
           assert EVIDENCE_DECISION_JSON_SCHEMA_SHA256 == expected_schema_sha256
+          assert PROB4D_SCHEMA_SHA256 == expected_schema_sha256
 
           bpt_revision = os.environ["BPT_CONTRACT_REVISION"]
-          causal4d_revision = os.environ["SYNTHETIC_CAUSAL4D_REVISION"]
-          prob4d_revision = os.environ["SYNTHETIC_PROB4D_REVISION"]
+          causal4d_revision = os.environ["CAUSAL4D_CONSUMER_REVISION"]
+          prob4d_revision = os.environ["PROB4D_CONSUMER_REVISION"]
           decision = EvidenceDecisionV1(
               claim_id="contract.causal-admission",
               protocol_id="evidence-decision-causal-admission-v1",
@@ -151,11 +171,26 @@ jobs:
               minimum_evidence_level=3,
               require_prob4d_binding=True,
           )
+
+          prob4d_validated = load_prob4d_evidence_decision_v1(output)
+          require_prob4d_authorized(
+              prob4d_validated,
+              claim_id="contract.causal-admission",
+              protocol_id="evidence-decision-causal-admission-v1",
+              minimum_evidence_level=3,
+          )
+          prob4d_binding = require_prob4d_evidence_binding_v1(
+              prob4d_validated,
+              expected_revision=prob4d_revision,
+          )
+
           assert admission.decision.decision_id == decision.decision_id
+          assert prob4d_validated.decision_id == decision.decision_id
           assert admission.bayesian_phystwin.role == "primary"
           assert admission.causal4d.role == "downstream"
           assert admission.prob4d is not None
           assert admission.prob4d.role == "observation"
+          assert admission.prob4d.revision == prob4d_binding.revision
           PY
       - name: Exercise installed command-line admission
         working-directory: ${{ runner.temp }}
@@ -165,14 +200,14 @@ jobs:
           --claim-id contract.causal-admission
           --protocol-id evidence-decision-causal-admission-v1
           --expected-bayesian-phystwin-revision "${BPT_CONTRACT_REVISION}"
-          --expected-causal4d-revision "${SYNTHETIC_CAUSAL4D_REVISION}"
-          --expected-prob4d-revision "${SYNTHETIC_PROB4D_REVISION}"
+          --expected-causal4d-revision "${CAUSAL4D_CONSUMER_REVISION}"
+          --expected-prob4d-revision "${PROB4D_CONSUMER_REVISION}"
           --minimum-evidence-level 3
           --require-prob4d-binding
           > admission-receipt.json
       - name: Upload admission receipt
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: evidence-decision-admission-receipt
+          name: three-repository-evidence-decision-admission-receipt
           path: ${{ runner.temp }}/admission-receipt.json
           retention-days: 14
