@@ -48,16 +48,19 @@ jobs:
               "        minimum_evidence_level=minimum_evidence_level,\n"
               "    )\n"
           )
-          admission_replacement = admission_anchor + (
-              "    require_prob4d = _require_bool(\n"
-              "        require_prob4d_binding,\n"
-              "        name=\"require_prob4d_binding\",\n"
-              "    )\n"
-              "    if require_prob4d and expected_prob4d_revision is None:\n"
-              "        raise ValueError(\n"
-              "            \"require_prob4d_binding requires \"
-              "\"expected_prob4d_revision\"\n"
-              "        )\n"
+          admission_lines = [
+              "    require_prob4d = _require_bool(",
+              "        require_prob4d_binding,",
+              '        name="require_prob4d_binding",',
+              "    )",
+              "    if require_prob4d and expected_prob4d_revision is None:",
+              "        raise ValueError(",
+              '            "require_prob4d_binding requires '
+              'expected_prob4d_revision"',
+              "        )",
+          ]
+          admission_replacement = (
+              admission_anchor + "\n".join(admission_lines) + "\n"
           )
           if text.count(admission_anchor) != 1:
               raise SystemExit("admission insertion point changed")
@@ -83,35 +86,37 @@ jobs:
               "def test_admission_and_repository_binding_errors() -> None:\n"
               "    payload = _authorized()\n\n"
           )
-          test_replacement = test_anchor + (
-              "    with pytest.raises(\n"
-              "        ValueError,\n"
-              "        match=(\n"
-              "            \"require_prob4d_binding requires \"
-              "\"expected_prob4d_revision\"\n"
-              "        ),\n"
-              "    ):\n"
-              "        admit_causal_claim_v1(\n"
-              "            payload,\n"
-              "            claim_id=CLAIM_ID,\n"
-              "            protocol_id=PROTOCOL_ID,\n"
-              "            expected_bayesian_phystwin_revision=BPT_REVISION,\n"
-              "            expected_causal4d_revision=CAUSAL4D_REVISION,\n"
-              "            require_prob4d_binding=True,\n"
-              "        )\n"
-              "    with pytest.raises(\n"
-              "        ValueError,\n"
-              "        match=\"require_prob4d_binding must be boolean\",\n"
-              "    ):\n"
-              "        admit_causal_claim_v1(\n"
-              "            payload,\n"
-              "            claim_id=CLAIM_ID,\n"
-              "            protocol_id=PROTOCOL_ID,\n"
-              "            expected_bayesian_phystwin_revision=BPT_REVISION,\n"
-              "            expected_causal4d_revision=CAUSAL4D_REVISION,\n"
-              "            require_prob4d_binding=1,  # type: ignore[arg-type]\n"
-              "        )\n\n"
-          )
+          test_lines = [
+              "    with pytest.raises(",
+              "        ValueError,",
+              "        match=(",
+              '            "require_prob4d_binding requires '
+              'expected_prob4d_revision"',
+              "        ),",
+              "    ):",
+              "        admit_causal_claim_v1(",
+              "            payload,",
+              "            claim_id=CLAIM_ID,",
+              "            protocol_id=PROTOCOL_ID,",
+              "            expected_bayesian_phystwin_revision=BPT_REVISION,",
+              "            expected_causal4d_revision=CAUSAL4D_REVISION,",
+              "            require_prob4d_binding=True,",
+              "        )",
+              "    with pytest.raises(",
+              "        ValueError,",
+              '        match="require_prob4d_binding must be boolean",',
+              "    ):",
+              "        admit_causal_claim_v1(",
+              "            payload,",
+              "            claim_id=CLAIM_ID,",
+              "            protocol_id=PROTOCOL_ID,",
+              "            expected_bayesian_phystwin_revision=BPT_REVISION,",
+              "            expected_causal4d_revision=CAUSAL4D_REVISION,",
+              "            require_prob4d_binding=1,  # type: ignore[arg-type]",
+              "        )",
+              "",
+          ]
+          test_replacement = test_anchor + "\n".join(test_lines) + "\n"
           if test_text.count(test_anchor) != 1:
               raise SystemExit("admission test insertion point changed")
           tests.write_text(
