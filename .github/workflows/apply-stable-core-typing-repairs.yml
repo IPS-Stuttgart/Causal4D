@@ -48,31 +48,21 @@ jobs:
           if text.count(old_import) != 1:
               raise SystemExit("unexpected contracts typing import")
           text = text.replace(old_import, new_import)
-          old_writer = '''    def write_archive(handle: BinaryIO) -> None:
-              np.savez_compressed(
-                  handle,
-                  descriptor_json=np.asarray(
-                      json.dumps(descriptor, sort_keys=True, separators=(",", ":"))
-                  ),
-                  **arrays,
-              )
-          '''
-          new_writer = '''    def write_archive(handle: BinaryIO) -> None:
-              # NumPy's stubs reserve ``allow_pickle`` as a Boolean keyword, while
-              # the runtime accepts arbitrary named archive members through ``**kwds``.
-              # Contract array names are schema-locked and cannot use that reserved name.
-              savez_compressed = cast(Callable[..., None], np.savez_compressed)
-              savez_compressed(
-                  handle,
-                  descriptor_json=np.asarray(
-                      json.dumps(descriptor, sort_keys=True, separators=(",", ":"))
-                  ),
-                  **arrays,
-              )
-          '''
-          if text.count(old_writer) != 1:
-              raise SystemExit("unexpected contract archive writer")
-          contracts.write_text(text.replace(old_writer, new_writer), encoding="utf-8")
+          old_call = "        np.savez_compressed(\n"
+          new_call = (
+              "        # NumPy's stubs reserve ``allow_pickle`` as a Boolean "
+              "keyword, while\n"
+              "        # the runtime accepts arbitrary named archive members "
+              "through ``**kwds``.\n"
+              "        # Contract array names are schema-locked and cannot use "
+              "that reserved name.\n"
+              "        savez_compressed = cast(Callable[..., None], "
+              "np.savez_compressed)\n"
+              "        savez_compressed(\n"
+          )
+          if text.count(old_call) != 1:
+              raise SystemExit("unexpected contract archive call")
+          contracts.write_text(text.replace(old_call, new_call), encoding="utf-8")
 
           abduction = root / "intervention_abduction.py"
           text = abduction.read_text(encoding="utf-8")
