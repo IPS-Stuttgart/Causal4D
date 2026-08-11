@@ -8,6 +8,9 @@ from typing import Any, Literal
 import numpy as np
 
 from causal4d.contracts import FactualIntervention, TwinBelief, array_sha256
+from causal4d.factual_abduction_uncertainty import (
+    FactualAbductionUncertaintyV1,
+)
 from causal4d.grouped_likelihood import (
     GroupLikelihoodDiagnostics,
     posterior_weights_from_grouped_evidence,
@@ -22,6 +25,7 @@ from causal4d.rollout_bank import JointRolloutBank
 
 
 DenseLikelihoodSemantics = Literal["legacy_v1", "normalized_v2"]
+IdentifiabilityPolicy = Literal["full_parameter", "registered_query"]
 
 
 @dataclass(frozen=True)
@@ -125,7 +129,7 @@ def _grouped_diagnostics_summary(
 ) -> dict[str, Any]:
     responsibilities = np.asarray(diagnostics.nominal_responsibilities, dtype=float)
     reduction_axes = tuple(range(responsibilities.ndim - 1))
-    return {
+    result = {
         "group_ids": list(diagnostics.group_ids),
         "effective_group_weights": list(diagnostics.effective_group_weights),
         "mean_nominal_responsibility_by_group": np.mean(
@@ -135,6 +139,15 @@ def _grouped_diagnostics_summary(
             responsibilities, axis=reduction_axes
         ).tolist(),
     }
+    if diagnostics.full_covariance_group_ids:
+        result["full_covariance_group_ids"] = list(
+            diagnostics.full_covariance_group_ids
+        )
+    if diagnostics.low_rank_covariance_group_ids:
+        result["low_rank_covariance_group_ids"] = list(
+            diagnostics.low_rank_covariance_group_ids
+        )
+    return result
 
 
 def _update_joint_weights(
@@ -147,6 +160,7 @@ def _update_joint_weights(
     settings: FactualAbductionConfig,
     base_weights: np.ndarray | None = None,
     grouped_evidence: GroupedObservationEvidence | None = None,
+    abduction_uncertainty: FactualAbductionUncertaintyV1 | None = None,
 ) -> tuple[np.ndarray, GroupLikelihoodDiagnostics | None]:
     if grouped_evidence is not None and settings.likelihood_semantics != "legacy_v1":
         raise ValueError(
@@ -190,6 +204,18 @@ def _update_joint_weights(
     component_variance = np.broadcast_to(
         discrepancy_variance[None, :, None], components.shape
     )
+    group_covariance: dict[str, np.ndarray] = {}
+    group_covariance_factor: dict[str, np.ndarray] = {}
+    if abduction_uncertainty is not None:
+        additional_variance, group_covariance, group_covariance_factor = (
+            abduction_uncertainty.validated_terms(
+                bank,
+                belief,
+                grouped_evidence,
+            )
+        )
+        if additional_variance is not None:
+            component_variance = component_variance + additional_variance
     prior = bank.prior_joint_weights if base_weights is None else base_weights
     return posterior_weights_from_grouped_evidence(
         prior,
@@ -197,6 +223,8 @@ def _update_joint_weights(
         grouped_evidence,
         prefix_frame_count=prefix_frame_count,
         component_variance_m2=component_variance,
+        component_group_covariance_m2=group_covariance,
+        component_group_covariance_factor_m=group_covariance_factor,
     )
 
 
@@ -211,6 +239,8 @@ def abduct_factual_intervention(
     grouped_evidence: GroupedObservationEvidence | None = None,
     identifiability: InterventionIdentifiabilityResult | None = None,
     abstain_when_unidentifiable: bool = False,
+    identifiability_policy: IdentifiabilityPolicy = "full_parameter",
+    abduction_uncertainty: FactualAbductionUncertaintyV1 | None = None,
 ) -> FactualIntervention:
     """Infer persistent ``phi`` and factual event ``kappa_obs`` from O+ only.
 
@@ -228,12 +258,34 @@ def abduct_factual_intervention(
     expected_stop = belief.context.o_plus.frame_start + prefix_frame_count - 1
     if expected_stop > belief.context.o_plus.frame_stop:
         raise ValueError("abduction prefix extends beyond O+")
+    if identifiability_policy not in {"full_parameter", "registered_query"}:
+        raise ValueError("unsupported identifiability policy")
     if abstain_when_unidentifiable and identifiability is None:
         raise ValueError("an identifiability result is required for guarded abduction")
+    if identifiability_policy == "registered_query":
+        if identifiability is None:
+            raise ValueError(
+                "registered_query identifiability requires an identifiability result"
+            )
+        if identifiability.query_identifiable is None:
+            raise ValueError(
+                "registered_query identifiability requires query_sensitivity"
+            )
+    if abduction_uncertainty is not None and grouped_evidence is None:
+        raise ValueError(
+            "factual-abduction uncertainty requires grouped observation evidence"
+        )
+    identifiability_admitted = True
+    if identifiability is not None:
+        identifiability_admitted = (
+            identifiability.identifiable
+            if identifiability_policy == "full_parameter"
+            else bool(identifiability.query_identifiable)
+        )
     abstained = bool(
         abstain_when_unidentifiable
         and identifiability is not None
-        and not identifiability.identifiable
+        and not identifiability_admitted
     )
     if abstained:
         joint_weights = bank.prior_joint_weights.copy()
@@ -247,6 +299,7 @@ def abduct_factual_intervention(
             observation_mask=observation_mask,
             settings=settings,
             grouped_evidence=grouped_evidence,
+            abduction_uncertainty=abduction_uncertainty,
         )
     hand_count = len(bank.hypothesis_metadata[0]["contact"]["attachment_shifts"])
     phi_names = ("gain_multiplier", "delay_steps", "rotation_degrees")
@@ -302,6 +355,11 @@ def abduct_factual_intervention(
     if identifiability is not None:
         metadata["intervention_identifiability"] = identifiability.as_dict()
         metadata["abduction_abstained_unidentifiable"] = abstained
+        if identifiability_policy != "full_parameter":
+            metadata["identifiability_policy"] = identifiability_policy
+            metadata["identifiability_policy_admitted"] = identifiability_admitted
+    if abduction_uncertainty is not None:
+        metadata["factual_abduction_uncertainty"] = abduction_uncertainty.as_dict()
     return FactualIntervention(
         context=belief.context,
         component_ids=tuple(component_ids),
@@ -393,6 +451,7 @@ def evaluate_factual_abduction(
     prefix_frame_count: int,
     config: FactualAbductionConfig | None = None,
     grouped_evidence: GroupedObservationEvidence | None = None,
+    abduction_uncertainty: FactualAbductionUncertaintyV1 | None = None,
 ) -> dict[str, Any]:
     """Compare BPT+z with a same-evidence BPT posterior fixed to nominal z."""
 
@@ -416,6 +475,7 @@ def evaluate_factual_abduction(
         settings=settings,
         base_weights=nominal_base,
         grouped_evidence=grouped_evidence,
+        abduction_uncertainty=abduction_uncertainty,
     )
     components = physical_readout_components(bank, belief)
     hypothesis_marginal = np.sum(z_weights, axis=1)
