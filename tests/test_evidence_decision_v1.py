@@ -84,9 +84,7 @@ def _authorized(*, include_prob4d: bool = True) -> dict[str, Any]:
             "evidence_fingerprint": "2" * 64,
             "evidence_level": 3,
             "evidence_summary_sha256": "3" * 64,
-            "limitations": [
-                "synthetic conformance vector; not scientific evidence"
-            ],
+            "limitations": ["synthetic conformance vector; not scientific evidence"],
             "metadata": {"synthetic": True},
             "metric": {
                 "comparison": "reference_contract",
@@ -248,9 +246,7 @@ def test_loader_rejects_invalid_json_duplicate_keys_and_constants(
             "lowercase Git revision",
         ),
         (
-            lambda value: value["repositories"][0].update(
-                repository="bad/name/extra"
-            ),
+            lambda value: value["repositories"][0].update(repository="bad/name/extra"),
             "owner/name",
         ),
         (
@@ -296,9 +292,7 @@ def test_authorization_and_repository_invariants_fail_closed() -> None:
         validate_evidence_decision_v1(payload)
 
     payload = _authorized()
-    payload["repositories"][1]["repository"] = payload["repositories"][0][
-        "repository"
-    ]
+    payload["repositories"][1]["repository"] = payload["repositories"][0]["repository"]
     _reseal(payload)
     with pytest.raises(ValueError, match="names must be unique"):
         validate_evidence_decision_v1(payload)
