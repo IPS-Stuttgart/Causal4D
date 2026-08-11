@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, cast
 
 import numpy as np
 
@@ -12,7 +12,7 @@ from causal4d.immutable_json import validated_json_mapping
 
 
 def _readonly(values: np.ndarray, *, dtype: Any = float) -> np.ndarray:
-    return readonly_array(values, dtype=dtype)
+    return cast(np.ndarray, readonly_array(values, dtype=dtype))
 
 
 def _require_nonempty_string(value: Any, *, name: str) -> str:
@@ -199,12 +199,15 @@ class ObservationGroup:
         if trajectories.ndim < 3:
             raise ValueError("trajectories_m must end in (frame, node, coordinate)")
         self.validate_rollout_shape(trajectories.shape[-3:])
-        return trajectories[
-            ...,
-            self.frame_indices,
-            self.node_indices,
-            self.coordinate_indices,
-        ]
+        return cast(
+            np.ndarray,
+            trajectories[
+                ...,
+                self.frame_indices,
+                self.node_indices,
+                self.coordinate_indices,
+            ],
+        )
 
 
 @dataclass(frozen=True)
@@ -351,11 +354,13 @@ class GroupedObservationEvidence:
             nodes = np.flatnonzero(valid[frame])
             if len(nodes) == 0:
                 continue
-            frame_indices = np.repeat(frame, len(nodes) * coordinate_count)
-            node_indices = np.repeat(nodes, coordinate_count)
-            coordinate_indices = np.tile(np.arange(coordinate_count), len(nodes))
-            values = observations[frame, nodes].reshape(-1)
-            covariance = np.eye(len(values), dtype=float) * scale_m**2
+            frame_indices: np.ndarray = np.repeat(frame, len(nodes) * coordinate_count)
+            node_indices: np.ndarray = np.repeat(nodes, coordinate_count)
+            coordinate_indices: np.ndarray = np.tile(
+                np.arange(coordinate_count), len(nodes)
+            )
+            values: np.ndarray = observations[frame, nodes].reshape(-1)
+            covariance: np.ndarray = np.eye(len(values), dtype=float) * scale_m**2
             groups.append(
                 ObservationGroup(
                     group_id=f"{source_id}:frame:{frame}",

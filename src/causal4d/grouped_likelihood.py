@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import lgamma
-from typing import Literal, Mapping
+from typing import Literal, Mapping, cast
 
 import numpy as np
 
@@ -52,8 +52,12 @@ def _student_t_log_density_from_terms(
         - lgamma(0.5 * degrees_of_freedom)
         - 0.5 * (dimension * np.log(degrees_of_freedom * np.pi) + log_determinant)
     )
-    return normalization - 0.5 * (degrees_of_freedom + dimension) * np.log1p(
-        mahalanobis / degrees_of_freedom
+    return cast(
+        np.ndarray,
+        normalization
+        - 0.5
+        * (degrees_of_freedom + dimension)
+        * np.log1p(mahalanobis / degrees_of_freedom),
     )
 
 
@@ -113,7 +117,7 @@ def _broadcast_additive_covariance(
         raise ValueError("additive covariance must be symmetric")
     if float(np.min(np.linalg.eigvalsh(covariance), initial=0.0)) < -1e-10:
         raise ValueError("additive covariance must be positive semidefinite")
-    return covariance
+    return cast(np.ndarray, covariance)
 
 
 def _broadcast_additive_covariance_factor(
@@ -140,7 +144,7 @@ def _broadcast_additive_covariance_factor(
         ) from error
     if not np.all(np.isfinite(factor)):
         raise ValueError("additive covariance factor must be finite")
-    return factor
+    return cast(np.ndarray, factor)
 
 
 def _multivariate_student_t_log_density_low_rank(
@@ -514,9 +518,7 @@ def posterior_weights_from_grouped_evidence(
         component_group_covariance_factor_m=(component_group_covariance_factor_m),
         score_semantics=score_semantics,
         likelihood_power=likelihood_power,
-        max_source_covariance_condition_number=(
-            max_source_covariance_condition_number
-        ),
+        max_source_covariance_condition_number=(max_source_covariance_condition_number),
     )
     log_posterior = log_weights_from_probabilities(prior, name="prior_weights") + score
     maximum = float(np.max(log_posterior))
