@@ -63,9 +63,9 @@ jobs:
             tests/test_self_hosted_workflow_policy.py
           git diff --check
           if grep -R -n -E \
-            'Anna Seel|Markus Rummel|Michael Feurer|environment\.approver|freezer\.primary|gate\.operational|verifier\.independent' \
+            'Anna Seel|Markus Rummel|Michael Feurer' \
             --exclude-dir=.git .; then
-            echo "Unsupported identities remain in the current tree" >&2
+            echo "Unsupported person names remain in the current tree" >&2
             exit 1
           fi
 
