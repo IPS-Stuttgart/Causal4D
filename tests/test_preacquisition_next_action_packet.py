@@ -57,6 +57,7 @@ def _decision(*, ready: bool = True) -> dict[str, object]:
             "method_freeze_validation",
         )
     }
+    prerequisites["operator_registry"]["independent_verifier_available"] = True
     gates = {
         name: _gate()
         for name in (
@@ -283,7 +284,7 @@ def test_cli_packet_preserves_valid_but_incomplete_exit_code(
     decision = _decision(ready=False)
     packet = tmp_path / "next-action.zip"
     monkeypatch.setattr(
-        readiness_cli,
+        readiness.cli,
         "build_preacquisition_next_action",
         lambda *args, **kwargs: decision,
     )
