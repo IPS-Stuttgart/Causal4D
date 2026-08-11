@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/grouped-v3-bootstrap
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -11,6 +14,7 @@ permissions:
 
 jobs:
   publish:
+    if: github.head_ref == '' || github.head_ref == 'agent/grouped-v3-bootstrap'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
