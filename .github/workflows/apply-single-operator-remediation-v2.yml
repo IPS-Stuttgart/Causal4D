@@ -39,6 +39,7 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/ci/apply_single_operator_remediation.py
+          python scripts/ci/remove_unsupported_operator_name_literals.py
 
       - name: Format and validate the correction
         shell: bash
@@ -76,7 +77,8 @@ jobs:
             .agent/apply-single-operator-remediation \
             .github/workflows/apply-single-operator-remediation.yml \
             .github/workflows/apply-single-operator-remediation-v2.yml \
-            scripts/ci/apply_single_operator_remediation.py
+            scripts/ci/apply_single_operator_remediation.py \
+            scripts/ci/remove_unsupported_operator_name_literals.py
           git diff --check
 
       - name: Commit and push the product correction
