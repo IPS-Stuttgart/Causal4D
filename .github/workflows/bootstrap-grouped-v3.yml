@@ -1,20 +1,20 @@
 name: Bootstrap grouped normalized likelihood v3
 
 on:
-  push:
-    branches:
-      - agent/grouped-v3-bootstrap
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: grouped-v3-publisher-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   publish:
-    if: github.head_ref == '' || github.head_ref == 'agent/grouped-v3-bootstrap'
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/grouped-v3-bootstrap'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -23,25 +23,38 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify and publish the clean implementation branch
+      - name: Verify and prepare the content-addressed patch
         env:
           BASE_SHA: 70b5e630c50b1a3702e1b5dc2d0309f530973c7d
-          GH_TOKEN: ${{ github.token }}
           PATCH_SHA256: d657c132d8bd0515f2ed5bb33fcf96e8ba1ea33e8db0a112d74537f51f83dfd3
-          REPOSITORY: ${{ github.repository }}
-          TARGET_BRANCH: agent/grouped-normalized-v3
         run: |
           set -euo pipefail
           git merge-base --is-ancestor "$BASE_SHA" HEAD
           echo "$PATCH_SHA256  .agent/grouped-v3.patch.gz" | \
             sha256sum --check --strict
+          mkdir -p build/grouped-v3-bootstrap
           gzip --decompress --stdout .agent/grouped-v3.patch.gz > \
-            "$RUNNER_TEMP/grouped-v3.patch"
+            build/grouped-v3-bootstrap/grouped-v3.patch
 
+      - name: Upload the verified patch for bootstrap diagnostics
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: grouped-v3-verified-patch-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/grouped-v3-bootstrap/grouped-v3.patch
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Apply, validate, and publish the clean implementation branch
+        env:
+          BASE_SHA: 70b5e630c50b1a3702e1b5dc2d0309f530973c7d
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: agent/grouped-normalized-v3
+        run: |
+          set -euo pipefail
+          patch="$PWD/build/grouped-v3-bootstrap/grouped-v3.patch"
           git checkout -B "$TARGET_BRANCH" "$BASE_SHA"
-          git apply --3way --index --whitespace=fix \
-            "$RUNNER_TEMP/grouped-v3.patch"
-          test -z "$(git ls-files --unmerged)"
+          git apply --check --whitespace=error-all "$patch"
+          git apply --index --whitespace=error-all "$patch"
           git diff --cached --check
           python -m compileall -q src tests
 
