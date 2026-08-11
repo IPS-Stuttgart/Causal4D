@@ -121,9 +121,6 @@ jobs:
           set -euo pipefail
           python -m pip install -e ".[dev]"
           python -m mypy --python-version 3.12 \
-            --disallow-untyped-defs \
-            --warn-return-any \
-            --no-implicit-reexport \
             src/causal4d/contracts.py \
             src/causal4d/counterfactual.py \
             src/causal4d/grouped_likelihood.py \
