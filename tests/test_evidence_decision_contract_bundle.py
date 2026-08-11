@@ -47,9 +47,7 @@ def test_packaged_schema_and_manifest_match_the_independent_binding() -> None:
     manifest = _json("manifest.json")
 
     assert set(manifest) == _MANIFEST_FIELDS
-    assert manifest["bundle_schema"] == (
-        "causal4d.evidence_decision_contract_bundle"
-    )
+    assert manifest["bundle_schema"] == "causal4d.evidence_decision_contract_bundle"
     assert manifest["bundle_version"] == 1
     assert manifest["consumer_module"] == "causal4d.evidence_decision_v1"
     assert manifest["source_repository"] == EVIDENCE_DECISION_SOURCE_REPOSITORY
@@ -101,9 +99,7 @@ def test_packaged_authorized_vector_is_sealed_and_admissible() -> None:
         expected_bayesian_phystwin_revision=(
             repositories["IPS-Stuttgart/BayesianPhysTwin"].revision
         ),
-        expected_causal4d_revision=(
-            repositories["IPS-Stuttgart/Causal4D"].revision
-        ),
+        expected_causal4d_revision=repositories["IPS-Stuttgart/Causal4D"].revision,
         expected_prob4d_revision=repositories["IPS-Stuttgart/Prob4D"].revision,
         minimum_evidence_level=3,
         require_prob4d_binding=True,
