@@ -28,7 +28,10 @@ def test_merge_gate_validates_the_pull_request_merge_result() -> None:
     record_index = text.index("- name: Record tested merge and head revisions")
     checkout_block = text[checkout_index:record_index]
 
-    assert "ref:" not in checkout_block
+    assert "ref: ${{ github.sha }}" in checkout_block
+    assert "fetch-depth: 1" in checkout_block
+    assert "fetch-depth: 0" not in checkout_block
+    assert "persist-credentials: false" in checkout_block
     assert "EXPECTED_MERGE_SHA: ${{ github.sha }}" in text
     assert "PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}" in text
     assert 'actual_merge_sha="$(git rev-parse HEAD)"' in text
