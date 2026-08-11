@@ -18,7 +18,7 @@ def _parser() -> argparse.ArgumentParser:
         "--repository-root",
         type=Path,
         required=True,
-        help="Source checkout that the installed import must not resolve beneath.",
+        help="Checkout whose src tree the installed import must not resolve beneath.",
     )
     return parser
 
@@ -53,10 +53,10 @@ def _require_installed_module(module: ModuleType, repository_root: Path) -> Path
     if not isinstance(file_name, str):
         raise RuntimeError("installed causal4d module has no ordinary file path")
     package_path = Path(file_name).resolve()
-    source_root = repository_root.resolve()
-    if package_path.is_relative_to(source_root):
+    source_tree = (repository_root.resolve() / "src").resolve()
+    if package_path.is_relative_to(source_tree):
         raise RuntimeError(
-            f"causal4d import resolved inside the source checkout: {package_path}"
+            f"causal4d import resolved inside the source tree: {package_path}"
         )
     return package_path
 
