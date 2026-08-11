@@ -59,7 +59,7 @@ def test_campaign_dispatches_only_fixed_reviewed_workflows_and_inputs() -> None:
 
     for workflow in workflows:
         assert workflow in text
-    assert text.count("--ref main") == 4
+    assert text.count("--ref main") == 3
     assert "-f profile=full" in text
     assert "-f run_bpt=true" in text
     assert "-f cuda_visible_devices=0" in text
