@@ -5,12 +5,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = (
-    ROOT
-    / ".github"
-    / "workflows"
-    / "seal-operator-registry-self-hosted.yml"
-)
+WORKFLOW = ROOT / ".github" / "workflows" / "seal-operator-registry-self-hosted.yml"
 SCRIPT = ROOT / "scripts" / "ci" / "seal_self_hosted_operator_registry.py"
 SELF_HOSTED_REGISTRY = ROOT / ".github" / "self-hosted-jobs.json"
 TRIGGER = "[self-hosted] seal Causal4D operator registry"
@@ -44,17 +39,9 @@ def test_operator_registry_seal_uses_fixed_local_paths_and_no_secrets() -> None:
 
     assert "permissions:\n  contents: read\n" in text
     assert "${{ secrets." not in text
-    assert (
-        "/mnt/lexar4tb/causal4d-physical/causal4d-frozen" in text
-    )
-    assert (
-        "/mnt/lexar4tb/causal4d-physical/"
-        "causal4d-sloth-multi-action-v1" in text
-    )
-    assert (
-        "/mnt/lexar4tb/causal4d-physical/private/operator-registry-v1"
-        in text
-    )
+    assert "/mnt/lexar4tb/causal4d-physical/causal4d-frozen" in text
+    assert "/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1" in text
+    assert "/mnt/lexar4tb/causal4d-physical/private/operator-registry-v1" in text
     assert "scripts/ci/seal_self_hosted_operator_registry.py" in text
     assert "ref: ${{ github.sha }}" in text
     assert "persist-credentials: false" in text
