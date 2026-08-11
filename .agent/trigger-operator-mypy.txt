@@ -1,0 +1,1 @@
+Trigger the existing self-deleting operator-registry typing fix after its workflow was present on the branch.
