@@ -341,3 +341,127 @@ def test_abduction_uncertainty_rejects_duplicate_dense_and_factor_routes() -> No
                 group.group_id: np.zeros((group.coordinate_count, 1))
             },
         )
+
+
+def test_grouped_component_batching_is_artifact_identical() -> None:
+    bank, belief, observations, mask, config, evidence = _problem()
+    dense = abduct_factual_intervention(
+        bank,
+        belief,
+        observations,
+        prefix_frame_count=4,
+        observation_mask=mask,
+        config=config,
+        grouped_evidence=evidence,
+    )
+    batched = abduct_factual_intervention(
+        bank,
+        belief,
+        observations,
+        prefix_frame_count=4,
+        observation_mask=mask,
+        config=config,
+        grouped_evidence=evidence,
+        grouped_component_batch_size=1,
+    )
+    assert np.array_equal(batched.weights, dense.weights)
+    assert batched.metadata == dense.metadata
+    assert batched.artifact_id == dense.artifact_id
+
+
+def test_grouped_component_batching_preserves_structured_uncertainty() -> None:
+    bank, belief, observations, mask, config, evidence = _problem()
+    group = evidence.groups[0]
+    factor = np.zeros((group.coordinate_count, 1), dtype=float)
+    factor[0, 0] = 0.002
+    uncertainty = FactualAbductionUncertaintyV1(
+        rollout_bank_id=bank.artifact_id,
+        twin_belief_id=belief.artifact_id,
+        grouped_evidence_id=evidence.evidence_id,
+        source_artifact_ids=("batched-structured-covariance",),
+        source_only=True,
+        disjoint_from_twin_belief_uncertainty=True,
+        disjoint_from_grouped_observation_covariance=True,
+        additional_independent_variance_m2=np.asarray(1e-7),
+        group_covariance_factor_m={group.group_id: factor},
+        independent_and_correlated_terms_are_disjoint=True,
+    )
+    dense = abduct_factual_intervention(
+        bank,
+        belief,
+        observations,
+        prefix_frame_count=4,
+        observation_mask=mask,
+        config=config,
+        grouped_evidence=evidence,
+        abduction_uncertainty=uncertainty,
+    )
+    batched = abduct_factual_intervention(
+        bank,
+        belief,
+        observations,
+        prefix_frame_count=4,
+        observation_mask=mask,
+        config=config,
+        grouped_evidence=evidence,
+        abduction_uncertainty=uncertainty,
+        grouped_component_batch_size=2,
+    )
+    assert np.array_equal(batched.weights, dense.weights)
+    assert batched.metadata == dense.metadata
+    assert batched.artifact_id == dense.artifact_id
+
+
+@pytest.mark.parametrize("batch_size", [0, -1, True, 1.5])
+def test_grouped_component_batching_rejects_invalid_sizes(batch_size) -> None:
+    bank, belief, observations, mask, config, evidence = _problem()
+    with pytest.raises(ValueError, match="positive integer"):
+        abduct_factual_intervention(
+            bank,
+            belief,
+            observations,
+            prefix_frame_count=4,
+            observation_mask=mask,
+            config=config,
+            grouped_evidence=evidence,
+            grouped_component_batch_size=batch_size,
+        )
+
+
+def test_grouped_component_batching_requires_grouped_evidence() -> None:
+    bank, belief, observations, mask, config, _ = _problem()
+    with pytest.raises(ValueError, match="requires grouped observation evidence"):
+        abduct_factual_intervention(
+            bank,
+            belief,
+            observations,
+            prefix_frame_count=4,
+            observation_mask=mask,
+            config=config,
+            grouped_component_batch_size=1,
+        )
+
+
+def test_grouped_component_batching_avoids_full_readout_materialization(
+    monkeypatch,
+) -> None:
+    bank, belief, observations, mask, config, evidence = _problem()
+
+    def fail_full_materialization(*_args, **_kwargs):
+        raise AssertionError("batched path materialized the complete readout bank")
+
+    monkeypatch.setattr(
+        "causal4d.intervention_abduction.physical_readout_components",
+        fail_full_materialization,
+    )
+    factual = abduct_factual_intervention(
+        bank,
+        belief,
+        observations,
+        prefix_frame_count=4,
+        observation_mask=mask,
+        config=config,
+        grouped_evidence=evidence,
+        grouped_component_batch_size=1,
+    )
+    assert np.argmax(factual.weights) == 1
