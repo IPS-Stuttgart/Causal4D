@@ -88,6 +88,24 @@ def build_parser() -> argparse.ArgumentParser:
             "frame instead of the legacy dense generalized likelihood."
         ),
     )
+    parser.add_argument(
+        "--grouped-likelihood-semantics",
+        choices=("legacy_v1", "normalized_v3"),
+        default="legacy_v1",
+        help=(
+            "Grouped full-covariance score. normalized_v3 is an opt-in, "
+            "contributor-capped coordinate-normalized development comparator."
+        ),
+    )
+    parser.add_argument(
+        "--grouped-covariance-condition-number-limit",
+        type=float,
+        default=1.0e12,
+        help=(
+            "Fail-closed source-covariance condition-number limit used by "
+            "grouped normalized_v3."
+        ),
+    )
     parser.add_argument("--prior-nominal-probability", type=float, default=0.95)
     parser.add_argument("--outlier-scale-multiplier", type=float, default=100.0)
     parser.add_argument(
@@ -190,6 +208,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.identifiability_npz is None
     ):
         raise ValueError("registered_query policy requires --identifiability-npz")
+    if (
+        args.grouped_likelihood_semantics != "legacy_v1"
+        and not args.grouped_observation_likelihood
+    ):
+        raise ValueError(
+            "--grouped-likelihood-semantics normalized_v3 requires "
+            "--grouped-observation-likelihood"
+        )
     if args.factual_abduction_uncertainty_npz is not None and (
         not args.grouped_observation_likelihood
     ):
@@ -218,6 +244,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         degrees_of_freedom=args.degrees_of_freedom,
         likelihood_semantics=args.likelihood_semantics,
         difference_correlation=args.difference_correlation,
+        grouped_likelihood_semantics=args.grouped_likelihood_semantics,
+        grouped_covariance_condition_number_limit=(
+            args.grouped_covariance_condition_number_limit
+        ),
     )
     grouped_evidence = None
     if args.grouped_observation_likelihood:

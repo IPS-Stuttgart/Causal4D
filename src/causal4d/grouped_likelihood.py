@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import lgamma
-from typing import Mapping
+from typing import Literal, Mapping
 
 import numpy as np
 
@@ -16,6 +16,12 @@ from causal4d.observation_evidence import (
 from causal4d.weighting import log_weights_from_probabilities
 
 
+GroupedScoreSemantics = Literal[
+    "legacy_sum_v1",
+    "normalized_coordinate_mean_v3",
+]
+
+
 @dataclass(frozen=True)
 class GroupLikelihoodDiagnostics:
     """Nominal responsibilities and effective powers for one grouped update."""
@@ -25,6 +31,13 @@ class GroupLikelihoodDiagnostics:
     nominal_responsibilities: np.ndarray
     full_covariance_group_ids: tuple[str, ...] = ()
     low_rank_covariance_group_ids: tuple[str, ...] = ()
+    score_semantics: GroupedScoreSemantics = "legacy_sum_v1"
+    likelihood_power: float = 1.0
+    contributor_power_caps: tuple[float, ...] = ()
+    group_coordinate_counts: tuple[int, ...] = ()
+    normalization_coordinate_mass: float | None = None
+    source_covariance_condition_numbers: tuple[float, ...] = ()
+    normalization_coordinate_fractions: tuple[float, ...] = ()
 
 
 def _student_t_log_density_from_terms(
@@ -324,6 +337,9 @@ def grouped_component_log_likelihoods(
     component_variance_m2: np.ndarray | None = None,
     component_group_covariance_m2: Mapping[str, np.ndarray] | None = None,
     component_group_covariance_factor_m: Mapping[str, np.ndarray] | None = None,
+    score_semantics: GroupedScoreSemantics = "legacy_sum_v1",
+    likelihood_power: float = 1.0,
+    max_source_covariance_condition_number: float = 1.0e12,
 ) -> tuple[np.ndarray, GroupLikelihoodDiagnostics]:
     """Score arbitrary leading component dimensions against grouped O-plus evidence.
 
@@ -332,7 +348,28 @@ def grouped_component_log_likelihoods(
     meters. Each factor must broadcast to
     ``component_shape + (group_coordinate, rank)`` and contributes
     ``factor @ factor.T`` without dense materialization.
+
+    ``legacy_sum_v1`` preserves the original robust composite likelihood. The
+    experimental ``normalized_coordinate_mean_v3`` divides the contributor-capped
+    score by contributor-capped coordinate mass and then applies the explicit
+    likelihood power. Source ``composite_weight`` values remain multiplicative
+    reliability temperatures and therefore do not cancel in the normalization.
     """
+
+    if score_semantics not in {
+        "legacy_sum_v1",
+        "normalized_coordinate_mean_v3",
+    }:
+        raise ValueError("unsupported grouped score semantics")
+    if not np.isfinite(likelihood_power) or likelihood_power <= 0.0:
+        raise ValueError("likelihood_power must be finite and positive")
+    if (
+        not np.isfinite(max_source_covariance_condition_number)
+        or max_source_covariance_condition_number < 1.0
+    ):
+        raise ValueError(
+            "max_source_covariance_condition_number must be finite and at least one"
+        )
 
     components = np.asarray(predicted_components_m, dtype=float)
     if components.ndim < 4:
@@ -368,10 +405,22 @@ def grouped_component_log_likelihoods(
         )
     total = np.zeros(leading_shape, dtype=float)
     responsibilities = []
+    contributor_caps = evidence.contributor_power_caps
     effective_weights = evidence.effective_group_weights
+    coordinate_counts = tuple(group.coordinate_count for group in evidence.groups)
+    condition_numbers = []
     full_covariance_groups = []
     low_rank_covariance_groups = []
     for group, weight in zip(evidence.groups, effective_weights, strict=True):
+        if score_semantics == "normalized_coordinate_mean_v3":
+            eigenvalues = np.linalg.eigvalsh(group.covariance_m2)
+            condition_number = float(eigenvalues[-1] / eigenvalues[0])
+            condition_numbers.append(condition_number)
+            if condition_number > max_source_covariance_condition_number:
+                raise ValueError(
+                    f"group {group.group_id!r} source covariance condition number "
+                    "exceeds the normalized-v3 limit"
+                )
         selected = group.selected_predictions(components)
         selected_variance = (
             None if variance is None else group.selected_predictions(variance)
@@ -391,12 +440,47 @@ def grouped_component_log_likelihoods(
         )
         total += weight * log_likelihood
         responsibilities.append(responsibility)
+
+    normalization_mass: float | None = None
+    normalization_fractions: tuple[float, ...] = ()
+    if score_semantics == "normalized_coordinate_mean_v3":
+        normalization_mass = float(
+            sum(
+                cap * coordinate_count
+                for cap, coordinate_count in zip(
+                    contributor_caps,
+                    coordinate_counts,
+                    strict=True,
+                )
+            )
+        )
+        if not np.isfinite(normalization_mass) or normalization_mass <= 0.0:
+            raise RuntimeError("normalized grouped coordinate mass is invalid")
+        total = likelihood_power * total / normalization_mass
+        normalization_fractions = tuple(
+            cap * coordinate_count / normalization_mass
+            for cap, coordinate_count in zip(
+                contributor_caps,
+                coordinate_counts,
+                strict=True,
+            )
+        )
+    else:
+        total = likelihood_power * total
+
     diagnostics = GroupLikelihoodDiagnostics(
         group_ids=tuple(group.group_id for group in evidence.groups),
         effective_group_weights=effective_weights,
         nominal_responsibilities=np.stack(responsibilities, axis=-1),
         full_covariance_group_ids=tuple(full_covariance_groups),
         low_rank_covariance_group_ids=tuple(low_rank_covariance_groups),
+        score_semantics=score_semantics,
+        likelihood_power=float(likelihood_power),
+        contributor_power_caps=contributor_caps,
+        group_coordinate_counts=coordinate_counts,
+        normalization_coordinate_mass=normalization_mass,
+        source_covariance_condition_numbers=tuple(condition_numbers),
+        normalization_coordinate_fractions=normalization_fractions,
     )
     return total, diagnostics
 
@@ -410,6 +494,9 @@ def posterior_weights_from_grouped_evidence(
     component_variance_m2: np.ndarray | None = None,
     component_group_covariance_m2: Mapping[str, np.ndarray] | None = None,
     component_group_covariance_factor_m: Mapping[str, np.ndarray] | None = None,
+    score_semantics: GroupedScoreSemantics = "legacy_sum_v1",
+    likelihood_power: float = 1.0,
+    max_source_covariance_condition_number: float = 1.0e12,
 ) -> tuple[np.ndarray, GroupLikelihoodDiagnostics]:
     """Apply grouped evidence to finite component support in log space."""
 
@@ -425,6 +512,11 @@ def posterior_weights_from_grouped_evidence(
         component_variance_m2=component_variance_m2,
         component_group_covariance_m2=component_group_covariance_m2,
         component_group_covariance_factor_m=(component_group_covariance_factor_m),
+        score_semantics=score_semantics,
+        likelihood_power=likelihood_power,
+        max_source_covariance_condition_number=(
+            max_source_covariance_condition_number
+        ),
     )
     log_posterior = log_weights_from_probabilities(prior, name="prior_weights") + score
     maximum = float(np.max(log_posterior))
