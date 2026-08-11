@@ -1,12 +1,16 @@
 {
   "analysis_id": null,
   "artifact_kind": "Causal4DRegisteredRealAnalysisManifestTemplate",
+  "historical_percentile_interval_role": "sensitivity_only",
+  "interval_amendment_id": "defe28799c4e6ea6c926df305fe9aac47427643c01a3f80b0911686a516c6dc7",
   "method_freeze_sha256": null,
   "optional_branches_may_change_primary_analysis": false,
   "preacquisition_amendment_sha256": "0e167538a7824e5ec053031d8359d4e9b4ff89ad61a85666400a86c2a88ac42f",
   "primary_analysis_locked": false,
+  "primary_interval_method": "target_session_bootstrap_t",
   "protocol_design_sha256": "6d61f2bea96af0ba04faaf3476990b58cd87e0a9c826420c254a012dec647968",
   "protocol_id": "causal4d-sloth-multi-action-v1",
-  "schema_version": 1,
+  "required_robustness_interval_method": "student_t_mean",
+  "schema_version": 3,
   "target_outcomes_may_select_method_or_hyperparameters": false
 }

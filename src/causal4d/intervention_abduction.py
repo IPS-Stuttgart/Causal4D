@@ -418,8 +418,26 @@ def evaluate_factual_abduction(
         grouped_evidence=grouped_evidence,
     )
     components = physical_readout_components(bank, belief)
+    hypothesis_marginal = np.sum(z_weights, axis=1)
     z_prediction = np.einsum("hp,hptnc->tnc", z_weights, components)
     nominal_prediction = np.einsum("hp,hptnc->tnc", nominal_weights, components)
+
+    map_flat_index = int(np.argmax(z_weights))
+    map_hypothesis_index, map_particle_index = np.unravel_index(
+        map_flat_index,
+        z_weights.shape,
+    )
+    map_prediction = components[map_hypothesis_index, map_particle_index]
+
+    z_with_prior_twin_weights = (
+        hypothesis_marginal[:, None] * bank.parameter_weights[None, :]
+    )
+    z_with_prior_twin_prediction = np.einsum(
+        "hp,hptnc->tnc",
+        z_with_prior_twin_weights,
+        components,
+    )
+
     z_metrics = _prediction_metrics(
         z_prediction,
         observations_from_endpoint_m,
@@ -432,8 +450,19 @@ def evaluate_factual_abduction(
         observation_mask,
         start_frame=prefix_frame_count,
     )
+    map_metrics = _prediction_metrics(
+        map_prediction,
+        observations_from_endpoint_m,
+        observation_mask,
+        start_frame=prefix_frame_count,
+    )
+    z_with_prior_twin_metrics = _prediction_metrics(
+        z_with_prior_twin_prediction,
+        observations_from_endpoint_m,
+        observation_mask,
+        start_frame=prefix_frame_count,
+    )
     improvement = 1.0 - z_metrics["track_error_m"] / nominal_metrics["track_error_m"]
-    hypothesis_marginal = np.sum(z_weights, axis=1)
     return {
         "abduction_prefix_frame_count_including_endpoint": prefix_frame_count,
         "held_out_rollout_interval": [prefix_frame_count, bank.frame_count],
@@ -448,7 +477,16 @@ def evaluate_factual_abduction(
         ),
         "bpt_without_z": nominal_metrics,
         "bpt_plus_causal4d_z": z_metrics,
+        "causal4d_map_joint_component": map_metrics,
+        "causal4d_z_with_prior_twin": z_with_prior_twin_metrics,
         "relative_track_error_improvement": float(improvement),
+        "map_joint_component": {
+            "component_id": factual.component_ids[map_flat_index],
+            "hypothesis_id": bank.hypothesis_ids[map_hypothesis_index],
+            "particle_id": belief.particle_ids[map_particle_index],
+            "probability": float(z_weights[map_hypothesis_index, map_particle_index]),
+        },
+        "z_with_prior_twin_parameter_weights": bank.parameter_weights.tolist(),
         "map_hypothesis_id": bank.hypothesis_ids[int(np.argmax(hypothesis_marginal))],
         "map_hypothesis_probability": float(np.max(hypothesis_marginal)),
         "nominal_hypothesis_probability": float(np.sum(hypothesis_marginal[nominal])),

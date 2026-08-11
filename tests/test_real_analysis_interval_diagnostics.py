@@ -8,6 +8,11 @@ import numpy as np
 import pytest
 
 from causal4d.cli.real_analysis_interval_diagnostics import main as diagnostics_main
+from causal4d.real_analysis_interval_amendment import (
+    REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH,
+    bind_repository_interval_amendment,
+    expected_real_analysis_interval_amendment,
+)
 from causal4d.real_analysis_interval_diagnostics import (
     bootstrap_t_sensitivity_interval,
     build_real_analysis_interval_diagnostics,
@@ -22,8 +27,9 @@ from causal4d.real_analysis_reporting import (
     effect_table_id_for_payload,
 )
 from causal4d.real_experiment_freeze import MILESTONE_ID, SCHEMA_VERSION
-from causal4d.real_result_source_verification import (
-    REGISTERED_ANALYSIS_ARTIFACT_KIND,
+from causal4d.real_protocol import load_protocol
+from causal4d.registered_real_analysis import (
+    build_registered_real_analysis_manifest,
 )
 
 
@@ -40,39 +46,82 @@ def _write_json(path: Path, payload: object) -> str:
 
 
 def _source_pair(tmp_path: Path) -> tuple[Path, Path, str, str]:
-    freeze = tmp_path / "method-freeze.json"
-    freeze_sha = _write_json(
-        freeze,
-        {
-            "schema_version": SCHEMA_VERSION,
-            "milestone_id": MILESTONE_ID,
-            "status": "sealed",
-            "locked_before_confirmatory_collection": True,
-            "target_outcomes_observed_at_freeze": False,
-            "protocol": {"design_sha256": EXPECTED_PROTOCOL_DESIGN_SHA256},
-            "preacquisition": {"amendment_sha256": EXPECTED_PREACQUISITION_SHA256},
-            "analysis_contract": {
-                "target_outcomes_may_select_method_or_hyperparameters": False,
-                "optional_branches_may_change_primary_analysis": False,
-            },
+    interval_amendment = bind_repository_interval_amendment(ROOT)
+    freeze_payload: dict[str, object] = {
+        "schema_version": SCHEMA_VERSION,
+        "milestone_id": MILESTONE_ID,
+        "status": "sealed",
+        "locked_before_confirmatory_collection": True,
+        "target_outcomes_observed_at_freeze": False,
+        "causal4d": {"commit_sha": "a" * 40},
+        "bayesian_phystwin": {"commit_sha": "b" * 40},
+        "protocol": {"design_sha256": EXPECTED_PROTOCOL_DESIGN_SHA256},
+        "preacquisition": {
+            "amendment_sha256": EXPECTED_PREACQUISITION_SHA256,
         },
-    )
-    analysis = tmp_path / "registered-analysis.json"
-    analysis_sha = _write_json(
-        analysis,
-        {
-            "schema_version": 1,
-            "artifact_kind": REGISTERED_ANALYSIS_ARTIFACT_KIND,
-            "analysis_id": "registered-real-analysis-v1",
-            "protocol_id": EXPECTED_PROTOCOL_ID,
-            "protocol_design_sha256": EXPECTED_PROTOCOL_DESIGN_SHA256,
-            "preacquisition_amendment_sha256": EXPECTED_PREACQUISITION_SHA256,
-            "method_freeze_sha256": freeze_sha,
-            "primary_analysis_locked": True,
+        "interval_amendment": interval_amendment,
+        "analysis_contract": {
+            "entrypoints": [
+                "causal4d protocol real",
+                "causal4d calibration execution-block",
+                "causal4d evidence physical-counterfactual evaluate",
+            ],
+            "diagnostic_only_entrypoints": ["causal4d calibration real"],
+            "allowed_observation_prefix_frames": 6,
+            "effect_interval": {
+                "amendment_path": (REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH),
+                "amendment_id": expected_real_analysis_interval_amendment()[
+                    "amendment_id"
+                ],
+                "primary_method": "target_session_bootstrap_t",
+                "required_robustness_method": "student_t_mean",
+                "historical_sensitivity_method": (
+                    "target_session_percentile_bootstrap"
+                ),
+                "positive_claim_requires_both_lower_bounds_positive": True,
+                "robustness_may_rescue_primary_failure": False,
+            },
+            "confirmatory_calibration": {
+                "entrypoint": "causal4d calibration execution-block",
+                "confidence_level": 0.90,
+                "outer_fold_count": 12,
+                "expected_calibration_units_per_outer_fold": 9,
+                "order_statistic_rank_one_based": 9,
+                "calibration_unit": (
+                    "one preregistered execution per independent session"
+                ),
+                "score_kind": "max_abs_standardized_coordinate_v1",
+                "target_threshold_reselection_allowed": False,
+                "pooled_coordinate_conformal_claimed": False,
+                "worst_group_coverage_guarantee_claimed": False,
+            },
             "target_outcomes_may_select_method_or_hyperparameters": False,
             "optional_branches_may_change_primary_analysis": False,
         },
+        "reporting_contract": {
+            "report_success_or_well_powered_negative_result": True,
+            "report_all_36_executions_or_preregistered_exclusions": True,
+            "report_independent_execution_calibration": True,
+            "report_effect_intervals_and_replay_reset_variance": True,
+            "positive_claim_requires_primary_and_robustness_intervals": True,
+            "historical_percentile_interval_is_sensitivity_only": True,
+            (
+                "optional_semantic_or_public_data_results_cannot_rescue_primary_failure"
+            ): True,
+        },
+    }
+    freeze = tmp_path / "method-freeze.json"
+    freeze_sha = _write_json(freeze, freeze_payload)
+    analysis_payload = build_registered_real_analysis_manifest(
+        load_protocol(PROTOCOL),
+        freeze_payload,
+        method_freeze_sha256=freeze_sha,
+        interval_amendment_binding=interval_amendment,
+        registered_by="independent-registrar",
+        registered_at_utc="2026-08-07T00:30:00+00:00",
     )
+    analysis = tmp_path / "registered-analysis.json"
+    analysis_sha = _write_json(analysis, analysis_payload)
     return freeze, analysis, freeze_sha, analysis_sha
 
 
@@ -178,7 +227,7 @@ def test_degenerate_samples_produce_explicit_point_intervals() -> None:
         assert result["upper"] == pytest.approx(1.5)
 
 
-def test_companion_artifact_preserves_primary_interval_and_sources(
+def test_companion_artifact_verifies_registered_intervals_and_sources(
     tmp_path: Path,
 ) -> None:
     freeze, analysis, freeze_sha, analysis_sha = _source_pair(tmp_path)
@@ -213,21 +262,21 @@ def test_companion_artifact_preserves_primary_interval_and_sources(
     assert first["source_primary_report_id"] == primary["report_id"]
     assert first["source_verification"] == primary["source_verification"]
     assert first["included_session_count"] == 18
+    registered = first["registered_intervals"]
+    reported = primary["primary_session_clustered_effect"]
+    assert registered["primary_bootstrap_t"] == reported["confidence_interval"]
     assert (
-        first["primary_percentile_interval"]["interval"]
-        == primary["primary_session_clustered_effect"]["confidence_interval"]
+        registered["required_student_t_robustness"]
+        == reported["required_robustness_interval"]
     )
     assert (
-        first["primary_percentile_interval"]["finite_sample_coverage_guaranteed"]
-        is False
+        registered["historical_percentile_sensitivity"]
+        == reported["historical_percentile_sensitivity_interval"]
     )
-    assert first["sensitivity_intervals"]["may_change_primary_decision"] is False
-    assert (
-        first["sensitivity_intervals"][
-            "promotion_requires_explicit_preacquisition_amendment"
-        ]
-        is True
-    )
+    assert registered["decision"] == reported["interval_decision"]
+    assert first["interpretation"]["bootstrap_t_is_registered_primary"] is True
+    assert first["interpretation"]["student_t_may_veto_positive_claim"] is True
+    assert first["interpretation"]["student_t_may_rescue_primary_failure"] is False
     assert first["interpretation"]["target_informed_selection"] is False
     assert (
         first["claim_boundary"]["physical_target_outcomes_used_to_choose_interval"]
@@ -259,7 +308,9 @@ def test_cli_publishes_atomically_and_requires_explicit_overwrite(
     assert diagnostics_main(arguments) == 0
     published = json.loads(output.read_text(encoding="utf-8"))
     assert published["artifact_kind"] == "Causal4DRealAnalysisIntervalDiagnostics"
-    assert published["sensitivity_intervals"]["may_change_primary_decision"] is False
+    assert published["registered_intervals"]["primary_bootstrap_t"]["role"] == (
+        "primary"
+    )
 
     with pytest.raises(FileExistsError):
         diagnostics_main(arguments)

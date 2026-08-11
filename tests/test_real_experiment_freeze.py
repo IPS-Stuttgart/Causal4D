@@ -6,6 +6,12 @@ from pathlib import Path
 
 import pytest
 
+from causal4d.real_analysis_interval_amendment import (
+    REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH,
+    REAL_ANALYSIS_INTERVAL_EVIDENCE_REPOSITORY_PATH,
+    expected_real_analysis_interval_amendment,
+    expected_real_analysis_interval_evidence,
+)
 from causal4d.real_experiment_freeze import (
     ACQUISITION_CANDIDATE_PATH,
     BPT_PIN_PATH,
@@ -51,6 +57,14 @@ def _repository(tmp_path: Path) -> Path:
         path.write_text(f"locked:{relative}\n", encoding="utf-8")
     (root / "configs/causal4d/sloth_multi_action_v1.json").write_text(
         json.dumps({"design_sha256": PROTOCOL_SHA}), encoding="utf-8"
+    )
+    (root / REAL_ANALYSIS_INTERVAL_EVIDENCE_REPOSITORY_PATH).write_text(
+        json.dumps(expected_real_analysis_interval_evidence()),
+        encoding="utf-8",
+    )
+    (root / REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH).write_text(
+        json.dumps(expected_real_analysis_interval_amendment()),
+        encoding="utf-8",
     )
 
     evidence: dict[str, object] = {
@@ -151,6 +165,11 @@ def test_freeze_binds_method_files_dependency_and_registered_calibration(
     assert result["bayesian_phystwin_commit_sha"] == BPT_SHA
     assert result["prob4d_used"] is False
     assert (
+        result["real_analysis_interval_amendment_id"]
+        == expected_real_analysis_interval_amendment()["amendment_id"]
+    )
+    assert result["real_analysis_interval_amendment_sha256"]
+    assert (
         result["acquisition_candidate_sha256"]
         == manifest["acquisition_candidate"]["candidate_sha256"]
     )
@@ -167,6 +186,15 @@ def test_freeze_binds_method_files_dependency_and_registered_calibration(
     assert analysis["diagnostic_only_entrypoints"] == list(
         DIAGNOSTIC_ONLY_ANALYSIS_ENTRYPOINTS
     )
+    assert analysis["effect_interval"] == {
+        "amendment_path": REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH,
+        "amendment_id": expected_real_analysis_interval_amendment()["amendment_id"],
+        "primary_method": "target_session_bootstrap_t",
+        "required_robustness_method": "student_t_mean",
+        "historical_sensitivity_method": "target_session_percentile_bootstrap",
+        "positive_claim_requires_both_lower_bounds_positive": True,
+        "robustness_may_rescue_primary_failure": False,
+    }
     assert analysis["confirmatory_calibration"] == {
         "entrypoint": "causal4d calibration execution-block",
         "confidence_level": 0.90,
@@ -254,6 +282,37 @@ def test_freeze_rejects_preacquisition_or_gate_control_drift(tmp_path: Path) -> 
     )
     evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
     with pytest.raises(ValueError, match="different gate-control evidence"):
+        validate_method_freeze_manifest(manifest, root, verify_files=False)
+
+
+def test_freeze_rejects_interval_amendment_or_evidence_drift(
+    tmp_path: Path,
+) -> None:
+    root = _repository(tmp_path)
+    manifest = build_method_freeze_manifest(
+        root,
+        causal4d_commit_sha=CAUSAL4D_SHA,
+        frozen_by="operator-1",
+    )
+
+    evidence_path = root / REAL_ANALYSIS_INTERVAL_EVIDENCE_REPOSITORY_PATH
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    evidence["physical_target_outcomes_used"] = True
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+    with pytest.raises(ValueError, match="interval evidence"):
+        validate_method_freeze_manifest(manifest, root, verify_files=False)
+
+    root = _repository(tmp_path / "amendment")
+    manifest = build_method_freeze_manifest(
+        root,
+        causal4d_commit_sha=CAUSAL4D_SHA,
+        frozen_by="operator-1",
+    )
+    amendment_path = root / REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH
+    amendment = json.loads(amendment_path.read_text(encoding="utf-8"))
+    amendment["required_robustness_interval"]["may_rescue_primary_failure"] = True
+    amendment_path.write_text(json.dumps(amendment), encoding="utf-8")
+    with pytest.raises(ValueError, match="interval amendment"):
         validate_method_freeze_manifest(manifest, root, verify_files=False)
 
 

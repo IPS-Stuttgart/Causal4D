@@ -1,0 +1,45 @@
+{
+  "amendment_id": "defe28799c4e6ea6c926df305fe9aac47427643c01a3f80b0911686a516c6dc7",
+  "artifact_kind": "Causal4DRealAnalysisIntervalAmendment",
+  "historical_sensitivity_interval": {
+    "confidence_level": 0.95,
+    "may_change_primary_decision": false,
+    "method": "target_session_percentile_bootstrap",
+    "replicates": 20000,
+    "seed": 20260726
+  },
+  "information_boundary": {
+    "changes_estimator": false,
+    "changes_protocol_units_or_splits": false,
+    "changes_target_access_boundary": false,
+    "negative_or_bounded_result_remains_reportable": true,
+    "physical_execution_count_at_registration": 0,
+    "positive_claim_requires_primary_and_robustness_intervals": true
+  },
+  "operating_characteristic_evidence": {
+    "implementation_target_sha": "fa6a64b2442474321e453e9e8fdccd591e0a282d",
+    "interval_selected_automatically_from_target_outcomes": false,
+    "physical_target_outcomes_used": false,
+    "repository_path": "runs/causal4d_real_analysis_interval_v1/operating_characteristics.json",
+    "result_sha256": "27f9ffed5ae3b520641457b7d0945b4a029c04d8e9c499c1026af6d7d53ef745"
+  },
+  "primary_interval": {
+    "confidence_level": 0.95,
+    "equal_session_weighting": true,
+    "method": "target_session_bootstrap_t",
+    "positive_claim_requires_strictly_positive_lower_bound": true,
+    "replicates": 20000,
+    "resampling_unit": "target_grasp_session",
+    "seed": 20260726
+  },
+  "required_robustness_interval": {
+    "confidence_level": 0.95,
+    "may_rescue_primary_failure": false,
+    "may_veto_positive_claim": true,
+    "method": "student_t_mean",
+    "positive_claim_requires_strictly_positive_lower_bound": true
+  },
+  "schema_version": 1,
+  "status": "registered_before_target_access",
+  "supersedes_primary_interval_method": "target_session_percentile_bootstrap"
+}

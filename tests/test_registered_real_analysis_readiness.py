@@ -6,6 +6,11 @@ import json
 from pathlib import Path
 
 import causal4d.preacquisition_readiness as readiness_module
+from causal4d.real_analysis_interval_amendment import (
+    REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH,
+    bind_repository_interval_amendment,
+    expected_real_analysis_interval_amendment,
+)
 from causal4d.real_experiment_freeze import MILESTONE_ID, SCHEMA_VERSION
 from causal4d.real_protocol import load_protocol
 from causal4d.registered_real_analysis import (
@@ -40,6 +45,7 @@ def _freeze() -> dict[str, object]:
         "preacquisition": {
             "amendment_sha256": EXPECTED_PREACQUISITION_SHA256,
         },
+        "interval_amendment": bind_repository_interval_amendment(ROOT),
         "analysis_contract": {
             "entrypoints": [
                 "causal4d protocol real",
@@ -48,6 +54,19 @@ def _freeze() -> dict[str, object]:
             ],
             "diagnostic_only_entrypoints": ["causal4d calibration real"],
             "allowed_observation_prefix_frames": 6,
+            "effect_interval": {
+                "amendment_path": (REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH),
+                "amendment_id": expected_real_analysis_interval_amendment()[
+                    "amendment_id"
+                ],
+                "primary_method": "target_session_bootstrap_t",
+                "required_robustness_method": "student_t_mean",
+                "historical_sensitivity_method": (
+                    "target_session_percentile_bootstrap"
+                ),
+                "positive_claim_requires_both_lower_bounds_positive": True,
+                "robustness_may_rescue_primary_failure": False,
+            },
             "confirmatory_calibration": {
                 "entrypoint": "causal4d calibration execution-block",
                 "confidence_level": 0.90,
@@ -70,6 +89,8 @@ def _freeze() -> dict[str, object]:
             "report_all_36_executions_or_preregistered_exclusions": True,
             "report_independent_execution_calibration": True,
             "report_effect_intervals_and_replay_reset_variance": True,
+            "positive_claim_requires_primary_and_robustness_intervals": True,
+            "historical_percentile_interval_is_sensitivity_only": True,
             (
                 "optional_semantic_or_public_data_results_cannot_rescue_primary_failure"
             ): True,
@@ -93,6 +114,7 @@ def _ready_fixture(tmp_path: Path) -> tuple[dict[str, object], dict[str, object]
         protocol,
         freeze,
         method_freeze_sha256=freeze_sha,
+        interval_amendment_binding=bind_repository_interval_amendment(ROOT),
         registered_by="independent-registrar",
         registered_at_utc="2026-08-07T00:30:00+00:00",
     )

@@ -4,6 +4,15 @@
 
 ### Added
 
+- Register two diagnostic factual-abduction arms: the maximum-posterior joint
+  intervention/twin component and the inferred intervention marginal combined
+  with the untouched physical-parameter prior. They separate MAP selection,
+  Bayesian marginalization, and twin updating without changing the frozen
+  Causal4D primary candidate.
+- Add a content-addressed, target-free real-analysis interval amendment and bind
+  its exact path, bytes, identity, operating-characteristic evidence, and policy
+  into the method freeze and schema-3 registered-analysis manifest.
+
 - Group repeated joint-observation selectors before propagating diagonal trajectory variance, and fail closed when a Woodbury quadratic becomes negative beyond scale-aware floating-point roundoff. The same guard now covers Gaussian and grouped Student-t low-rank paths.
 - Add a registered Causal4D consumer for strict claim-bearing tree-block
   posterior queries, including independent provider/result revalidation,
@@ -92,6 +101,12 @@ evidence. Source-panel executions remain source-only and cannot increment the
 `0/36` confirmatory evidence count.
 
 ### Fixed
+
+- Replace the under-covering session percentile interval as the registered
+  primary real-effect interval with deterministic bootstrap-t. Require a
+  Student-t lower bound as a veto-only robustness gate, retain the percentile
+  result as historical sensitivity, and prohibit the robustness interval from
+  rescuing a primary failure.
 
 - Route Prob4D observation-factor manifests and payload archives through one
   symlink-free exact-byte snapshot, the shared strict JSON decoder, and the

@@ -12,8 +12,14 @@ from pathlib import Path
 from typing import Any
 
 from causal4d.atomic_io import atomic_write_json
+from causal4d.real_analysis_interval_amendment import (
+    REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH,
+    REAL_ANALYSIS_INTERVAL_EVIDENCE_REPOSITORY_PATH,
+    bind_repository_interval_amendment,
+    expected_real_analysis_interval_amendment,
+)
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MILESTONE_ID = "causal4d-same-object-real-v1"
 BPT_PIN_PATH = "requirements/ci/bayesian-phystwin-provider-v1.sha"
 PROTOCOL_PATH = "configs/causal4d/sloth_multi_action_v1.json"
@@ -29,6 +35,8 @@ REQUIRED_LOCKED_PATHS = (
     "configs/causal4d/sloth_multi_action_v1_schedule.csv",
     PREACQUISITION_PATH,
     MECHANISM_GATE_EVIDENCE_PATH,
+    REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH,
+    REAL_ANALYSIS_INTERVAL_EVIDENCE_REPOSITORY_PATH,
     "docs/causal4d_paper_scope.md",
     "docs/causal4d_same_object_multi_action_protocol.md",
     "docs/causal4d_real_experiment_milestone.md",
@@ -293,10 +301,20 @@ def _acquisition_candidate_contract(
 
 
 def _analysis_contract() -> dict[str, Any]:
+    interval_amendment = expected_real_analysis_interval_amendment()
     return {
         "entrypoints": list(REQUIRED_ANALYSIS_ENTRYPOINTS),
         "diagnostic_only_entrypoints": list(DIAGNOSTIC_ONLY_ANALYSIS_ENTRYPOINTS),
         "allowed_observation_prefix_frames": 6,
+        "effect_interval": {
+            "amendment_path": (REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH),
+            "amendment_id": interval_amendment["amendment_id"],
+            "primary_method": "target_session_bootstrap_t",
+            "required_robustness_method": "student_t_mean",
+            "historical_sensitivity_method": ("target_session_percentile_bootstrap"),
+            "positive_claim_requires_both_lower_bounds_positive": True,
+            "robustness_may_rescue_primary_failure": False,
+        },
         "confirmatory_calibration": {
             "entrypoint": "causal4d calibration execution-block",
             "confidence_level": 0.90,
@@ -321,6 +339,8 @@ def _reporting_contract() -> dict[str, Any]:
         "report_all_36_executions_or_preregistered_exclusions": True,
         "report_independent_execution_calibration": True,
         "report_effect_intervals_and_replay_reset_variance": True,
+        "positive_claim_requires_primary_and_robustness_intervals": True,
+        "historical_percentile_interval_is_sensitivity_only": True,
         "optional_semantic_or_public_data_results_cannot_rescue_primary_failure": True,
     }
 
@@ -405,6 +425,7 @@ def build_method_freeze_manifest(
         root,
         protocol_design_sha256=design_sha256,
     )
+    interval_amendment = bind_repository_interval_amendment(root)
     bpt_commit = _read_bayesian_phystwin_pin(root / BPT_PIN_PATH)
     acquisition_candidate = _acquisition_candidate_contract(
         root,
@@ -431,6 +452,7 @@ def build_method_freeze_manifest(
             "design_sha256": design_sha256,
         },
         "preacquisition": preacquisition,
+        "interval_amendment": interval_amendment,
         "locked_files": locked_files,
         "analysis_contract": _analysis_contract(),
         "reporting_contract": _reporting_contract(),
@@ -518,6 +540,7 @@ def validate_method_freeze_manifest(
         protocol_design_sha256=str(protocol["design_sha256"]),
         bayesian_phystwin_commit_sha=str(bpt_commit),
     )
+    checked_interval_amendment = bind_repository_interval_amendment(root)
     _require(
         manifest.get("preacquisition") == checked_preacquisition,
         "pre-acquisition contract differs from the registered method freeze",
@@ -525,6 +548,10 @@ def validate_method_freeze_manifest(
     _require(
         manifest.get("acquisition_candidate") == checked_candidate,
         "acquisition candidate differs from the registered method freeze",
+    )
+    _require(
+        manifest.get("interval_amendment") == checked_interval_amendment,
+        "interval amendment differs from the registered method freeze",
     )
 
     entries = manifest.get("locked_files", [])
@@ -584,6 +611,10 @@ def validate_method_freeze_manifest(
         "mechanism_gate_control_sha256": checked_preacquisition[
             "mechanism_gate_control"
         ]["result_sha256"],
+        "real_analysis_interval_amendment_id": checked_interval_amendment[
+            "amendment_id"
+        ],
+        "real_analysis_interval_amendment_sha256": checked_interval_amendment["sha256"],
         "confirmatory_calibration_entrypoint": _analysis_contract()[
             "confirmatory_calibration"
         ]["entrypoint"],

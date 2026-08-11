@@ -24,11 +24,20 @@ from causal4d.execution_block_calibration import (
     ExecutionBlockConformalCalibration,
 )
 from causal4d.immutable_json import plain_json
+from causal4d.real_analysis_intervals import (
+    REAL_EFFECT_BOOTSTRAP_REPLICATES,
+    REAL_EFFECT_BOOTSTRAP_SEED,
+    REAL_EFFECT_CONFIDENCE_LEVEL,
+    bootstrap_t_mean_interval,
+    percentile_bootstrap_mean_interval,
+    registered_positive_effect_interval_decision,
+    student_t_mean_interval,
+)
 from causal4d.real_protocol import validate_protocol
 from causal4d.real_result_source_verification import verify_real_result_sources
 
 REAL_ANALYSIS_EFFECT_TABLE_SCHEMA_VERSION = 1
-REAL_ANALYSIS_REPORT_SCHEMA_VERSION = 1
+REAL_ANALYSIS_REPORT_SCHEMA_VERSION = 2
 EXPECTED_PROTOCOL_ID = "causal4d-sloth-multi-action-v1"
 EXPECTED_PROTOCOL_DESIGN_SHA256 = (
     "6d61f2bea96af0ba04faaf3476990b58cd87e0a9c826420c254a012dec647968"
@@ -37,9 +46,9 @@ EXPECTED_PREACQUISITION_SHA256 = (
     "0e167538a7824e5ec053031d8359d4e9b4ff89ad61a85666400a86c2a88ac42f"
 )
 EXPECTED_OBJECT_ID = "sloth_plush_instance_1"
-BOOTSTRAP_REPLICATES = 20_000
-BOOTSTRAP_SEED = 20_260_726
-BOOTSTRAP_CONFIDENCE_LEVEL = 0.95
+BOOTSTRAP_REPLICATES = REAL_EFFECT_BOOTSTRAP_REPLICATES
+BOOTSTRAP_SEED = REAL_EFFECT_BOOTSTRAP_SEED
+BOOTSTRAP_CONFIDENCE_LEVEL = REAL_EFFECT_CONFIDENCE_LEVEL
 
 Endpoint = Literal[
     "factual_continuation",
@@ -488,30 +497,34 @@ def _session_effects(
     )
 
 
-def _bootstrap(values: Sequence[float]) -> dict[str, Any]:
-    array: NDArray[np.float64] = np.asarray(values, dtype=np.float64)
-    result: dict[str, Any] = {
-        "estimable": len(array) >= 2,
-        "method": "session_cluster_percentile_bootstrap",
-        "confidence_level": BOOTSTRAP_CONFIDENCE_LEVEL,
-        "replicates": BOOTSTRAP_REPLICATES,
-        "seed": BOOTSTRAP_SEED,
-        "lower": None,
-        "upper": None,
+def _registered_intervals(values: Sequence[float]) -> dict[str, Any]:
+    """Build the registered primary, robustness, and historical intervals."""
+
+    primary = bootstrap_t_mean_interval(values)
+    robustness = student_t_mean_interval(values)
+    historical = percentile_bootstrap_mean_interval(values)
+    return {
+        "primary": {
+            **primary,
+            "role": "primary",
+            "may_change_primary_decision": True,
+        },
+        "required_robustness": {
+            **robustness,
+            "role": "required_positive_claim_robustness",
+            "may_veto_positive_claim": True,
+            "may_rescue_primary_failure": False,
+        },
+        "historical_percentile_sensitivity": {
+            **historical,
+            "role": "historical_sensitivity",
+            "may_change_primary_decision": False,
+        },
+        "decision": registered_positive_effect_interval_decision(
+            primary,
+            robustness,
+        ),
     }
-    if len(array) < 2:
-        return result
-    generator = np.random.default_rng(BOOTSTRAP_SEED)
-    indices = generator.integers(
-        0,
-        len(array),
-        size=(BOOTSTRAP_REPLICATES, len(array)),
-    )
-    means = np.mean(array[indices], axis=1)
-    tail = 0.5 * (1.0 - BOOTSTRAP_CONFIDENCE_LEVEL)
-    lower, upper = np.quantile(means, [tail, 1.0 - tail])
-    result.update(lower=float(lower), upper=float(upper))
-    return result
 
 
 def _drift(
@@ -650,6 +663,7 @@ def build_real_analysis_effect_report(
         lower_is_better=table.lower_is_better,
     )
     session_values = list(effects.values())
+    intervals = _registered_intervals(session_values)
     expected_units, expected_sessions = _ENDPOINT_COUNTS[table.endpoint]
     tolerance = 1e-12
     report: dict[str, Any] = {
@@ -705,7 +719,12 @@ def build_real_analysis_effect_report(
         "primary_session_clustered_effect": {
             "estimable": len(session_values) >= 2,
             "equal_session_weighted_improvement": _summary(session_values),
-            "confidence_interval": _bootstrap(session_values),
+            "confidence_interval": intervals["primary"],
+            "required_robustness_interval": intervals["required_robustness"],
+            "historical_percentile_sensitivity_interval": intervals[
+                "historical_percentile_sensitivity"
+            ],
+            "interval_decision": intervals["decision"],
             "candidate_better_session_count": sum(
                 value > tolerance for value in session_values
             ),
@@ -753,6 +772,10 @@ def build_real_analysis_effect_report(
             "subgroup_summaries_may_change_primary_decision": False,
             "drift_diagnostics_may_select_exclusions": False,
             "target_informed_selection": False,
+            "bootstrap_t_is_primary_interval": True,
+            "student_t_robustness_may_veto_positive_claim": True,
+            "student_t_robustness_may_rescue_primary_failure": False,
+            "historical_percentile_interval_may_change_primary_decision": False,
         },
     }
     report["report_id"] = _canonical_sha256(report)
