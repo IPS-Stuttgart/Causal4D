@@ -1,0 +1,261 @@
+name: Controlled self-hosted execution campaign
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+
+concurrency:
+  group: controlled-execution-campaign-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Dispatch target-free executions from reviewed main
+    if: >-
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.issue.user.login == 'FlorianPfaff' &&
+      github.event.issue.user.id == 6773539 &&
+      github.event.issue.title ==
+        '[self-hosted] run Causal4D controlled execution campaign'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+    steps:
+      - name: Verify the exact reviewed main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          main_sha="$(
+            gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha
+          )"
+          test "${main_sha}" = "${GITHUB_SHA}"
+          echo "MAIN_SHA=${main_sha}" >> "${GITHUB_ENV}"
+
+      - name: Record existing dispatch runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/causal4d-controlled-campaign"
+          workflows=(
+            self-hosted-evaluation.yml
+            workstation2-evaluation.yml
+            deform360-reset-mechanics.yml
+            deform360-prefix-kinematics.yml
+            deform360-filament-support.yml
+            deform360-contact-support.yml
+          )
+          for workflow in "${workflows[@]}"; do
+            gh run list \
+              --repo "${GITHUB_REPOSITORY}" \
+              --workflow "${workflow}" \
+              --branch main \
+              --event workflow_dispatch \
+              --limit 100 \
+              --json databaseId \
+              --jq '.[].databaseId' \
+              | sort -n \
+              > "${RUNNER_TEMP}/causal4d-controlled-campaign/${workflow}.before"
+          done
+
+      - name: Dispatch the controlled execution campaign
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run self-hosted-evaluation.yml \
+            --repo "${GITHUB_REPOSITORY}" \
+            --ref main \
+            -f profile=full \
+            -f run_bpt=true
+          gh workflow run workstation2-evaluation.yml \
+            --repo "${GITHUB_REPOSITORY}" \
+            --ref main \
+            -f cuda_visible_devices=0 \
+            -f extended_seeds=500:540
+          for workflow in \
+            deform360-reset-mechanics.yml \
+            deform360-prefix-kinematics.yml \
+            deform360-filament-support.yml \
+            deform360-contact-support.yml
+          do
+            gh workflow run "${workflow}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --ref main \
+              -f run_source_diagnostic=true
+          done
+
+      - name: Resolve and verify dispatched run identities
+        id: runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflows=(
+            self-hosted-evaluation.yml
+            workstation2-evaluation.yml
+            deform360-reset-mechanics.yml
+            deform360-prefix-kinematics.yml
+            deform360-filament-support.yml
+            deform360-contact-support.yml
+          )
+          for workflow in "${workflows[@]}"; do
+            before="${RUNNER_TEMP}/causal4d-controlled-campaign/${workflow}.before"
+            run_id=""
+            for _ in $(seq 1 60); do
+              after="$(mktemp)"
+              gh run list \
+                --repo "${GITHUB_REPOSITORY}" \
+                --workflow "${workflow}" \
+                --branch main \
+                --event workflow_dispatch \
+                --limit 100 \
+                --json databaseId \
+                --jq '.[].databaseId' \
+                | sort -n > "${after}"
+              run_id="$(comm -13 "${before}" "${after}" | tail -n 1)"
+              rm -f "${after}"
+              if [[ -n "${run_id}" ]]; then
+                break
+              fi
+              sleep 2
+            done
+            test -n "${run_id}"
+            readarray -t identity < <(
+              gh run view "${run_id}" \
+                --repo "${GITHUB_REPOSITORY}" \
+                --json event,headSha,url \
+                --jq '.event, .headSha, .url'
+            )
+            test "${identity[0]}" = "workflow_dispatch"
+            test "${identity[1]}" = "${MAIN_SHA}"
+            case "${workflow}" in
+              self-hosted-evaluation.yml) key=research ;;
+              workstation2-evaluation.yml) key=workstation2 ;;
+              deform360-reset-mechanics.yml) key=reset_mechanics ;;
+              deform360-prefix-kinematics.yml) key=prefix_kinematics ;;
+              deform360-filament-support.yml) key=filament_support ;;
+              deform360-contact-support.yml) key=contact_support ;;
+              *) exit 1 ;;
+            esac
+            echo "${key}_run_id=${run_id}" >> "${GITHUB_OUTPUT}"
+            echo "${key}_run_url=${identity[2]}" >> "${GITHUB_OUTPUT}"
+          done
+
+      - name: Write the campaign dispatch receipt
+        shell: bash
+        env:
+          RESEARCH_RUN_ID: ${{ steps.runs.outputs.research_run_id }}
+          RESEARCH_RUN_URL: ${{ steps.runs.outputs.research_run_url }}
+          WORKSTATION2_RUN_ID: ${{ steps.runs.outputs.workstation2_run_id }}
+          WORKSTATION2_RUN_URL: ${{ steps.runs.outputs.workstation2_run_url }}
+          RESET_RUN_ID: ${{ steps.runs.outputs.reset_mechanics_run_id }}
+          RESET_RUN_URL: ${{ steps.runs.outputs.reset_mechanics_run_url }}
+          PREFIX_RUN_ID: ${{ steps.runs.outputs.prefix_kinematics_run_id }}
+          PREFIX_RUN_URL: ${{ steps.runs.outputs.prefix_kinematics_run_url }}
+          FILAMENT_RUN_ID: ${{ steps.runs.outputs.filament_support_run_id }}
+          FILAMENT_RUN_URL: ${{ steps.runs.outputs.filament_support_run_url }}
+          CONTACT_RUN_ID: ${{ steps.runs.outputs.contact_support_run_id }}
+          CONTACT_RUN_URL: ${{ steps.runs.outputs.contact_support_run_url }}
+        run: |
+          set -euo pipefail
+          mkdir -p outputs/controlled-execution-campaign
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          runs = {
+              "full_research_evaluation": {
+                  "run_id": int(os.environ["RESEARCH_RUN_ID"]),
+                  "url": os.environ["RESEARCH_RUN_URL"],
+              },
+              "workstation2_controlled_replication": {
+                  "run_id": int(os.environ["WORKSTATION2_RUN_ID"]),
+                  "url": os.environ["WORKSTATION2_RUN_URL"],
+                  "independent_seed_range": "500:540",
+              },
+              "deform360_reset_mechanics": {
+                  "run_id": int(os.environ["RESET_RUN_ID"]),
+                  "url": os.environ["RESET_RUN_URL"],
+              },
+              "deform360_prefix_kinematics": {
+                  "run_id": int(os.environ["PREFIX_RUN_ID"]),
+                  "url": os.environ["PREFIX_RUN_URL"],
+              },
+              "deform360_filament_support": {
+                  "run_id": int(os.environ["FILAMENT_RUN_ID"]),
+                  "url": os.environ["FILAMENT_RUN_URL"],
+              },
+              "deform360_contact_support": {
+                  "run_id": int(os.environ["CONTACT_RUN_ID"]),
+                  "url": os.environ["CONTACT_RUN_URL"],
+              },
+          }
+          receipt = {
+              "schema_version": 1,
+              "artifact_kind": "Causal4DControlledExecutionCampaignDispatch",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "reviewed_main_sha": os.environ["MAIN_SHA"],
+              "trigger_issue_number": int(os.environ["ISSUE_NUMBER"]),
+              "runs": runs,
+              "target_outcomes_used": False,
+              "registered_physical_dataset_modified": False,
+              "physical_evidence_increment": 0,
+              "claim_boundary": (
+                  "Dispatch receipt for controlled and approved source-only "
+                  "workflows. It is not physical target evidence and cannot "
+                  "authorize the registered 36-execution campaign."
+              ),
+          }
+          Path(
+              "outputs/controlled-execution-campaign/dispatch.json"
+          ).write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload the dispatch receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: causal4d-controlled-execution-campaign-dispatch
+          path: outputs/controlled-execution-campaign/dispatch.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Report the dispatched workflows
+        shell: bash
+        env:
+          RESEARCH_RUN_URL: ${{ steps.runs.outputs.research_run_url }}
+          WORKSTATION2_RUN_URL: ${{ steps.runs.outputs.workstation2_run_url }}
+          RESET_RUN_URL: ${{ steps.runs.outputs.reset_mechanics_run_url }}
+          PREFIX_RUN_URL: ${{ steps.runs.outputs.prefix_kinematics_run_url }}
+          FILAMENT_RUN_URL: ${{ steps.runs.outputs.filament_support_run_url }}
+          CONTACT_RUN_URL: ${{ steps.runs.outputs.contact_support_run_url }}
+        run: |
+          set -euo pipefail
+          body="$(cat <<EOF
+          Controlled Causal4D execution campaign dispatched from reviewed main \`${MAIN_SHA}\`.
+
+          - Full research evaluation: ${RESEARCH_RUN_URL}
+          - Workstation2 controlled replication, fresh diagnostic seeds \`500:540\`: ${WORKSTATION2_RUN_URL}
+          - Deform360 reset mechanics: ${RESET_RUN_URL}
+          - Deform360 prefix kinematics: ${PREFIX_RUN_URL}
+          - Deform360 filament support: ${FILAMENT_RUN_URL}
+          - Deform360 contact/support: ${CONTACT_RUN_URL}
+          - Dispatch artifact: \`causal4d-controlled-execution-campaign-dispatch\`
+          - Target outcomes used: \`false\`
+          - Registered physical dataset modified: \`false\`
+          - Physical evidence increment: \`0\`
+          EOF
+          )"
+          gh issue comment "${ISSUE_NUMBER}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --body "${body}"
