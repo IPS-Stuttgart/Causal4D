@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -59,4 +59,4 @@ EOF
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git commit -m "Add grouped covariance-normalized likelihood v3" \
             -m "Introduce an opt-in grouped full-covariance normalized score with contributor caps, reliability tempering, explicit likelihood power, source-covariance conditioning diagnostics, and invariant tests. Preserve legacy semantics and the registered physical-study artifact identity."
-          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          git push --force-with-lease origin "HEAD:refs/heads/$TARGET_BRANCH"
