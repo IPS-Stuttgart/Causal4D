@@ -105,15 +105,9 @@ def _setup(
     trajectories = np.zeros((3, 1, 6, node_count, 3), dtype=np.float32)
     for node_index in range(node_count):
         node_offset = node_index * 0.1
-        trajectories[0, 0, :, node_index, 0] = (
-            np.arange(6) * 0.01 + node_offset
-        )
-        trajectories[1, 0, :, node_index, 0] = (
-            np.arange(6) * 0.012 + node_offset
-        )
-        trajectories[2, 0, :, node_index, 0] = (
-            np.arange(6) * 0.014 + node_offset
-        )
+        trajectories[0, 0, :, node_index, 0] = np.arange(6) * 0.01 + node_offset
+        trajectories[1, 0, :, node_index, 0] = np.arange(6) * 0.012 + node_offset
+        trajectories[2, 0, :, node_index, 0] = np.arange(6) * 0.014 + node_offset
     bank = JointRolloutBank(
         hypothesis_ids=("nominal", "shift", "gain"),
         hypothesis_metadata=(
