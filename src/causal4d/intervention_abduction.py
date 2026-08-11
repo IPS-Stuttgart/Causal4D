@@ -691,7 +691,10 @@ def nominal_contact_hypotheses(bank: JointRolloutBank) -> np.ndarray:
             selected.append(index)
     if not selected:
         raise ValueError("rollout bank contains no nominal-contact hypothesis")
-    return np.asarray(selected, dtype=np.int64)
+    return cast(
+        np.ndarray,
+        np.asarray(selected, dtype=np.int64),
+    )
 
 
 def _prediction_metrics(
