@@ -1,0 +1,58 @@
+name: Bootstrap grouped normalized likelihood v3
+
+on:
+  push:
+    branches:
+      - agent/grouped-v3-bootstrap
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Verify and publish the clean implementation branch
+        env:
+          BASE_SHA: 70b5e630c50b1a3702e1b5dc2d0309f530973c7d
+          PATCH_SHA256: d657c132d8bd0515f2ed5bb33fcf96e8ba1ea33e8db0a112d74537f51f83dfd3
+          TARGET_BRANCH: agent/grouped-normalized-v3
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          echo "$PATCH_SHA256  .agent/grouped-v3.patch.gz" | sha256sum --check --strict
+          cp .agent/grouped-v3.patch.gz /tmp/grouped-v3.patch.gz
+          gzip --decompress --stdout /tmp/grouped-v3.patch.gz > /tmp/grouped-v3.patch
+
+          git checkout -B "$TARGET_BRANCH" "$BASE_SHA"
+          git apply --check --whitespace=error-all /tmp/grouped-v3.patch
+          git apply --index --whitespace=error-all /tmp/grouped-v3.patch
+          git diff --cached --check
+          python -m compileall -q src tests
+
+          actual="$(git diff --cached --name-only | LC_ALL=C sort)"
+          expected="$(cat <<'EOF'
+docs/grouped_normalized_likelihood_v3.md
+docs/structured_grouped_likelihood.md
+src/causal4d/__init__.py
+src/causal4d/cli/abduct_phystwin_intervention.py
+src/causal4d/grouped_likelihood.py
+src/causal4d/intervention_abduction.py
+src/causal4d/observation_evidence.py
+tests/test_factual_likelihood_semantics.py
+tests/test_grouped_normalized_v3.py
+EOF
+)"
+          test "$actual" = "$expected"
+
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "Add grouped covariance-normalized likelihood v3" \
+            -m "Introduce an opt-in grouped full-covariance normalized score with contributor caps, reliability tempering, explicit likelihood power, source-covariance conditioning diagnostics, and invariant tests. Preserve legacy semantics and the registered physical-study artifact identity."
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
