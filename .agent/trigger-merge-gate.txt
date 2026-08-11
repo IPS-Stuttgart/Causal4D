@@ -1,0 +1,1 @@
+Trigger the existing pull-request merge gate after its bootstrap-only job was added.
