@@ -142,3 +142,14 @@ Thus a held-out prediction may remain admissible even when gain, delay, contact,
 or frame-bias components cannot all be individually recovered. Conversely, a
 query that amplifies an unresolved direction must widen uncertainty or abstain.
 Neither local result establishes global recovery or held-out calibration.
+
+## Operational prospective integration
+
+The query decision and structured covariance are available in the factual
+PhysTwin abduction path through `--identifiability-policy registered_query` and
+`FactualAbductionUncertaintyV1`. See
+[`registered_query_abduction_and_structured_uncertainty.md`](
+registered_query_abduction_and_structured_uncertainty.md
+)
+for the exact bindings, fail-closed declarations, NPZ interchange, and promotion
+requirements. The historical full-parameter policy remains the default.
