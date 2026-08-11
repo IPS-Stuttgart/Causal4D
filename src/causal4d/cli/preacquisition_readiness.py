@@ -15,6 +15,11 @@ from causal4d.operator_registry import (
     scaffold_operator_registry,
     seal_operator_registry,
 )
+from causal4d.preacquisition_next_action_packet import (
+    validate_preacquisition_next_action_packet,
+    write_preacquisition_next_action_packet,
+    write_preacquisition_next_action_packet_validation,
+)
 from causal4d.preacquisition_next_action_validation import (
     validate_preacquisition_next_action_report,
     write_preacquisition_next_action_validation,
@@ -220,6 +225,29 @@ def build_parser() -> argparse.ArgumentParser:
     next_action_validate.add_argument("dataset_root")
     next_action_validate.add_argument("decision_json")
     next_action_validate.add_argument("--output-json")
+
+    next_action_packet = subparsers.add_parser(
+        "next-action-packet",
+        help=(
+            "publish an exactly-once packet binding the current decision to its "
+            "human instructions"
+        ),
+    )
+    next_action_packet.add_argument("repository_root")
+    next_action_packet.add_argument("dataset_root")
+    next_action_packet.add_argument("output_zip")
+
+    next_action_packet_validate = subparsers.add_parser(
+        "next-action-packet-validate",
+        help=(
+            "require a packet and its human instructions to match the current "
+            "hash-verified decision"
+        ),
+    )
+    next_action_packet_validate.add_argument("repository_root")
+    next_action_packet_validate.add_argument("dataset_root")
+    next_action_packet_validate.add_argument("packet_zip")
+    next_action_packet_validate.add_argument("--output-json")
     return parser
 
 
@@ -339,6 +367,27 @@ def main(argv: Sequence[str] | None = None) -> int:
                     args.output_json,
                     result,
                 )
+        elif args.command == "next-action-packet":
+            decision = build_preacquisition_next_action(
+                args.repository_root,
+                args.dataset_root,
+                verify_file_hashes=True,
+            )
+            result = write_preacquisition_next_action_packet(
+                args.output_zip,
+                decision,
+            )
+        elif args.command == "next-action-packet-validate":
+            result = validate_preacquisition_next_action_packet(
+                args.repository_root,
+                args.dataset_root,
+                args.packet_zip,
+            )
+            if args.output_json:
+                write_preacquisition_next_action_packet_validation(
+                    args.output_json,
+                    result,
+                )
         else:
             result = build_preacquisition_readiness(
                 args.repository_root,
@@ -374,7 +423,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
         if args.require_complete and not result["complete"]:
             return _VALID_BUT_INCOMPLETE
-    if args.command == "next-action":
+    if args.command in {"next-action", "next-action-packet"}:
         if not result["valid"]:
             return 2
         if not result["ready"]:
