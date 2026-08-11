@@ -148,14 +148,36 @@ def test_report_uses_sessions_as_the_resampling_unit(tmp_path: Path) -> None:
     assert primary["session_is_resampling_unit"] is True
     assert primary["executions_are_not_treated_as_independent"] is True
     assert primary["equal_session_weighted_improvement"]["mean"] == pytest.approx(1.0)
-    assert primary["confidence_interval"]["method"] == ("target_session_bootstrap_t")
-    assert primary["confidence_interval"]["lower"] == pytest.approx(1.0)
-    assert primary["confidence_interval"]["upper"] == pytest.approx(1.0)
-    assert primary["required_robustness_interval"]["method"] == "student_t_mean"
-    assert primary["historical_percentile_sensitivity_interval"]["method"] == (
-        "target_session_percentile_bootstrap"
-    )
-    assert primary["interval_decision"]["positive_claim_interval_gate_passed"]
+
+    registered = primary["confidence_interval"]
+    robustness = primary["required_robustness_interval"]
+    historical = primary["historical_percentile_sensitivity_interval"]
+    decision = primary["interval_decision"]
+
+    assert registered["method"] == "target_session_bootstrap_t"
+    assert registered["estimable"] is False
+    assert registered["point_estimate"] == pytest.approx(1.0)
+    assert registered["lower"] is None
+    assert registered["upper"] is None
+    assert registered["degenerate_sample"] is True
+
+    assert robustness["method"] == "student_t_mean"
+    assert robustness["estimable"] is False
+    assert robustness["point_estimate"] == pytest.approx(1.0)
+    assert robustness["lower"] is None
+    assert robustness["upper"] is None
+    assert robustness["degenerate_sample"] is True
+
+    assert historical["method"] == "target_session_percentile_bootstrap"
+    assert historical["estimable"] is True
+    assert historical["lower"] == pytest.approx(1.0)
+    assert historical["upper"] == pytest.approx(1.0)
+    assert historical["degenerate_sample"] is True
+
+    assert decision["registered_interval_inputs_match"] is True
+    assert decision["degenerate_session_panel"] is True
+    assert decision["degenerate_session_panel_blocks_positive_claim"] is True
+    assert decision["positive_claim_interval_gate_passed"] is False
     assert report["claim_boundary"]["object_class_generalization_claimed"] is False
     assert (
         report["design_diagnostics"]["condition_comparisons_are_descriptive_only"]
