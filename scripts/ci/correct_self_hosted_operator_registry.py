@@ -70,9 +70,6 @@ EXPECTED_NEXT_ACTION = "stop_independent_verifier_unavailable"
 _MAXIMUM_SNAPSHOT_FILES = 50_000
 _MAXIMUM_SNAPSHOT_BYTES = 4 * 1024**3
 _FORBIDDEN_PUBLIC_IDENTITIES = (
-    "Anna Seel",
-    "Markus Rummel",
-    "Michael Feurer",
     "environment.approver",
     "freezer.primary",
     "gate.operational",
@@ -519,8 +516,7 @@ def execute_operator_registry_correction(
     )
     old_registry = _read_json_mapping(registry_path, name="operator registry")
     _require(
-        old_registry.get("artifact_sha256")
-        == EXPECTED_OLD_REGISTRY_ARTIFACT_SHA256,
+        old_registry.get("artifact_sha256") == EXPECTED_OLD_REGISTRY_ARTIFACT_SHA256,
         "existing registry artifact is not the known unsupported roster",
     )
     _require(

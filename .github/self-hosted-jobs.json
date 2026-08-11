@@ -94,6 +94,20 @@
       "secrets_allowed": false
     },
     {
+      "workflow": "correct-operator-registry-self-hosted.yml",
+      "job": "correct",
+      "authorization_model": "main-only",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi"
+      ],
+      "purpose": "Replace the unsupported roster with the single real participant",
+      "dataset_access": "registered-local-preacquisition-operator-registry-correction",
+      "secrets_allowed": false
+    },
+    {
       "workflow": "deform360-contact-support.yml",
       "job": "source-diagnostic",
       "authorization_model": "main-only",
@@ -175,20 +189,6 @@
       ],
       "purpose": "Installed-wheel prepared joint-observation parity and scale validation",
       "dataset_access": "none",
-      "secrets_allowed": false
-    },
-    {
-      "workflow": "seal-operator-registry-self-hosted.yml",
-      "job": "seal",
-      "authorization_model": "main-only",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi"
-      ],
-      "purpose": "Seal the registered operator roster from workstation-private identity material",
-      "dataset_access": "registered-local-preacquisition-operator-registry-write",
       "secrets_allowed": false
     },
     {

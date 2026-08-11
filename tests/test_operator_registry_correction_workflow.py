@@ -5,12 +5,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = (
-    ROOT
-    / ".github"
-    / "workflows"
-    / "correct-operator-registry-self-hosted.yml"
-)
+WORKFLOW = ROOT / ".github" / "workflows" / "correct-operator-registry-self-hosted.yml"
 SCRIPT = ROOT / "scripts" / "ci" / "correct_self_hosted_operator_registry.py"
 SELF_HOSTED_REGISTRY = ROOT / ".github" / "self-hosted-jobs.json"
 TRIGGER = "[self-hosted] correct Causal4D operator registry"
@@ -42,14 +37,8 @@ def test_correction_uses_fixed_paths_and_sanitized_uploads() -> None:
     text = _workflow_text()
 
     assert "/mnt/lexar4tb/causal4d-physical/causal4d-frozen" in text
-    assert (
-        "/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1"
-        in text
-    )
-    assert (
-        "/mnt/lexar4tb/causal4d-physical/private/operator-registry-v1"
-        in text
-    )
+    assert "/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1" in text
+    assert "/mnt/lexar4tb/causal4d-physical/private/operator-registry-v1" in text
     assert "scripts/ci/correct_self_hosted_operator_registry.py" in text
     assert "ref: ${{ github.sha }}" in text
     assert "persist-credentials: false" in text
