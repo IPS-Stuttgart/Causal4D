@@ -62,9 +62,7 @@ def save_finite_support_adequacy_certificate(
     """Atomically publish a strict non-pickled certificate archive."""
 
     if not isinstance(certificate, FiniteSupportAdequacyCertificateV1):
-        raise TypeError(
-            "certificate must be FiniteSupportAdequacyCertificateV1"
-        )
+        raise TypeError("certificate must be FiniteSupportAdequacyCertificateV1")
     descriptor = {
         **certificate._scalar_payload(),
         "artifact_id": certificate.artifact_id,
@@ -87,9 +85,7 @@ def save_finite_support_adequacy_certificate(
     def validate_archive(temporary: Path) -> None:
         restored = load_finite_support_adequacy_certificate(temporary)
         if restored.artifact_id != certificate.artifact_id:
-            raise ValueError(
-                "written support adequacy certificate failed validation"
-            )
+            raise ValueError("written support adequacy certificate failed validation")
 
     atomic_write_binary(
         path,
@@ -127,9 +123,7 @@ def load_finite_support_adequacy_certificate(
     if type(schema_version) is not int or schema_version < 1:
         raise ValueError("schema_version must be a positive integer")
     if schema_version != FINITE_SUPPORT_ADEQUACY_SCHEMA_VERSION:
-        raise ValueError(
-            "unsupported finite support adequacy schema version"
-        )
+        raise ValueError("unsupported finite support adequacy schema version")
     artifact_kind = _require_nonempty_string(
         fields["artifact_kind"],
         name="artifact_kind",

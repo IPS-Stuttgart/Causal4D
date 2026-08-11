@@ -42,9 +42,7 @@ def _build(
         omitted_query_lower=np.asarray([-1.0]),
         omitted_query_upper=np.asarray([3.0]),
         minimum_retained_prior_mass=minimum_retained_prior_mass,
-        maximum_omitted_posterior_mass=(
-            maximum_omitted_posterior_mass
-        ),
+        maximum_omitted_posterior_mass=(maximum_omitted_posterior_mass),
         fallback_artifact_id=_digest("fallback"),
         metadata={"registered_before_target_access": True},
     )

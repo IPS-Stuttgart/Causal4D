@@ -142,9 +142,7 @@ def _canonicalize_log_likelihoods(
 ) -> tuple[np.ndarray, float | None]:
     retained = np.asarray(retained_log_likelihoods, dtype=float)
     if retained.ndim != 1 or len(retained) == 0 or not np.all(np.isfinite(retained)):
-        raise ValueError(
-            "retained_log_likelihoods must be a finite nonempty vector"
-        )
+        raise ValueError("retained_log_likelihoods must be a finite nonempty vector")
     omitted_mass = 1.0 - retained_prior_mass
     if omitted_mass > 0.0:
         if (
@@ -183,11 +181,14 @@ def _retained_posterior_weights(
     prior_weights: np.ndarray,
     log_likelihoods: np.ndarray,
 ) -> np.ndarray:
-    log_joint = np.log(
-        prior_weights,
-        where=prior_weights > 0.0,
-        out=np.full_like(prior_weights, -np.inf),
-    ) + log_likelihoods
+    log_joint = (
+        np.log(
+            prior_weights,
+            where=prior_weights > 0.0,
+            out=np.full_like(prior_weights, -np.inf),
+        )
+        + log_likelihoods
+    )
     normalizer = float(logsumexp(log_joint))
     if not np.isfinite(normalizer):
         raise ValueError("retained support has zero or non-finite evidence")
@@ -384,8 +385,7 @@ class FiniteSupportAdequacyCertificateV1:
         query_count = len(query_labels)
         if query_values.shape != (component_count, query_count):
             raise ValueError(
-                "retained_query_values must have shape "
-                "(component, query_output)"
+                "retained_query_values must have shape (component, query_output)"
             )
         if not np.all(np.isfinite(query_values)):
             raise ValueError("retained_query_values must be finite")
@@ -467,14 +467,12 @@ class FiniteSupportAdequacyCertificateV1:
                 "omitted_posterior_mass_upper_bound disagrees with its evidence"
             )
 
-        expected_mean, expected_lower, expected_upper, expected_shift = (
-            _query_envelope(
-                query_values,
-                posterior_weights,
-                omitted_lower,
-                omitted_upper,
-                omitted_posterior_mass_upper,
-            )
+        expected_mean, expected_lower, expected_upper, expected_shift = _query_envelope(
+            query_values,
+            posterior_weights,
+            omitted_lower,
+            omitted_upper,
+            omitted_posterior_mass_upper,
         )
         supplied_query_arrays = (
             ("retained_query_mean", self.retained_query_mean, expected_mean),
@@ -596,9 +594,7 @@ class FiniteSupportAdequacyCertificateV1:
                 self.omitted_posterior_mass_upper_bound
             ),
             "minimum_retained_prior_mass": self.minimum_retained_prior_mass,
-            "maximum_omitted_posterior_mass": (
-                self.maximum_omitted_posterior_mass
-            ),
+            "maximum_omitted_posterior_mass": (self.maximum_omitted_posterior_mass),
             "admissible": self.admissible,
             "failure_reasons": list(self.failure_reasons),
             "fallback_artifact_id": self.fallback_artifact_id,
@@ -639,10 +635,7 @@ class FiniteSupportAdequacyCertificateV1:
         return {
             **self._scalar_payload(),
             "artifact_id": self.artifact_id,
-            **{
-                name: values.tolist()
-                for name, values in self._array_payload().items()
-            },
+            **{name: values.tolist() for name, values in self._array_payload().items()},
         }
 
 
@@ -681,9 +674,7 @@ def build_finite_support_adequacy_certificate(
     canonical_logs, canonical_omitted_upper = _canonicalize_log_likelihoods(
         retained_log_likelihoods,
         retained_prior_mass=retained_mass,
-        omitted_log_likelihood_upper_bound=(
-            omitted_log_likelihood_upper_bound
-        ),
+        omitted_log_likelihood_upper_bound=(omitted_log_likelihood_upper_bound),
     )
     if len(prior_weights) != len(canonical_logs):
         raise ValueError(
@@ -702,8 +693,7 @@ def build_finite_support_adequacy_certificate(
     query_values = np.asarray(retained_query_values, dtype=float)
     if query_values.ndim != 2 or query_values.shape[0] != len(prior_weights):
         raise ValueError(
-            "retained_query_values must have shape "
-            "(retained_component, query_output)"
+            "retained_query_values must have shape (retained_component, query_output)"
         )
     omitted_lower = np.asarray(omitted_query_lower, dtype=float)
     omitted_upper = np.asarray(omitted_query_upper, dtype=float)
