@@ -62,7 +62,9 @@ python -m causal4d.provider_v2_factor_contract_bundle --compact
 
 The command reports the copied corpus identity, provider and schema versions,
 valid and invalid vector counts, observation count, prior identity, semantic
-identity, and numerical tolerances.
+identity, and numerical tolerances. Verification is local and deterministic: it
+reads only the installed package data and performs no network access or remote
+artifact discovery.
 
 ## Ownership boundary
 
