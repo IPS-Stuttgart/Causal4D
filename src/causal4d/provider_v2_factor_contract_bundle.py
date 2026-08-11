@@ -39,9 +39,7 @@ _STACK_SEMANTIC_SCHEMA = "prob4d.provider-v2-tree-sparse-stack-semantic"
 _STACK_SEMANTIC_VERSION = 1
 _GAUGE_TREE_SCHEMA = "prob4d.gauge-tree-square-root-prior"
 _GAUGE_TREE_VERSION = 1
-_GAUGE_TREE_SEMANTICS = (
-    "zero-mean-linearized-causal-tree-independent-innovations-v1"
-)
+_GAUGE_TREE_SEMANTICS = "zero-mean-linearized-causal-tree-independent-innovations-v1"
 _GAUGE_DIMENSION = 7
 _BUNDLE_DIRECTORY = ("contract_data", "provider_v2_factors_v1")
 _VECTOR_NAMES = frozenset({"minimal"})
@@ -470,8 +468,7 @@ def _array_record(
     if isinstance(raw_shape, (str, bytes)) or not isinstance(raw_shape, Sequence):
         raise ValueError(f"{name} shape must be a sequence")
     parsed_shape = tuple(
-        _genuine_integer(item, name=f"{name} shape", minimum=0)
-        for item in raw_shape
+        _genuine_integer(item, name=f"{name} shape", minimum=0) for item in raw_shape
     )
     if parsed_shape != shape:
         raise ValueError(f"{name} shape must be {shape}")
@@ -531,9 +528,7 @@ def _so3_right_jacobian(rotation_vector: np.ndarray) -> np.ndarray:
     return (
         identity
         - ((1.0 - math.cos(angle)) / angle_squared) * cross
-        + ((angle - math.sin(angle)) / (angle_squared * angle))
-        * cross
-        @ cross
+        + ((angle - math.sin(angle)) / (angle_squared * angle)) * cross @ cross
     )
 
 
@@ -616,8 +611,7 @@ def _materialize_stack(bundle_value: object) -> tuple[_Stack, np.ndarray]:
     ):
         raise ValueError("bundle gauges must be a sequence")
     gauges = tuple(
-        _gauge_from_record(value, index=index)
-        for index, value in enumerate(raw_gauges)
+        _gauge_from_record(value, index=index) for index, value in enumerate(raw_gauges)
     )
     if not gauges:
         raise ValueError("bundle must contain gauges")
@@ -625,9 +619,7 @@ def _materialize_stack(bundle_value: object) -> tuple[_Stack, np.ndarray]:
     if len(gauge_ids) != len(set(gauge_ids)):
         raise ValueError("gauge IDs must be unique")
     gauge_map = {gauge.gauge_id: gauge for gauge in gauges}
-    gauge_indices_by_id = {
-        gauge_id: index for index, gauge_id in enumerate(gauge_ids)
-    }
+    gauge_indices_by_id = {gauge_id: index for index, gauge_id in enumerate(gauge_ids)}
     gauge_count = len(gauges)
     joint_covariance = _array_record(
         bundle["joint_gauge_covariance"],
@@ -794,11 +786,7 @@ def _materialize_stack(bundle_value: object) -> tuple[_Stack, np.ndarray]:
         gauge = gauge_map[gauge_id]
         gauge_index = gauge_indices_by_id[gauge_id]
         linear = gauge.scale * gauge.rotation
-        selected = (
-            valid_mask
-            & (association_values > 0.0)
-            & (reliability_values > 0.0)
-        )
+        selected = valid_mask & (association_values > 0.0) & (reliability_values > 0.0)
         for local_index in np.flatnonzero(selected):
             point = points[local_index]
             mean = linear @ point + gauge.translation
@@ -831,19 +819,13 @@ def _materialize_stack(bundle_value: object) -> tuple[_Stack, np.ndarray]:
         marginal_world_covariance_m2=readonly_array(
             np.stack(marginal_covariances).astype(np.float64)
         ),
-        local_gauge_jacobian=readonly_array(
-            np.stack(jacobians).astype(np.float64)
-        ),
+        local_gauge_jacobian=readonly_array(np.stack(jacobians).astype(np.float64)),
         gauge_indices=readonly_array(np.asarray(gauge_indices, dtype=np.int64)),
         association_probability=readonly_array(
             np.asarray(association, dtype=np.float64)
         ),
-        prior_reliability=readonly_array(
-            np.asarray(reliability, dtype=np.float64)
-        ),
-        prior_nominal_probability=readonly_array(
-            np.asarray(nominal, dtype=np.float64)
-        ),
+        prior_reliability=readonly_array(np.asarray(reliability, dtype=np.float64)),
+        prior_nominal_probability=readonly_array(np.asarray(nominal, dtype=np.float64)),
         composite_weight=readonly_array(np.asarray(composite, dtype=np.float64)),
         point_ids=readonly_array(np.asarray(point_ids, dtype=np.int64)),
         frame_indices=readonly_array(np.asarray(frame_indices, dtype=np.int64)),
@@ -861,9 +843,7 @@ def _canonical_array_descriptor(value: np.ndarray) -> dict[str, object]:
     digest = hashlib.sha256()
     digest.update(array.dtype.str.encode("ascii"))
     digest.update(b"\0")
-    digest.update(
-        json.dumps(list(array.shape), separators=(",", ":")).encode("ascii")
-    )
+    digest.update(json.dumps(list(array.shape), separators=(",", ":")).encode("ascii"))
     digest.update(b"\0")
     digest.update(array.tobytes(order="C"))
     return {
@@ -949,8 +929,7 @@ def _tree_prior(
             blocks[child, other] = transition @ blocks[parent, other]
             blocks[other, child] = blocks[child, other].T
         blocks[child, child] = (
-            transition @ blocks[parent, parent] @ transition.T
-            + innovations[child]
+            transition @ blocks[parent, parent] @ transition.T + innovations[child]
         )
     dense = np.block(
         [
@@ -1021,7 +1000,9 @@ def validate_provider_v2_factor_contract_vector(
 ) -> ProviderV2FactorContractValidation:
     """Independently validate one neutral vector without importing Prob4D."""
 
-    payload = vector.payload if isinstance(vector, ProviderV2FactorContractVector) else vector
+    payload = (
+        vector.payload if isinstance(vector, ProviderV2FactorContractVector) else vector
+    )
     mapping = _mapping(payload, name="provider-v2 factor vector")
     _exact_fields(
         mapping,

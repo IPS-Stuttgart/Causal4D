@@ -46,9 +46,7 @@ def test_provider_v2_factor_contract_schema_fixes_advanced_semantics() -> None:
     assert schema["provider_factor_api_version"] == 2
     assert schema["observation_factor_schema_version"] == 4
     assert schema["tree_sparse_observation_schema_version"] == 1
-    assert schema["required_semantics"]["gauge_covariance"] == (
-        "joint-cross-window"
-    )
+    assert schema["required_semantics"]["gauge_covariance"] == ("joint-cross-window")
     assert schema["required_semantics"]["causal_frame_stop"] == "exclusive"
     assert schema["valid_vectors"] == ["minimal"]
 
@@ -99,9 +97,7 @@ def test_bundle_verifier_reports_portable_identities() -> None:
     assert summary["valid_vectors"] == 1
     assert summary["invalid_vectors"] == 10
     assert summary["observation_count"] == 4
-    assert summary["minimal_prior_id"] == (
-        PROVIDER_V2_FACTOR_CONTRACT_MINIMAL_PRIOR_ID
-    )
+    assert summary["minimal_prior_id"] == (PROVIDER_V2_FACTOR_CONTRACT_MINIMAL_PRIOR_ID)
     assert summary["minimal_stack_semantic_sha256"] == (
         PROVIDER_V2_FACTOR_CONTRACT_STACK_SEMANTIC_SHA256
     )
@@ -141,9 +137,7 @@ def test_provider_v2_factor_contract_cli_reports_verified_summary() -> None:
 
     assert summary["bundle_name"] == PROVIDER_V2_FACTOR_CONTRACT_BUNDLE
     assert summary["bundle_sha256"] == PROVIDER_V2_FACTOR_CONTRACT_BUNDLE_SHA256
-    assert summary["minimal_prior_id"] == (
-        PROVIDER_V2_FACTOR_CONTRACT_MINIMAL_PRIOR_ID
-    )
+    assert summary["minimal_prior_id"] == (PROVIDER_V2_FACTOR_CONTRACT_MINIMAL_PRIOR_ID)
     assert summary["minimal_stack_semantic_sha256"] == (
         PROVIDER_V2_FACTOR_CONTRACT_STACK_SEMANTIC_SHA256
     )
