@@ -11,6 +11,10 @@ The corrected project roster contains one real participant only:
 | --- | --- | --- |
 | `florianpfaff` | Florian Pfaff | `freezer`, `gate_approver`, `software_environment_approver` |
 
+This is the complete participant list for the current project. Historical hashes,
+operator IDs, workflow receipts, or Git metadata must not be interpreted as
+identifying any additional participant.
+
 No `independent_verifier` is registered. Causal4D must therefore report
 `independent_verifier_available=false` and stop before object registration,
 source-panel acquisition, gate approval, method-freeze attestation, or any
