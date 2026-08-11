@@ -16,7 +16,10 @@ from causal4d.contracts import (
     TaskPosterior,
     TwinBelief,
 )
-from causal4d.counterfactual import apply_counterfactual_operator
+from causal4d.counterfactual import (
+    apply_counterfactual_operator,
+    project_physical_posterior,
+)
 from causal4d.hierarchical_abduction import (
     HierarchicalAbductionResult,
     abduct_hierarchical_interventions,
@@ -94,6 +97,7 @@ __all__ = [
     "TwinBelief",
     "abduct_hierarchical_interventions",
     "apply_counterfactual_operator",
+    "project_physical_posterior",
     "block_diagonalize_covariance",
     "build_interventional_contrast",
     "joint_component_log_likelihoods",
