@@ -424,9 +424,7 @@ def project_physical_posterior(
             ),
             "projection_node_count": len(nodes),
             "projection_node_indices": (
-                None
-                if query.query_node_indices is None
-                else nodes.tolist()
+                None if query.query_node_indices is None else nodes.tolist()
             ),
             "projection_preserves_component_weights": True,
         }
