@@ -1,71 +1,315 @@
-name: Publish grouped normalized likelihood v3 on current main
+name: Rebase grouped normalized likelihood v3 on current main
 
 on:
   pull_request:
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: grouped-v3-current-main-publisher
+  group: grouped-v3-current-main-rebase
   cancel-in-progress: true
 
 jobs:
-  publish:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.head_ref == 'agent/grouped-v3-bootstrap'
+  rebase:
+    if: github.head_ref == 'agent/grouped-v3-bootstrap'
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 18
     steps:
-      - name: Check out the content-addressed publisher
+      - name: Check out the exact publisher revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify and publish the exact current-main implementation
+      - name: Reconstruct, integrate, verify, and publish the review branch
         env:
-          BASE_SHA: a82f7ca093b71d1480e52e2b11b8b77c3b007620
-          EXPECTED_TARGET_SHA: 4aa560ab74066c13efb5ae7d73102de4c244561e
+          BASE_SHA: 308cbd92a11b602b9483b08aec655e385b3f6b1e
+          EXPECTED_TARGET_SHA: a01d5e98aeb41eac2d3e9d252aa5f683eb1d94e7
           GH_TOKEN: ${{ github.token }}
-          PATCH_BASE64_SHA256: 19aa47cd39ed18f993bc03fa24cd0466f31565dc4a735ff7030d59db33d89284
-          PATCH_SHA256: 7cfb45840626a31a590d249fd2cfa3ab70c6b220188f458c6535a95dc83c55a9
+          PATCH_BASE_SHA: de5116f0bd7e6c04c1ccd4af6b5f4cc8b089f65f
+          SOURCE_PATCH_SHA: 4aa560ab74066c13efb5ae7d73102de4c244561e
           TARGET_BRANCH: agent/grouped-normalized-v3-review
         run: |
           set -euo pipefail
 
-          remote_main="$(
-            git ls-remote origin refs/heads/main | awk '{print $1}'
-          )"
-          remote_target="$(
-            git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}'
-          )"
-          test "$remote_main" = "$BASE_SHA"
-          test "$remote_target" = "$EXPECTED_TARGET_SHA"
-          git cat-file -e "$BASE_SHA^{commit}"
-
-          # Base64 wrapping and a final newline are transport details. Verify the
-          # canonical no-whitespace encoding, then verify the decoded gzip bytes.
-          tr -d '[:space:]' < .agent/grouped-v3-a82.patch.gz.b64 > \
-            "$RUNNER_TEMP/grouped-v3-a82.patch.gz.b64"
-          echo "$PATCH_BASE64_SHA256  $RUNNER_TEMP/grouped-v3-a82.patch.gz.b64" | \
-            sha256sum --check --strict
-          base64 --decode "$RUNNER_TEMP/grouped-v3-a82.patch.gz.b64" > \
-            "$RUNNER_TEMP/grouped-v3-a82.patch.gz"
-          echo "$PATCH_SHA256  $RUNNER_TEMP/grouped-v3-a82.patch.gz" | \
-            sha256sum --check --strict
-          gzip --decompress --stdout \
-            "$RUNNER_TEMP/grouped-v3-a82.patch.gz" > \
-            "$RUNNER_TEMP/grouped-v3-a82.patch"
-
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = \
+            "$BASE_SHA"
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')" = \
+            "$EXPECTED_TARGET_SHA"
+          git fetch --no-tags --no-recurse-submodules origin \
+            "$BASE_SHA" "$PATCH_BASE_SHA" "$SOURCE_PATCH_SHA"
           git checkout -B "$TARGET_BRANCH" "$BASE_SHA"
-          git apply --index --whitespace=error-all \
-            "$RUNNER_TEMP/grouped-v3-a82.patch"
 
-          actual="$(git diff --cached --name-only | LC_ALL=C sort)"
+          modified_paths=(
+            docs/structured_grouped_likelihood.md
+            src/causal4d/cli/abduct_phystwin_intervention.py
+            src/causal4d/grouped_likelihood.py
+            src/causal4d/observation_evidence.py
+            tests/test_factual_likelihood_semantics.py
+          )
+          for path in "${modified_paths[@]}"; do
+            base_blob="$(git rev-parse "$PATCH_BASE_SHA:$path")"
+            current_blob="$(git rev-parse "$BASE_SHA:$path")"
+            test "$base_blob" = "$current_blob"
+            git show "$SOURCE_PATCH_SHA:$path" > "$path"
+          done
+
+          added_paths=(
+            docs/grouped_normalized_likelihood_v3.md
+            tests/test_grouped_normalized_v3.py
+          )
+          for path in "${added_paths[@]}"; do
+            if git cat-file -e "$BASE_SHA:$path" 2>/dev/null; then
+              echo "refusing to replace an independently added path: $path" >&2
+              exit 1
+            fi
+            mkdir -p "$(dirname "$path")"
+            git show "$SOURCE_PATCH_SHA:$path" > "$path"
+          done
+
+          python - <<'PY'
+          from pathlib import Path
+
+
+          def replace_once(text: str, old: str, new: str, *, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match, found {count}")
+              return text.replace(old, new, 1)
+
+
+          init_path = Path("src/causal4d/__init__.py")
+          init_text = init_path.read_text(encoding="utf-8")
+          init_text = replace_once(
+              init_text,
+              """from causal4d.grouped_likelihood import (\n    GroupLikelihoodDiagnostics,\n    grouped_component_log_likelihoods,\n    posterior_weights_from_grouped_evidence,\n)\n""",
+              """from causal4d.grouped_likelihood import (\n    GroupLikelihoodDiagnostics,\n    GroupedScoreSemantics,\n    grouped_component_log_likelihoods,\n    posterior_weights_from_grouped_evidence,\n)\n""",
+              label="grouped score import",
+          )
+          init_text = replace_once(
+              init_text,
+              '    "GroupLikelihoodDiagnostics",\n    "GroupedObservationEvidence",\n',
+              '    "GroupLikelihoodDiagnostics",\n    "GroupedObservationEvidence",\n    "GroupedScoreSemantics",\n',
+              label="grouped score export",
+          )
+          init_path.write_text(init_text, encoding="utf-8")
+
+          path = Path("src/causal4d/intervention_abduction.py")
+          text = path.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              """from causal4d.grouped_likelihood import (\n    GroupLikelihoodDiagnostics,\n    grouped_component_log_likelihoods,\n    posterior_weights_from_grouped_evidence,\n)\n""",
+              """from causal4d.grouped_likelihood import (\n    GroupLikelihoodDiagnostics,\n    GroupedScoreSemantics,\n    grouped_component_log_likelihoods,\n    posterior_weights_from_grouped_evidence,\n)\n""",
+              label="intervention grouped score import",
+          )
+          text = replace_once(
+              text,
+              'DenseLikelihoodSemantics = Literal["legacy_v1", "normalized_v2"]\nIdentifiabilityPolicy = Literal["full_parameter", "registered_query"]\n',
+              'DenseLikelihoodSemantics = Literal["legacy_v1", "normalized_v2"]\nGroupedLikelihoodSemantics = Literal["legacy_v1", "normalized_v3"]\nIdentifiabilityPolicy = Literal["full_parameter", "registered_query"]\n',
+              label="grouped semantics alias",
+          )
+          text = replace_once(
+              text,
+              """    ``legacy_v1`` preserves the registered dense score exactly. ``normalized_v2``\n    is an opt-in development path that uses the endpoint-inclusive, scale-normalized\n    prefix likelihood. The legacy defaults remain unchanged.\n""",
+              """    ``legacy_v1`` preserves the registered dense score exactly. ``normalized_v2``\n    is an opt-in development path that uses the endpoint-inclusive, scale-normalized\n    prefix likelihood. ``grouped_likelihood_semantics`` independently controls the\n    full-covariance grouped path; ``normalized_v3`` is a contributor-capped,\n    coordinate-normalized development comparator. All legacy defaults remain\n    unchanged.\n""",
+              label="config documentation",
+          )
+          text = replace_once(
+              text,
+              """    likelihood_semantics: DenseLikelihoodSemantics = "legacy_v1"\n    difference_correlation: float = 0.0\n""",
+              """    likelihood_semantics: DenseLikelihoodSemantics = "legacy_v1"\n    difference_correlation: float = 0.0\n    grouped_likelihood_semantics: GroupedLikelihoodSemantics = "legacy_v1"\n    grouped_covariance_condition_number_limit: float = 1.0e12\n""",
+              label="config fields",
+          )
+          text = replace_once(
+              text,
+              """        if self.likelihood_semantics not in {"legacy_v1", "normalized_v2"}:\n            raise ValueError("unsupported dense likelihood semantics")\n        if not np.isfinite(self.difference_correlation) or not (\n""",
+              """        if self.likelihood_semantics not in {"legacy_v1", "normalized_v2"}:\n            raise ValueError("unsupported dense likelihood semantics")\n        if self.grouped_likelihood_semantics not in {"legacy_v1", "normalized_v3"}:\n            raise ValueError("unsupported grouped likelihood semantics")\n        if (\n            not np.isfinite(self.grouped_covariance_condition_number_limit)\n            or self.grouped_covariance_condition_number_limit < 1.0\n        ):\n            raise ValueError(\n                "grouped covariance condition-number limit must be finite and at "\n                "least one"\n            )\n        if not np.isfinite(self.difference_correlation) or not (\n""",
+              label="config validation",
+          )
+          text = replace_once(
+              text,
+              """        if self.likelihood_semantics != "legacy_v1":\n            result["likelihood_semantics"] = self.likelihood_semantics\n            result["difference_correlation"] = self.difference_correlation\n        return result\n""",
+              """        if self.likelihood_semantics != "legacy_v1":\n            result["likelihood_semantics"] = self.likelihood_semantics\n            result["difference_correlation"] = self.difference_correlation\n        if self.grouped_likelihood_semantics != "legacy_v1":\n            result["grouped_likelihood_semantics"] = (\n                self.grouped_likelihood_semantics\n            )\n            result["grouped_covariance_condition_number_limit"] = (\n                self.grouped_covariance_condition_number_limit\n            )\n        return result\n""",
+              label="artifact metadata",
+          )
+          text = replace_once(
+              text,
+              """    if diagnostics.low_rank_covariance_group_ids:\n        result["low_rank_covariance_group_ids"] = list(\n            diagnostics.low_rank_covariance_group_ids\n        )\n    return result\n""",
+              """    if diagnostics.low_rank_covariance_group_ids:\n        result["low_rank_covariance_group_ids"] = list(\n            diagnostics.low_rank_covariance_group_ids\n        )\n    if diagnostics.score_semantics != "legacy_sum_v1":\n        result.update(\n            {\n                "score_semantics": diagnostics.score_semantics,\n                "likelihood_power": diagnostics.likelihood_power,\n                "contributor_power_caps": list(\n                    diagnostics.contributor_power_caps\n                ),\n                "group_coordinate_counts": list(\n                    diagnostics.group_coordinate_counts\n                ),\n                "normalization_coordinate_mass": (\n                    diagnostics.normalization_coordinate_mass\n                ),\n                "source_covariance_condition_numbers": list(\n                    diagnostics.source_covariance_condition_numbers\n                ),\n                "normalization_coordinate_fractions": list(\n                    diagnostics.normalization_coordinate_fractions\n                ),\n            }\n        )\n    return result\n""",
+              label="diagnostics summary",
+          )
+          text = replace_once(
+              text,
+              """    group_covariance_factor_m: dict[str, np.ndarray],\n    component_batch_size: int,\n) -> tuple[np.ndarray, GroupLikelihoodDiagnostics]:\n""",
+              """    group_covariance_factor_m: dict[str, np.ndarray],\n    component_batch_size: int,\n    score_semantics: GroupedScoreSemantics,\n    likelihood_power: float,\n    max_source_covariance_condition_number: float,\n) -> tuple[np.ndarray, GroupLikelihoodDiagnostics]:\n""",
+              label="batched signature",
+          )
+          text = replace_once(
+              text,
+              """    full_covariance_group_ids: tuple[str, ...] | None = None\n    low_rank_covariance_group_ids: tuple[str, ...] | None = None\n\n    for start in range(0, component_count, component_batch_size):\n""",
+              """    full_covariance_group_ids: tuple[str, ...] | None = None\n    low_rank_covariance_group_ids: tuple[str, ...] | None = None\n    diagnostic_score_semantics: GroupedScoreSemantics | None = None\n    diagnostic_likelihood_power: float | None = None\n    contributor_power_caps: tuple[float, ...] | None = None\n    group_coordinate_counts: tuple[int, ...] | None = None\n    normalization_coordinate_mass: float | None = None\n    source_covariance_condition_numbers: tuple[float, ...] | None = None\n    normalization_coordinate_fractions: tuple[float, ...] | None = None\n\n    for start in range(0, component_count, component_batch_size):\n""",
+              label="batched diagnostics state",
+          )
+          text = replace_once(
+              text,
+              """            component_group_covariance_m2=dense_batch,\n            component_group_covariance_factor_m=factor_batch,\n        )\n""",
+              """            component_group_covariance_m2=dense_batch,\n            component_group_covariance_factor_m=factor_batch,\n            score_semantics=score_semantics,\n            likelihood_power=likelihood_power,\n            max_source_covariance_condition_number=(\n                max_source_covariance_condition_number\n            ),\n        )\n""",
+              label="batched grouped score call",
+          )
+          text = replace_once(
+              text,
+              """            full_covariance_group_ids = diagnostics.full_covariance_group_ids\n            low_rank_covariance_group_ids = diagnostics.low_rank_covariance_group_ids\n        elif (\n""",
+              """            full_covariance_group_ids = diagnostics.full_covariance_group_ids\n            low_rank_covariance_group_ids = diagnostics.low_rank_covariance_group_ids\n            diagnostic_score_semantics = diagnostics.score_semantics\n            diagnostic_likelihood_power = diagnostics.likelihood_power\n            contributor_power_caps = diagnostics.contributor_power_caps\n            group_coordinate_counts = diagnostics.group_coordinate_counts\n            normalization_coordinate_mass = (\n                diagnostics.normalization_coordinate_mass\n            )\n            source_covariance_condition_numbers = (\n                diagnostics.source_covariance_condition_numbers\n            )\n            normalization_coordinate_fractions = (\n                diagnostics.normalization_coordinate_fractions\n            )\n        elif (\n""",
+              label="capture batched diagnostics",
+          )
+          text = replace_once(
+              text,
+              """            or diagnostics.low_rank_covariance_group_ids\n            != low_rank_covariance_group_ids\n        ):\n""",
+              """            or diagnostics.low_rank_covariance_group_ids\n            != low_rank_covariance_group_ids\n            or diagnostics.score_semantics != diagnostic_score_semantics\n            or diagnostics.likelihood_power != diagnostic_likelihood_power\n            or diagnostics.contributor_power_caps != contributor_power_caps\n            or diagnostics.group_coordinate_counts != group_coordinate_counts\n            or diagnostics.normalization_coordinate_mass\n            != normalization_coordinate_mass\n            or diagnostics.source_covariance_condition_numbers\n            != source_covariance_condition_numbers\n            or diagnostics.normalization_coordinate_fractions\n            != normalization_coordinate_fractions\n        ):\n""",
+              label="compare batched diagnostics",
+          )
+          text = replace_once(
+              text,
+              """        or full_covariance_group_ids is None\n        or low_rank_covariance_group_ids is None\n    ):\n""",
+              """        or full_covariance_group_ids is None\n        or low_rank_covariance_group_ids is None\n        or diagnostic_score_semantics is None\n        or diagnostic_likelihood_power is None\n        or contributor_power_caps is None\n        or group_coordinate_counts is None\n        or source_covariance_condition_numbers is None\n        or normalization_coordinate_fractions is None\n    ):\n""",
+              label="validate batched diagnostics",
+          )
+          text = replace_once(
+              text,
+              """        full_covariance_group_ids=full_covariance_group_ids,\n        low_rank_covariance_group_ids=low_rank_covariance_group_ids,\n    )\n""",
+              """        full_covariance_group_ids=full_covariance_group_ids,\n        low_rank_covariance_group_ids=low_rank_covariance_group_ids,\n        score_semantics=diagnostic_score_semantics,\n        likelihood_power=diagnostic_likelihood_power,\n        contributor_power_caps=contributor_power_caps,\n        group_coordinate_counts=group_coordinate_counts,\n        normalization_coordinate_mass=normalization_coordinate_mass,\n        source_covariance_condition_numbers=(\n            source_covariance_condition_numbers\n        ),\n        normalization_coordinate_fractions=(\n            normalization_coordinate_fractions\n        ),\n    )\n""",
+              label="rebuild batched diagnostics",
+          )
+          text = replace_once(
+              text,
+              """    if grouped_evidence is not None and settings.likelihood_semantics != "legacy_v1":\n        raise ValueError(\n            "normalized_v2 cannot be combined with grouped observation evidence"\n        )\n    batch_size = _validated_grouped_component_batch_size(grouped_component_batch_size)\n""",
+              """    if grouped_evidence is not None and settings.likelihood_semantics != "legacy_v1":\n        raise ValueError(\n            "normalized_v2 cannot be combined with grouped observation evidence"\n        )\n    if (\n        grouped_evidence is None\n        and settings.grouped_likelihood_semantics != "legacy_v1"\n    ):\n        raise ValueError("normalized_v3 requires grouped observation evidence")\n    batch_size = _validated_grouped_component_batch_size(grouped_component_batch_size)\n""",
+              label="grouped evidence admission",
+          )
+          text = replace_once(
+              text,
+              """    prior = bank.prior_joint_weights if base_weights is None else base_weights\n    if batch_size is not None:\n""",
+              """    prior = bank.prior_joint_weights if base_weights is None else base_weights\n    normalized_grouped = settings.grouped_likelihood_semantics == "normalized_v3"\n    grouped_score_semantics: GroupedScoreSemantics = (\n        "normalized_coordinate_mean_v3" if normalized_grouped else "legacy_sum_v1"\n    )\n    grouped_likelihood_power = settings.likelihood_power if normalized_grouped else 1.0\n    if batch_size is not None:\n""",
+              label="grouped score selection",
+          )
+          text = replace_once(
+              text,
+              """            group_covariance_factor_m=group_covariance_factor,\n            component_batch_size=batch_size,\n        )\n""",
+              """            group_covariance_factor_m=group_covariance_factor,\n            component_batch_size=batch_size,\n            score_semantics=grouped_score_semantics,\n            likelihood_power=grouped_likelihood_power,\n            max_source_covariance_condition_number=(\n                settings.grouped_covariance_condition_number_limit\n            ),\n        )\n""",
+              label="batched score selection",
+          )
+          text = replace_once(
+              text,
+              """        component_group_covariance_m2=group_covariance,\n        component_group_covariance_factor_m=group_covariance_factor,\n    )\n""",
+              """        component_group_covariance_m2=group_covariance,\n        component_group_covariance_factor_m=group_covariance_factor,\n        score_semantics=grouped_score_semantics,\n        likelihood_power=grouped_likelihood_power,\n        max_source_covariance_condition_number=(\n            settings.grouped_covariance_condition_number_limit\n        ),\n    )\n""",
+              label="dense score selection",
+          )
+          text = replace_once(
+              text,
+              """        "evidence_model": (\n            "grouped_robust_composite"\n            if grouped_evidence is not None\n""",
+              """        "evidence_model": (\n            (\n                "grouped_normalized_v3"\n                if settings.grouped_likelihood_semantics == "normalized_v3"\n                else "grouped_robust_composite"\n            )\n            if grouped_evidence is not None\n""",
+              label="evaluation evidence model",
+          )
+          path.write_text(text, encoding="utf-8")
+
+          test_path = Path("tests/test_causal4d_grouped_abduction.py")
+          test_text = test_path.read_text(encoding="utf-8")
+          marker = "def test_grouped_component_batching_preserves_normalized_v3_semantics()"
+          if marker in test_text:
+              raise SystemExit("normalized-v3 batching test already exists")
+          addition = r'''
+
+
+def test_grouped_component_batching_preserves_normalized_v3_semantics() -> None:
+    bank, belief, observations, mask, _, evidence = _problem()
+    config = FactualAbductionConfig(
+        observation_scale_m=0.001,
+        grouped_likelihood_semantics="normalized_v3",
+    )
+    dense = abduct_factual_intervention(
+        bank,
+        belief,
+        observations,
+        prefix_frame_count=4,
+        observation_mask=mask,
+        config=config,
+        grouped_evidence=evidence,
+    )
+    batched = abduct_factual_intervention(
+        bank,
+        belief,
+        observations,
+        prefix_frame_count=4,
+        observation_mask=mask,
+        config=config,
+        grouped_evidence=evidence,
+        grouped_component_batch_size=1,
+    )
+
+    assert np.array_equal(batched.weights, dense.weights)
+    assert batched.metadata == dense.metadata
+    assert batched.artifact_id == dense.artifact_id
+    diagnostics = batched.metadata["grouped_observation_evidence"]["diagnostics"]
+    assert diagnostics["score_semantics"] == "normalized_coordinate_mean_v3"
+    assert diagnostics["likelihood_power"] == config.likelihood_power
+          '''
+          test_path.write_text(
+              test_text.rstrip() + addition.rstrip() + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          verify_blob() {
+            expected="$1"
+            path="$2"
+            test "$(git hash-object "$path")" = "$expected"
+          }
+          verify_blob b60a5bed04cf5ebb18d53c42f2dc4589ce5050fc \
+            docs/grouped_normalized_likelihood_v3.md
+          verify_blob a37e80a14d836c5b0bb0e93a1b576fe2f343fd25 \
+            docs/structured_grouped_likelihood.md
+          verify_blob f3e3c60ba1659b07dbf5314fd5590250b0529dfc \
+            src/causal4d/__init__.py
+          verify_blob 08c127d8d36595aa2eef8c332222716cdd26cd2f \
+            src/causal4d/cli/abduct_phystwin_intervention.py
+          verify_blob 8e6bb0081201e080bf7717a8411fe1ad4912cde6 \
+            src/causal4d/grouped_likelihood.py
+          verify_blob 6d92d8063e2123441a7f3a534a371ef5c46b2da7 \
+            src/causal4d/observation_evidence.py
+          verify_blob 0f8ff6268326afdc4547e4b59f6003dffa7a1d5a \
+            tests/test_factual_likelihood_semantics.py
+          verify_blob 031e110e3d04021607651b70f2f801b9cd1c1604 \
+            tests/test_grouped_normalized_v3.py
+
+          python -m pip install --disable-pip-version-check -e ".[dev]"
+          changed_python=(
+            src/causal4d/__init__.py
+            src/causal4d/cli/abduct_phystwin_intervention.py
+            src/causal4d/grouped_likelihood.py
+            src/causal4d/intervention_abduction.py
+            src/causal4d/observation_evidence.py
+            tests/test_causal4d_grouped_abduction.py
+            tests/test_factual_likelihood_semantics.py
+            tests/test_grouped_normalized_v3.py
+          )
+          python -m ruff format "${changed_python[@]}"
+          python -m ruff check "${changed_python[@]}"
+          python -m ruff format --check "${changed_python[@]}"
+          python -m mypy \
+            src/causal4d/grouped_likelihood.py \
+            src/causal4d/intervention_abduction.py \
+            src/causal4d/observation_evidence.py
+          python -m pytest -q \
+            tests/test_grouped_normalized_v3.py \
+            tests/test_factual_likelihood_semantics.py \
+            tests/test_causal4d_grouped_abduction.py
+          python -m compileall -q src tests
+          git diff --check
+
+          actual="$(git status --short | awk '{print $2}' | LC_ALL=C sort)"
           expected="$(printf '%s\n' \
             docs/grouped_normalized_likelihood_v3.md \
             docs/structured_grouped_likelihood.md \
@@ -74,62 +318,33 @@ jobs:
             src/causal4d/grouped_likelihood.py \
             src/causal4d/intervention_abduction.py \
             src/causal4d/observation_evidence.py \
+            tests/test_causal4d_grouped_abduction.py \
             tests/test_factual_likelihood_semantics.py \
             tests/test_grouped_normalized_v3.py | LC_ALL=C sort)"
           test "$actual" = "$expected"
 
-          verify_postimage() {
-            expected_blob="$1"
-            path="$2"
-            actual_blob="$(git hash-object "$path")"
-            test "$actual_blob" = "$expected_blob"
-          }
-          verify_postimage \
-            b60a5bed04cf5ebb18d53c42f2dc4589ce5050fc \
-            docs/grouped_normalized_likelihood_v3.md
-          verify_postimage \
-            a37e80a14d836c5b0bb0e93a1b576fe2f343fd25 \
-            docs/structured_grouped_likelihood.md
-          verify_postimage \
-            f3e3c60ba1659b07dbf5314fd5590250b0529dfc \
-            src/causal4d/__init__.py
-          verify_postimage \
-            08c127d8d36595aa2eef8c332222716cdd26cd2f \
-            src/causal4d/cli/abduct_phystwin_intervention.py
-          verify_postimage \
-            8e6bb0081201e080bf7717a8411fe1ad4912cde6 \
-            src/causal4d/grouped_likelihood.py
-          verify_postimage \
-            9c006c00f07e793683e828a5b5a7ee93eedf5f7e \
-            src/causal4d/intervention_abduction.py
-          verify_postimage \
-            6d92d8063e2123441a7f3a534a371ef5c46b2da7 \
-            src/causal4d/observation_evidence.py
-          verify_postimage \
-            0f8ff6268326afdc4547e4b59f6003dffa7a1d5a \
-            tests/test_factual_likelihood_semantics.py
-          verify_postimage \
-            031e110e3d04021607651b70f2f801b9cd1c1604 \
-            tests/test_grouped_normalized_v3.py
-
-          git diff --cached --check
-          python -m compileall -q src tests
-
           git config user.name github-actions[bot]
           git config user.email \
             41898282+github-actions[bot]@users.noreply.github.com
+          git add \
+            docs/grouped_normalized_likelihood_v3.md \
+            docs/structured_grouped_likelihood.md \
+            src/causal4d/__init__.py \
+            src/causal4d/cli/abduct_phystwin_intervention.py \
+            src/causal4d/grouped_likelihood.py \
+            src/causal4d/intervention_abduction.py \
+            src/causal4d/observation_evidence.py \
+            tests/test_causal4d_grouped_abduction.py \
+            tests/test_factual_likelihood_semantics.py \
+            tests/test_grouped_normalized_v3.py
           git commit -m "Add grouped covariance-normalized likelihood v3" \
-            -m "Rebase the opt-in grouped full-covariance normalized score onto registered-query structured factual abduction and the interventional-contrast API. Add contributor caps, reliability tempering, explicit likelihood power, source-covariance conditioning diagnostics, and invariant tests while preserving legacy defaults and the registered physical-study artifact identity."
+            -m "Rebase the opt-in contributor-capped full-covariance score onto the current registered-query, interventional-contrast, and bounded-memory grouped-abduction implementation. Preserve legacy defaults and exact dense/batched artifact parity while adding explicit likelihood power, covariance conditioning diagnostics, and invariant tests."
 
-          remote_main_after_build="$(
-            git ls-remote origin refs/heads/main | awk '{print $1}'
-          )"
-          remote_target_after_build="$(
-            git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}'
-          )"
-          test "$remote_main_after_build" = "$BASE_SHA"
-          test "$remote_target_after_build" = "$EXPECTED_TARGET_SHA"
-
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = \
+            "$BASE_SHA"
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')" = \
+            "$EXPECTED_TARGET_SHA"
           auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           git -c http.extraheader="AUTHORIZATION: basic $auth" push \
-            --force origin "HEAD:refs/heads/$TARGET_BRANCH"
+            --force-with-lease="refs/heads/$TARGET_BRANCH:$EXPECTED_TARGET_SHA" \
+            origin "HEAD:refs/heads/$TARGET_BRANCH"
