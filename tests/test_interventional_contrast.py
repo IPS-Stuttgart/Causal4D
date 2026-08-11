@@ -205,9 +205,7 @@ def test_independent_readout_adds_only_declared_branch_covariance() -> None:
         rtol=1e-6,
     )
     np.testing.assert_allclose(result.covariance, [[0.8]], rtol=1e-6)
-    expected = 0.75 * ndtr(1.0 / np.sqrt(0.05)) + 0.25 * ndtr(
-        3.0 / np.sqrt(0.05)
-    )
+    expected = 0.75 * ndtr(1.0 / np.sqrt(0.05)) + 0.25 * ndtr(3.0 / np.sqrt(0.05))
     np.testing.assert_allclose(result.probability_positive, [expected])
     assert result.metadata["cross_branch_discrepancy_covariance_available"] is False
 

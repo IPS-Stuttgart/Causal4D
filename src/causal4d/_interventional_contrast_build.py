@@ -231,9 +231,7 @@ def _query_components(
     expected = (len(trajectories), trajectories.shape[2], trajectories.shape[3])
     if component_variance.shape != expected:
         raise ValueError("source readout variance has the wrong shape")
-    if not np.all(np.isfinite(component_variance)) or np.any(
-        component_variance < 0.0
-    ):
+    if not np.all(np.isfinite(component_variance)) or np.any(component_variance < 0.0):
         raise ValueError("source readout variance must be finite and nonnegative")
     full_variance = np.broadcast_to(
         component_variance[:, None],
@@ -419,9 +417,7 @@ def build_interventional_contrast(
             dtype=float,
         )
     else:
-        conditional_covariance = (
-            covariance_a[pairs[:, 0]] + covariance_b[pairs[:, 1]]
-        )
+        conditional_covariance = covariance_a[pairs[:, 0]] + covariance_b[pairs[:, 1]]
 
     result_metadata = {
         "claim_boundary": _CLAIM_BOUNDARY,

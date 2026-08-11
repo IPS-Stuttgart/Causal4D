@@ -169,9 +169,7 @@ class InterventionalContrastPosteriorV1:
             rtol=1e-10,
         ):
             raise ValueError("conditional covariance must be symmetric")
-        minimum_eigenvalue = float(
-            np.min(np.linalg.eigvalsh(covariance), initial=0.0)
-        )
+        minimum_eigenvalue = float(np.min(np.linalg.eigvalsh(covariance), initial=0.0))
         if minimum_eigenvalue < -1e-10:
             raise ValueError("conditional covariance must be positive semidefinite")
         if variance_policy == "component_means_only" and np.any(covariance != 0.0):

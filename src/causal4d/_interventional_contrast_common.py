@@ -218,8 +218,7 @@ def _mixture_marginal_quantiles(
             if np.any(~continuous):
                 total += float(
                     np.sum(
-                        weights[~continuous]
-                        * (component_means[~continuous] <= value)
+                        weights[~continuous] * (component_means[~continuous] <= value)
                     )
                 )
             return total
