@@ -156,3 +156,13 @@ them before target outcomes are opened.
 A passed local diagnostic is necessary but not sufficient for a paper claim.
 The same-object multi-action protocol and independent-execution calibration
 remain the required real-evidence gates.
+
+## Prospective registered-query and covariance bridge
+
+For an opt-in query-specific gate and provenance-bound full or low-rank
+conditional covariance in factual abduction, see
+[`registered_query_abduction_and_structured_uncertainty.md`](
+registered_query_abduction_and_structured_uncertainty.md
+).
+This extension is prospective and does not change the registered physical-study
+path or its default artifact identity.

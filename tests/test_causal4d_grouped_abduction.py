@@ -1,7 +1,16 @@
 import numpy as np
+import pytest
 
 from causal4d.contracts import TwinBelief, build_causal_context
-from causal4d.identifiability import assess_intervention_identifiability
+from causal4d.factual_abduction_uncertainty import (
+    FactualAbductionUncertaintyV1,
+    load_factual_abduction_uncertainty_npz,
+    save_factual_abduction_uncertainty_npz,
+)
+from causal4d.identifiability import (
+    IdentifiabilityConfig,
+    assess_intervention_identifiability,
+)
 from causal4d.intervention_abduction import (
     FactualAbductionConfig,
     abduct_factual_intervention,
@@ -136,3 +145,199 @@ def test_unidentifiable_abduction_returns_exact_joint_prior() -> None:
     assert not identifiability.identifiable
     assert np.array_equal(factual.weights, bank.prior_joint_weights.reshape(-1))
     assert factual.metadata["abduction_abstained_unidentifiable"] is True
+
+
+def _partially_identified_query(query_sensitivity: np.ndarray):
+    return assess_intervention_identifiability(
+        np.asarray([[1.0, 1.0], [0.0, 1.0]]),
+        np.asarray([[0.0], [1.0]]),
+        query_sensitivity=query_sensitivity,
+        config=IdentifiabilityConfig(
+            minimum_information_eigenvalue=1e-8,
+            minimum_residualized_response_fraction=0.01,
+            maximum_subspace_cosine=1.0,
+            maximum_query_null_response_fraction=1e-8,
+        ),
+    )
+
+
+def test_registered_query_policy_admits_query_despite_partial_parameter_rank() -> None:
+    bank, belief, observations, mask, config, evidence = _problem()
+    identifiability = _partially_identified_query(np.asarray([[1.0, 1.0]]))
+    assert not identifiability.identifiable
+    assert identifiability.query_identifiable
+
+    full_parameter = abduct_factual_intervention(
+        bank,
+        belief,
+        observations,
+        prefix_frame_count=4,
+        observation_mask=mask,
+        config=config,
+        grouped_evidence=evidence,
+        identifiability=identifiability,
+        abstain_when_unidentifiable=True,
+    )
+    registered_query = abduct_factual_intervention(
+        bank,
+        belief,
+        observations,
+        prefix_frame_count=4,
+        observation_mask=mask,
+        config=config,
+        grouped_evidence=evidence,
+        identifiability=identifiability,
+        abstain_when_unidentifiable=True,
+        identifiability_policy="registered_query",
+    )
+
+    assert np.array_equal(
+        full_parameter.weights,
+        bank.prior_joint_weights.reshape(-1),
+    )
+    assert not np.array_equal(
+        registered_query.weights,
+        bank.prior_joint_weights.reshape(-1),
+    )
+    assert registered_query.metadata["identifiability_policy"] == "registered_query"
+    assert registered_query.metadata["identifiability_policy_admitted"] is True
+
+
+def test_registered_query_policy_falls_back_exactly_for_unresolved_query() -> None:
+    bank, belief, observations, mask, config, evidence = _problem()
+    identifiability = _partially_identified_query(np.asarray([[1.0, -1.0]]))
+    assert identifiability.query_identifiable is False
+    factual = abduct_factual_intervention(
+        bank,
+        belief,
+        observations,
+        prefix_frame_count=4,
+        observation_mask=mask,
+        config=config,
+        grouped_evidence=evidence,
+        identifiability=identifiability,
+        abstain_when_unidentifiable=True,
+        identifiability_policy="registered_query",
+    )
+    assert np.array_equal(factual.weights, bank.prior_joint_weights.reshape(-1))
+    assert factual.metadata["identifiability_policy_admitted"] is False
+
+
+def test_registered_query_policy_requires_query_sensitivity() -> None:
+    bank, belief, observations, mask, config, evidence = _problem()
+    identifiability = assess_intervention_identifiability(np.asarray([[1.0], [0.0]]))
+    with pytest.raises(ValueError, match="requires query_sensitivity"):
+        abduct_factual_intervention(
+            bank,
+            belief,
+            observations,
+            prefix_frame_count=4,
+            observation_mask=mask,
+            config=config,
+            grouped_evidence=evidence,
+            identifiability=identifiability,
+            abstain_when_unidentifiable=True,
+            identifiability_policy="registered_query",
+        )
+
+
+def test_structured_abduction_uncertainty_is_bound_recorded_and_round_trips(
+    tmp_path,
+) -> None:
+    bank, belief, observations, mask, config, evidence = _problem()
+    group = evidence.groups[0]
+    factor = np.zeros((group.coordinate_count, 1), dtype=float)
+    factor[0, 0] = 0.01
+    uncertainty = FactualAbductionUncertaintyV1(
+        rollout_bank_id=bank.artifact_id,
+        twin_belief_id=belief.artifact_id,
+        grouped_evidence_id=evidence.evidence_id,
+        source_artifact_ids=("prob4d-source-only-covariance",),
+        source_only=True,
+        disjoint_from_twin_belief_uncertainty=True,
+        disjoint_from_grouped_observation_covariance=True,
+        group_covariance_factor_m={group.group_id: factor},
+    )
+    path = tmp_path / "abduction-uncertainty.npz"
+    save_factual_abduction_uncertainty_npz(path, uncertainty)
+    restored = load_factual_abduction_uncertainty_npz(path)
+    assert restored.artifact_id == uncertainty.artifact_id
+
+    factual = abduct_factual_intervention(
+        bank,
+        belief,
+        observations,
+        prefix_frame_count=4,
+        observation_mask=mask,
+        config=config,
+        grouped_evidence=evidence,
+        abduction_uncertainty=restored,
+    )
+    recorded = factual.metadata["factual_abduction_uncertainty"]
+    assert recorded["artifact_id"] == uncertainty.artifact_id
+    diagnostics = factual.metadata["grouped_observation_evidence"]["diagnostics"]
+    assert diagnostics["low_rank_covariance_group_ids"] == [group.group_id]
+
+
+def test_abduction_uncertainty_rejects_wrong_bindings() -> None:
+    bank, belief, observations, mask, config, evidence = _problem()
+    group = evidence.groups[0]
+    uncertainty = FactualAbductionUncertaintyV1(
+        rollout_bank_id="wrong-bank",
+        twin_belief_id=belief.artifact_id,
+        grouped_evidence_id=evidence.evidence_id,
+        source_artifact_ids=("source-only-covariance",),
+        source_only=True,
+        disjoint_from_twin_belief_uncertainty=True,
+        disjoint_from_grouped_observation_covariance=True,
+        group_covariance_m2={group.group_id: np.eye(group.coordinate_count) * 1e-6},
+    )
+    with pytest.raises(ValueError, match="rollout_bank_id"):
+        abduct_factual_intervention(
+            bank,
+            belief,
+            observations,
+            prefix_frame_count=4,
+            observation_mask=mask,
+            config=config,
+            grouped_evidence=evidence,
+            abduction_uncertainty=uncertainty,
+        )
+
+
+def test_abduction_uncertainty_requires_disjoint_source_declaration() -> None:
+    bank, belief, _, _, _, evidence = _problem()
+    group = evidence.groups[0]
+    with pytest.raises(ValueError, match="disjoint-source declaration"):
+        FactualAbductionUncertaintyV1(
+            rollout_bank_id=bank.artifact_id,
+            twin_belief_id=belief.artifact_id,
+            grouped_evidence_id=evidence.evidence_id,
+            source_artifact_ids=("combined-uncertainty",),
+            source_only=True,
+            disjoint_from_twin_belief_uncertainty=True,
+            disjoint_from_grouped_observation_covariance=True,
+            additional_independent_variance_m2=1e-6,
+            group_covariance_factor_m={
+                group.group_id: np.zeros((group.coordinate_count, 1))
+            },
+        )
+
+
+def test_abduction_uncertainty_rejects_duplicate_dense_and_factor_routes() -> None:
+    bank, belief, _, _, _, evidence = _problem()
+    group = evidence.groups[0]
+    with pytest.raises(ValueError, match="either dense or low-rank"):
+        FactualAbductionUncertaintyV1(
+            rollout_bank_id=bank.artifact_id,
+            twin_belief_id=belief.artifact_id,
+            grouped_evidence_id=evidence.evidence_id,
+            source_artifact_ids=("duplicate-route",),
+            source_only=True,
+            disjoint_from_twin_belief_uncertainty=True,
+            disjoint_from_grouped_observation_covariance=True,
+            group_covariance_m2={group.group_id: np.eye(group.coordinate_count) * 1e-6},
+            group_covariance_factor_m={
+                group.group_id: np.zeros((group.coordinate_count, 1))
+            },
+        )
