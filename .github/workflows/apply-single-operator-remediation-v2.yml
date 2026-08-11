@@ -64,8 +64,9 @@ jobs:
           git diff --check
           if grep -R -n -E \
             'Anna Seel|Markus Rummel|Michael Feurer' \
-            --exclude-dir=.git .; then
-            echo "Unsupported person names remain in the current tree" >&2
+            --exclude-dir=.git \
+            --exclude='apply-single-operator-remediation*.yml' .; then
+            echo "Unsupported person names remain in the product tree" >&2
             exit 1
           fi
 
