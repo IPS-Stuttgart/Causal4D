@@ -284,7 +284,7 @@ def test_cli_packet_preserves_valid_but_incomplete_exit_code(
     decision = _decision(ready=False)
     packet = tmp_path / "next-action.zip"
     monkeypatch.setattr(
-        readiness.cli,
+        readiness_cli,
         "build_preacquisition_next_action",
         lambda *args, **kwargs: decision,
     )
