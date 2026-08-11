@@ -20,9 +20,7 @@ def test_campaign_uses_an_exact_maintainer_issue_trigger() -> None:
     assert "github.ref == 'refs/heads/main'" in text
     assert "github.event.issue.user.login == 'FlorianPfaff'" in text
     assert "github.event.issue.user.id == 6773539" in text
-    assert (
-        "'[self-hosted] run Causal4D controlled execution campaign'" in text
-    )
+    assert "'[self-hosted] run Causal4D controlled execution campaign'" in text
     assert text.count("github.event.issue.title") == 1
     for forbidden in (
         "github.event.issue.body",
