@@ -4,6 +4,10 @@
 
 ### Added
 
+- Make the historical package-root API lazy while preserving exact owning-module
+  object identity, wildcard exports, and module introspection. Package an explicit
+  `__init__.pyi` surface, promote physical-posterior query projection through API
+  v1, and verify the runtime and typing boundaries from installed wheels and sdists.
 - Formalize Causal4D's structural causal model and identification assumptions,
   and add a typed, content-addressed, analysis-only posterior for explicit
   `Q(branch_a) - Q(branch_b)` interventional trajectory contrasts. The API
