@@ -1,4 +1,4 @@
-"""CLI for non-decision-making real-analysis interval diagnostics."""
+"""CLI for source-verified registered real-analysis intervals."""
 
 from __future__ import annotations
 
@@ -16,8 +16,8 @@ from causal4d.real_analysis_interval_diagnostics import (
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Build source-verified Student-t and bootstrap-t companion intervals "
-            "without changing the frozen primary percentile report."
+            "Verify the registered bootstrap-t primary interval, Student-t "
+            "robustness gate, and historical percentile sensitivity."
         )
     )
     parser.add_argument("effect_table", type=Path)
@@ -50,8 +50,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "artifact_kind": payload["artifact_kind"],
                 "diagnostic_id": payload["diagnostic_id"],
                 "output": str(arguments.output),
-                "primary_interval_unchanged": True,
-                "sensitivity_intervals_may_change_primary_decision": False,
+                "primary_interval_method": "target_session_bootstrap_t",
+                "student_t_may_veto_positive_claim": True,
+                "student_t_may_rescue_primary_failure": False,
             },
             indent=2,
             sort_keys=True,

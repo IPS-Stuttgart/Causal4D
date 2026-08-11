@@ -148,8 +148,14 @@ def test_report_uses_sessions_as_the_resampling_unit(tmp_path: Path) -> None:
     assert primary["session_is_resampling_unit"] is True
     assert primary["executions_are_not_treated_as_independent"] is True
     assert primary["equal_session_weighted_improvement"]["mean"] == pytest.approx(1.0)
+    assert primary["confidence_interval"]["method"] == ("target_session_bootstrap_t")
     assert primary["confidence_interval"]["lower"] == pytest.approx(1.0)
     assert primary["confidence_interval"]["upper"] == pytest.approx(1.0)
+    assert primary["required_robustness_interval"]["method"] == "student_t_mean"
+    assert primary["historical_percentile_sensitivity_interval"]["method"] == (
+        "target_session_percentile_bootstrap"
+    )
+    assert primary["interval_decision"]["positive_claim_interval_gate_passed"]
     assert report["claim_boundary"]["object_class_generalization_claimed"] is False
     assert (
         report["design_diagnostics"]["condition_comparisons_are_descriptive_only"]

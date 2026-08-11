@@ -15,19 +15,27 @@ nuisance variables. The primary effect report therefore:
    registered evaluation unit;
 2. averages those effects within each target grasp session;
 3. weights the resulting session effects equally; and
-4. obtains a deterministic 95% percentile interval by resampling sessions.
+4. obtains a deterministic 95% bootstrap-t interval by resampling sessions;
+5. computes a Student-t interval as a required veto-only robustness check; and
+6. retains the historical percentile interval as non-decision-making sensitivity.
 
 The fixed reporting configuration is:
 
 ```text
 resampling unit: target grasp session
+primary interval: bootstrap-t
+required robustness interval: Student-t
+historical sensitivity interval: percentile bootstrap
 bootstrap replicates: 20,000
 bootstrap seed: 20,260,726
 confidence level: 95%
 ```
 
-An unweighted execution mean is retained only as a diagnostic. It cannot replace
-or override the equal-session estimate.
+A positive interval claim requires strictly positive lower bounds from both the
+bootstrap-t and Student-t intervals. Student-t may veto but cannot rescue a
+bootstrap-t failure. A non-estimable primary interval yields no positive claim;
+the negative or bounded result remains reportable. An unweighted execution mean
+is diagnostic only and cannot override the equal-session estimate.
 
 ## Complete accounting
 
@@ -118,7 +126,10 @@ cannot be admitted by retaining the old embedded digest.
 
 The output contains:
 
-- the equal-session primary effect and deterministic clustered interval;
+- the equal-session primary effect and deterministic bootstrap-t interval;
+- the required Student-t veto-only robustness interval;
+- the historical percentile-bootstrap sensitivity interval;
+- the registered two-interval positive-claim decision;
 - candidate-better, tied, and worse session counts;
 - complete inclusion and exclusion accounting;
 - an unweighted execution diagnostic;

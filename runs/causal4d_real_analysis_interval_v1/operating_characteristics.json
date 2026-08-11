@@ -1,0 +1,52 @@
+{
+  "artifact_kind": "Causal4DRealAnalysisIntervalOperatingCharacteristics",
+  "claim_boundary": {
+    "changes_estimator": false,
+    "changes_protocol_units_or_splits": false,
+    "operating_characteristics_are_physical_evidence": false
+  },
+  "implementation_target_sha": "fa6a64b2442474321e453e9e8fdccd591e0a282d",
+  "interval_comparison_study": {
+    "audit_id": "5a13c416d7efd522f5123f98afacaacd218838583d78256d463eeb5e1d478576",
+    "bootstrap_t_mean_absolute_coverage_error": 0.019,
+    "bootstrap_t_worst_absolute_coverage_error": 0.042,
+    "common_synthetic_panels": 15000,
+    "methods": [
+      "percentile",
+      "basic",
+      "student_t",
+      "bca",
+      "bootstrap_t"
+    ],
+    "student_t_maximum_favorable_one_sided_type_i_error": 0.02666666666666667,
+    "workflow_run_id": 31091652355
+  },
+  "percentile_bootstrap_study": {
+    "audit_id": "7dbea2a9b99cbc98acd03fa28af9583f0e95d4d0772e58853af4f05d0584267a",
+    "bootstrap_replicates_per_panel": 20000,
+    "bootstrap_seed": 20260726,
+    "gaussian_coverage_by_session_count": {
+      "12": 0.909,
+      "18": 0.931
+    },
+    "scenario_count": 10,
+    "strong_right_skew_coverage_lower_than_gaussian": true,
+    "synthetic_panels_per_scenario": 2000,
+    "workflow_run_id": 31091137654
+  },
+  "physical_target_outcomes_used": false,
+  "registered_decision": {
+    "historical_sensitivity_interval": "target_session_percentile_bootstrap",
+    "positive_claim_requires_both_lower_bounds_positive": true,
+    "primary_interval": "target_session_bootstrap_t",
+    "required_robustness_interval": "student_t_mean",
+    "robustness_may_rescue_primary_failure": false
+  },
+  "registered_session_counts": [
+    12,
+    18
+  ],
+  "result_sha256": "27f9ffed5ae3b520641457b7d0945b4a029c04d8e9c499c1026af6d7d53ef745",
+  "schema_version": 1,
+  "status": "completed_target_free"
+}

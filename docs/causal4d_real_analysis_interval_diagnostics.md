@@ -1,41 +1,49 @@
-# Real-analysis interval diagnostics
+# Registered real-analysis intervals
 
-The registered real-analysis report remains session-clustered and keeps its
-frozen percentile-bootstrap interval unchanged.  A source-only operating-
-characteristic audit completed before physical target acquisition showed that
-an unstudentized percentile interval for the session mean can materially
-undercover at the registered sample sizes of 12 and 18 sessions.
+The real Causal4D endpoints are aggregated by independent target grasp session.
+Before any confirmatory physical execution, a target-free operating-characteristic
+audit showed material undercoverage of the previously registered unstudentized
+percentile interval at the exact endpoint sample sizes of 12 and 18 sessions.
+The content-addressed amendment in
+`configs/causal4d/real_analysis_interval_amendment_v1.json` therefore changes the
+reporting rule without changing the estimator, protocol units, target split,
+exclusion policy, or target-access boundary.
 
-This companion artifact makes that limitation explicit and adds two
-non-decision-making sensitivity intervals:
+The registered interval policy is:
 
-- a Student-t interval for a transparent symmetric small-sample check; and
-- a deterministic bootstrap-t interval for better calibration under skew and
-  other non-Gaussian session-effect distributions.
+1. **Primary:** deterministic session-clustered bootstrap-t, with 20,000
+   resamples, seed `20260726`, and 95% confidence.
+2. **Required robustness:** Student-t interval for the same equal-session mean.
+   It may veto a positive claim but can never rescue a primary failure.
+3. **Historical sensitivity:** the original session percentile interval. It is
+   retained for continuity and cannot change the primary decision.
 
-Neither sensitivity interval may rescue a failed primary endpoint, alter a
-registered gate, or select a method after target access.  Promotion to primary
-status requires a separate, content-addressed preacquisition amendment.
+A positive interval claim requires strictly positive lower bounds from both the
+bootstrap-t and Student-t intervals. A non-estimable bootstrap-t interval, a
+bootstrap-t interval containing zero, or a Student-t interval containing zero
+precludes a positive claim. The complete negative or bounded result remains
+reportable.
 
-## Workflow evidence
+## Target-free evidence
 
-All studies evaluated the immutable implementation at
-`fa6a64b2442474321e453e9e8fdccd591e0a282d` and used no physical target
-outcomes.
+All interval-selection studies evaluated the immutable implementation at
+`fa6a64b2442474321e453e9e8fdccd591e0a282d` and used no physical target outcome.
+The compact, content-addressed evidence record is retained at
+`runs/causal4d_real_analysis_interval_v1/operating_characteristics.json` and is
+bound by both the amendment and method freeze.
 
-### Exact percentile-bootstrap operating characteristics
+### Percentile-bootstrap operating characteristics
 
 - workflow run: `31091137654`;
 - audit ID:
   `7dbea2a9b99cbc98acd03fa28af9583f0e95d4d0772e58853af4f05d0584267a`;
 - ten distribution/sample-size scenarios;
 - 2,000 synthetic session panels per scenario;
-- the frozen 20,000 bootstrap resamples and seed `20260726` for every panel;
-- matrix implementation verified against the production `_bootstrap` function
-  in every scenario.
+- 20,000 bootstrap resamples with seed `20260726` per panel; and
+- exact production-implementation parity.
 
-For Gaussian session effects, nominal 95% percentile coverage was about 90.9%
-at 12 sessions and 93.1% at 18 sessions.  Coverage was lower under strong
+For Gaussian session effects, nominal 95% percentile coverage was approximately
+90.9% at 12 sessions and 93.1% at 18 sessions. Coverage was lower under strong
 right skew.
 
 ### Interval-method comparison
@@ -43,19 +51,31 @@ right skew.
 - workflow run: `31091652355`;
 - audit ID:
   `5a13c416d7efd522f5123f98afacaacd218838583d78256d463eeb5e1d478576`;
-- 15,000 common synthetic panels;
-- percentile, basic, Student-t, BCa, and bootstrap-t intervals compared on the
-  same panels and bootstrap resamples.
+- 15,000 common synthetic panels; and
+- percentile, basic, Student-t, BCa, and bootstrap-t intervals evaluated on the
+  same panels and resamples.
 
-Across the ten scenarios, bootstrap-t had the smallest mean absolute coverage
-error, 0.019, and the best worst-case absolute coverage error, 0.042.  The
-Student-t interval had the smallest maximum favorable one-sided type-I error,
-about 0.0267.  Basic and BCa intervals did not improve the aggregate result.
+Bootstrap-t had the smallest mean absolute coverage error, `0.019`, and the best
+worst-case absolute coverage error, `0.042`. Student-t had the smallest maximum
+favorable one-sided type-I error, approximately `0.0267`. These target-free
+results justify the registered primary-plus-veto rule; they are not physical
+evidence.
 
-These findings justify publishing bootstrap-t and Student-t as sensitivity
-intervals; they do not change the frozen primary analysis.
+## Content binding
 
-## Build the companion artifact
+The method-freeze manifest records the amendment contract and exact file bytes.
+The schema-3 registered-analysis manifest independently binds:
+
+- the repository-relative amendment path;
+- amendment ID;
+- exact SHA-256 and byte count; and
+- the complete closed amendment contract.
+
+Sealing or validating the analysis reopens the checked-in amendment file. A
+changed method, seed, confidence level, role, evidence identifier, target-use
+flag, or consistently re-addressed policy fails closed.
+
+## Build the verification artifact
 
 ```bash
 python -m causal4d.cli.real_analysis_interval_diagnostics \
@@ -66,23 +86,12 @@ python -m causal4d.cli.real_analysis_interval_diagnostics \
   --analysis-manifest registered-analysis.json
 ```
 
-Use `--overwrite` only for an intentional regeneration of the same output
-path.  The command first builds the complete primary report, including protocol
-and source verification, and then derives the companion intervals from the
-same equal-session-weighted effects.
+The command rebuilds the complete source-verified primary report and independently
+recomputes all three intervals through the shared interval implementation. It
+fails when the report and recomputation differ. The output records the registered
+intervals, decision gate, amendment identity, workflow evidence, and unchanged
+same-object claim boundary.
 
-## Output contract
-
-The companion JSON records:
-
-- the exact primary report and effect-table identities;
-- the unchanged primary percentile interval;
-- `finite_sample_coverage_guaranteed=false` for that interval;
-- Student-t and bootstrap-t sensitivity bounds;
-- the fixed bootstrap seed and replicate count;
-- the completed workflow evidence and audit identifiers;
-- `may_change_primary_decision=false` for every sensitivity interval; and
-- the same one-object, non-safety claim boundary as the primary report.
-
-The companion artifact is additive.  Existing report consumers and the frozen
-primary percentile output are unaffected.
+Use `--overwrite` only to regenerate the same derived output path intentionally.
+The verification artifact cannot revise the registered interval policy or select
+another method after target access.

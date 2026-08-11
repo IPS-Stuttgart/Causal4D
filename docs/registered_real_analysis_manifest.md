@@ -1,11 +1,10 @@
 # Registered real-analysis manifest
 
-The confirmatory Causal4D analysis is now sealed as one self-contained,
+The confirmatory Causal4D analysis is sealed as one self-contained,
 content-addressed manifest after the method freeze and before target access. The
-manifest does not change the estimator, protocol, split, calibration threshold,
-or reporting rules. It makes the rules already distributed across the protocol,
-method freeze, and reporting implementation independently inspectable in one
-artifact.
+manifest does not change the estimator, protocol units, target split, calibration
+threshold, or exclusion policy. It makes the already registered analysis and
+reporting rules independently inspectable and fail-closed.
 
 ## Seal the manifest
 
@@ -20,18 +19,19 @@ causal4d protocol real analysis-manifest-seal \
   --registered-by "<independent-registrar>"
 ```
 
-The command revalidates the protocol, every method-freeze file digest, the exact
-Causal4D and BayesianPhysTwin revisions, and the frozen analysis and reporting
-contracts. Publication is atomic and non-overwriting. The output records both:
+The command revalidates the protocol, every method-freeze file digest, exact
+Causal4D and BayesianPhysTwin revisions, and the checked-in real-analysis
+interval amendment. Publication is atomic and non-overwriting. The output binds:
 
-- `analysis_id`: the canonical SHA-256 of the logical manifest excluding its own
-  identity field; and
-- the exact file SHA-256 and byte count used by readiness, evidence, and result
-  artifacts.
+- `analysis_id`, the canonical SHA-256 of the logical manifest excluding its own
+  identity field;
+- exact manifest SHA-256 and byte count;
+- exact method-freeze SHA-256; and
+- interval-amendment ID, SHA-256, byte count, path, and complete contract.
 
 A second publication to the same path fails. A changed method freeze, protocol,
-bootstrap rule, comparison arm, calibration rule, endpoint inventory, or claim
-boundary produces a different identity or fails validation.
+interval rule, comparison arm, calibration rule, endpoint inventory, or claim
+boundary changes the identity or fails validation.
 
 ## Revalidate retained bytes
 
@@ -43,40 +43,41 @@ causal4d protocol real analysis-manifest-validate \
   /data/causal4d-sloth-multi-action-v1/registered-analysis.json
 ```
 
-Validation reopens all three source files and verifies their exact identities.
-The result is target-free and cannot authorize acquisition by itself.
+Validation reopens the protocol, freeze, analysis manifest, and interval
+amendment and verifies their exact identities. The result is target-free and
+cannot authorize acquisition by itself.
 
 ## Readiness admission
 
 The canonical `causal4d protocol readiness status` path requires
 `registered-analysis.json` as a first-class prerequisite. It verifies the exact
-method-freeze SHA-256, protocol and amendment identities, Causal4D and
-BayesianPhysTwin revisions, manifest content identity, and registration
-chronology. The collection gate exposes:
+method-freeze SHA-256, protocol and amendment identities, software revisions,
+manifest identity, and registration chronology. The collection gate exposes:
 
 ```text
 primary_analysis_registered=true
 ```
 
 A missing, malformed, consistently re-addressed policy change, pre-freeze
-registration, or software-identity mismatch keeps
-`first_confirmatory_execution_allowed=false`. The lower-level readiness evaluator
-retains an explicit opt-in for isolated contract tests, but the canonical
-repository-and-dataset builder always enables this prerequisite.
+registration, interval-amendment mismatch, or software-identity mismatch keeps
+`first_confirmatory_execution_allowed=false`.
 
 ## Bound analysis contract
 
-Schema version 2 closes and content-addresses:
+Schema version 3 closes and content-addresses:
 
-- the protocol, v4 amendment, method freeze, Causal4D revision, and pinned
-  BayesianPhysTwin revision;
+- the protocol, v4 operational amendment, interval amendment, method freeze,
+  Causal4D revision, and pinned BayesianPhysTwin revision;
 - the six-frame causal prefix and zero-future-frame selection boundary;
 - the exact primary and diagnostic command entrypoints;
 - nominal PhysTwin, BayesianPhysTwin with nominal realized intervention, frozen
-  Causal4D, and the diagnostic intervention oracle as distinct arms;
+  Causal4D, MAP joint-component Causal4D, Causal4D with prior twin weights, and
+  the intervention oracle as distinct arms;
 - complete factual, same-grasp, and new-contact endpoint inventories;
-- equal-target-session effects with 20,000 deterministic session bootstrap
-  replicates at 95% confidence;
+- equal-target-session effects with primary bootstrap-t, required Student-t
+  robustness, and historical percentile sensitivity;
+- the rule that both primary and robustness lower bounds must be positive for a
+  positive interval claim;
 - the 12-fold execution-block calibration contract with nine independent
   calibration units, rank 9 of 9, and no target threshold reselection;
 - complete failure and preregistered-exclusion accounting;
@@ -84,16 +85,18 @@ Schema version 2 closes and content-addresses:
 - the same-object, non-SOTA, non-safety, and non-raw-covariance-calibration claim
   boundary.
 
-The coarse nine-unit calibration design is therefore visible in the primary
-analysis artifact rather than discoverable only from prose. Fragility diagnostics
-remain mandatory and cannot select another threshold.
+The MAP and prior-twin arms are diagnostic only. They cannot replace the frozen
+Causal4D primary candidate or rescue a failed primary endpoint. The target-free
+report shell binds the same interval amendment, exposes separate primary,
+robustness, and historical-sensitivity columns, and requires the two diagnostic
+arms to remain visibly non-primary.
 
 ## Compatibility
 
 The result-source verifier continues to accept historical schema-version-1
-manifests for already frozen consumers. New confirmatory acquisition should use
-the schema-version-2 sealing command. Schema 2 is strict: even a consistently
-re-addressed policy change is rejected when any fixed analysis field differs.
+manifests for already frozen consumers. New confirmatory acquisition uses the
+schema-version-3 sealing command. Schema 3 is strict: consistently re-addressing
+a changed interval, comparison arm, or reporting policy is rejected.
 
 ## Scientific boundary
 

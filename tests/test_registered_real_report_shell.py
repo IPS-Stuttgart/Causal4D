@@ -8,6 +8,11 @@ from pathlib import Path
 import pytest
 
 from causal4d.cli.command_registry import find_command
+from causal4d.real_analysis_interval_amendment import (
+    REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH,
+    bind_repository_interval_amendment,
+    expected_real_analysis_interval_amendment,
+)
 from causal4d.real_experiment_freeze import MILESTONE_ID, SCHEMA_VERSION
 from causal4d.real_protocol import load_protocol
 from causal4d.registered_real_analysis import (
@@ -43,6 +48,7 @@ def _method_freeze() -> dict[str, object]:
         "preacquisition": {
             "amendment_sha256": EXPECTED_PREACQUISITION_SHA256,
         },
+        "interval_amendment": bind_repository_interval_amendment(ROOT),
         "analysis_contract": {
             "entrypoints": [
                 "causal4d protocol real",
@@ -51,6 +57,19 @@ def _method_freeze() -> dict[str, object]:
             ],
             "diagnostic_only_entrypoints": ["causal4d calibration real"],
             "allowed_observation_prefix_frames": 6,
+            "effect_interval": {
+                "amendment_path": (REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH),
+                "amendment_id": expected_real_analysis_interval_amendment()[
+                    "amendment_id"
+                ],
+                "primary_method": "target_session_bootstrap_t",
+                "required_robustness_method": "student_t_mean",
+                "historical_sensitivity_method": (
+                    "target_session_percentile_bootstrap"
+                ),
+                "positive_claim_requires_both_lower_bounds_positive": True,
+                "robustness_may_rescue_primary_failure": False,
+            },
             "confirmatory_calibration": {
                 "entrypoint": "causal4d calibration execution-block",
                 "confidence_level": 0.90,
@@ -73,6 +92,8 @@ def _method_freeze() -> dict[str, object]:
             "report_all_36_executions_or_preregistered_exclusions": True,
             "report_independent_execution_calibration": True,
             "report_effect_intervals_and_replay_reset_variance": True,
+            "positive_claim_requires_primary_and_robustness_intervals": True,
+            "historical_percentile_interval_is_sensitivity_only": True,
             (
                 "optional_semantic_or_public_data_results_cannot_rescue_primary_failure"
             ): True,
@@ -85,6 +106,7 @@ def _analysis() -> dict[str, object]:
         load_protocol(PROTOCOL),
         _method_freeze(),
         method_freeze_sha256="c" * 64,
+        interval_amendment_binding=bind_repository_interval_amendment(ROOT),
         registered_by="independent-registrar",
         registered_at_utc="2026-08-08T00:00:00+00:00",
     )
@@ -135,6 +157,27 @@ def test_shell_is_deterministic_content_addressed_and_result_free() -> None:
         "same_grasp_transfer",
         "new_contact_transfer",
     ]
+    contract = first["analysis_contract"]
+    assert (
+        contract["interval_amendment"]["amendment_id"]
+        == (expected_real_analysis_interval_amendment()["amendment_id"])
+    )
+    endpoint_table = next(
+        table
+        for table in first["table_plan"]
+        if table["table_id"] == "endpoint-factual_continuation-effects"
+    )
+    assert "primary_interval_lower" in endpoint_table["required_columns"]
+    assert "required_robustness_interval_lower" in endpoint_table["required_columns"]
+    assert "positive_claim_interval_gate_passed" in endpoint_table["required_columns"]
+    assert (
+        "student_t_robustness_may_veto_but_never_rescue_a_positive_claim"
+        in first["completion_checks"]
+    )
+    assert (
+        "map_and_prior_twin_abduction_arms_remain_diagnostic_only"
+        in first["completion_checks"]
+    )
 
 
 def test_markdown_renders_every_registered_path_without_results() -> None:

@@ -10,7 +10,13 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Final, cast
 
-REPORT_SHELL_SCHEMA_VERSION: Final = 1
+from causal4d.real_analysis_interval_amendment import (
+    REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH,
+    REAL_ANALYSIS_INTERVAL_EVIDENCE_REPOSITORY_PATH,
+    validate_real_analysis_interval_amendment,
+)
+
+REPORT_SHELL_SCHEMA_VERSION: Final = 2
 REPORT_SHELL_ARTIFACT_KIND: Final = "Causal4DRegisteredRealReportShell"
 REPORT_SHELL_STATUS: Final = "target-free-template"
 
@@ -43,6 +49,7 @@ _SOURCE_FIELDS = frozenset(
 )
 _CONTRACT_FIELDS = frozenset(
     {
+        "interval_amendment",
         "comparison_arms",
         "effect_reporting",
         "confirmatory_calibration",
@@ -67,9 +74,15 @@ _ENDPOINT_COLUMNS = (
     "excluded_units",
     "equal_target_session_mean",
     "candidate_minus_baseline",
-    "confidence_interval_lower",
-    "confidence_interval_upper",
-    "interval_method",
+    "primary_interval_lower",
+    "primary_interval_upper",
+    "primary_interval_method",
+    "required_robustness_interval_lower",
+    "required_robustness_interval_upper",
+    "required_robustness_interval_method",
+    "positive_claim_interval_gate_passed",
+    "historical_percentile_interval_lower",
+    "historical_percentile_interval_upper",
     "replay_reset_variance",
 )
 _COMPLETION_CHECKS = (
@@ -77,9 +90,13 @@ _COMPLETION_CHECKS = (
     "factual_same_grasp_new_contact_and_calibration_are_reported_separately",
     "candidate_effects_use_equal_target_session_weighting",
     "effect_intervals_use_the_registered_resampling_unit_and_seed",
+    "bootstrap_t_is_the_registered_primary_effect_interval",
+    "student_t_robustness_may_veto_but_never_rescue_a_positive_claim",
+    "historical_percentile_interval_remains_sensitivity_only",
     "technical_failures_and_exclusion_reasons_are_retained",
     "coverage_interval_width_and_finite_calibration_sensitivity_are_reported",
     "intervention_oracle_remains_diagnostic_only",
+    "map_and_prior_twin_abduction_arms_remain_diagnostic_only",
     "positive_and_bounded_negative_narratives_are_both_renderable",
     "optional_branches_cannot_rescue_a_primary_failure",
     "claim_language_remains_inside_the_registered_boundary",
@@ -197,6 +214,85 @@ def _normalize_software(value: Any) -> dict[str, Any]:
     }
 
 
+def _normalize_interval_amendment(value: Any) -> dict[str, Any]:
+    binding = _mapping(value, name="interval amendment binding")
+    required = {
+        "repository_path",
+        "amendment_id",
+        "sha256",
+        "bytes",
+        "contract",
+        "operating_characteristic_evidence",
+    }
+    _require(set(binding) == required, "interval amendment binding fields changed")
+    _require(
+        binding.get("repository_path")
+        == REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH,
+        "interval amendment path changed",
+    )
+    contract = validate_real_analysis_interval_amendment(
+        _mapping(binding.get("contract"), name="interval amendment contract")
+    )
+    amendment_id = _hex_digest(
+        binding.get("amendment_id"),
+        name="interval amendment ID",
+        length=64,
+    )
+    _require(
+        amendment_id == contract["amendment_id"],
+        "interval amendment ID differs from its contract",
+    )
+    evidence = _mapping(
+        binding.get("operating_characteristic_evidence"),
+        name="interval operating-characteristic evidence",
+    )
+    _require(
+        set(evidence) == {"repository_path", "result_sha256", "sha256", "bytes"},
+        "interval evidence binding fields changed",
+    )
+    _require(
+        evidence.get("repository_path")
+        == REAL_ANALYSIS_INTERVAL_EVIDENCE_REPOSITORY_PATH,
+        "interval evidence path changed",
+    )
+    result_sha256 = _hex_digest(
+        evidence.get("result_sha256"),
+        name="interval evidence result SHA-256",
+        length=64,
+    )
+    _require(
+        result_sha256 == contract["operating_characteristic_evidence"]["result_sha256"],
+        "interval amendment binds different operating-characteristic evidence",
+    )
+    return {
+        "repository_path": REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH,
+        "amendment_id": amendment_id,
+        "sha256": _hex_digest(
+            binding.get("sha256"),
+            name="interval amendment file SHA-256",
+            length=64,
+        ),
+        "bytes": _positive_int(
+            binding.get("bytes"),
+            name="interval amendment byte count",
+        ),
+        "contract": contract,
+        "operating_characteristic_evidence": {
+            "repository_path": REAL_ANALYSIS_INTERVAL_EVIDENCE_REPOSITORY_PATH,
+            "result_sha256": result_sha256,
+            "sha256": _hex_digest(
+                evidence.get("sha256"),
+                name="interval evidence file SHA-256",
+                length=64,
+            ),
+            "bytes": _positive_int(
+                evidence.get("bytes"),
+                name="interval evidence byte count",
+            ),
+        },
+    }
+
+
 def _normalize_comparison_arms(value: Any) -> list[dict[str, Any]]:
     raw_arms = _sequence(value, name="comparison arms")
     _require(len(raw_arms) >= 3, "comparison arms are incomplete")
@@ -289,6 +385,28 @@ def _normalize_effect_reporting(value: Any) -> dict[str, Any]:
         type(confidence) in {int, float} and 0.0 < float(confidence) < 1.0,
         "bootstrap confidence level must be in (0, 1)",
     )
+    _require(
+        normalized.get("primary_interval_method") == "target_session_bootstrap_t",
+        "registered primary interval method changed",
+    )
+    _require(
+        normalized.get("required_robustness_interval_method") == "student_t_mean",
+        "registered robustness interval method changed",
+    )
+    _require(
+        normalized.get("historical_sensitivity_interval_method")
+        == "target_session_percentile_bootstrap",
+        "historical interval method changed",
+    )
+    _require(
+        normalized.get("positive_claim_interval_rule")
+        == "primary_and_required_robustness_lower_bounds_strictly_positive",
+        "positive-claim interval rule changed",
+    )
+    _require(
+        normalized.get("robustness_interval_may_rescue_primary_failure") is False,
+        "robustness interval may not rescue a primary failure",
+    )
     return normalized
 
 
@@ -303,6 +421,9 @@ def _normalize_contract(analysis: Mapping[str, Any]) -> dict[str, Any]:
         _require(analysis.get(name) is expected, f"registered analysis {name} changed")
 
     contract = {
+        "interval_amendment": _normalize_interval_amendment(
+            analysis.get("interval_amendment")
+        ),
         "comparison_arms": _normalize_comparison_arms(analysis.get("comparison_arms")),
         "effect_reporting": _normalize_effect_reporting(
             analysis.get("effect_reporting")
@@ -359,6 +480,15 @@ def _normalize_contract(analysis: Mapping[str, Any]) -> dict[str, Any]:
         )
         is True,
         "optional results may not rescue a primary failure",
+    )
+    _require(
+        reporting.get("positive_claim_requires_primary_and_robustness_intervals")
+        is True,
+        "positive claims require both registered intervals",
+    )
+    _require(
+        reporting.get("historical_percentile_interval_is_sensitivity_only") is True,
+        "historical percentile interval must remain sensitivity-only",
     )
     return contract
 
@@ -517,7 +647,9 @@ def _figure_plan(contract: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "required_series": [
                     "target_session",
                     "candidate_minus_baseline",
-                    "confidence_interval",
+                    "primary_bootstrap_t_interval",
+                    "required_student_t_robustness_interval",
+                    "historical_percentile_sensitivity_interval",
                 ],
                 "values": [],
                 "data_source": "registered blind analysis output",
@@ -578,6 +710,7 @@ def _narrative_plan() -> list[dict[str, Any]]:
                 "same-grasp transfer gate passed",
                 "new-contact transfer gate passed",
                 "independent-execution calibration gate passed",
+                "bootstrap-t and required Student-t effect gates passed",
                 "all failures and exclusions remain reported",
             ],
             "forbidden_claims": [
@@ -594,6 +727,7 @@ def _narrative_plan() -> list[dict[str, Any]]:
             "required_statements": [
                 "failed prediction or transfer gates are identified separately",
                 "calibration does not rescue a failed prediction gate",
+                "Student-t robustness cannot rescue a failed bootstrap-t gate",
                 "all failures and exclusions remain reported",
                 "the measured transfer or calibration boundary is quantified",
                 "no target-informed retuning is performed",

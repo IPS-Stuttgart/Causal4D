@@ -15,6 +15,18 @@ from causal4d.execution_block_calibration import (
     EXECUTION_BLOCK_CALIBRATION_UNIT,
     EXECUTION_BLOCK_SCORE_KIND,
 )
+from causal4d.real_analysis_interval_amendment import (
+    REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH,
+    REAL_ANALYSIS_INTERVAL_EVIDENCE_REPOSITORY_PATH,
+    bind_repository_interval_amendment,
+    expected_real_analysis_interval_amendment,
+    validate_real_analysis_interval_amendment,
+)
+from causal4d.real_analysis_intervals import (
+    REAL_EFFECT_BOOTSTRAP_REPLICATES,
+    REAL_EFFECT_BOOTSTRAP_SEED,
+    REAL_EFFECT_CONFIDENCE_LEVEL,
+)
 from causal4d.real_experiment_freeze import (
     DIAGNOSTIC_ONLY_ANALYSIS_ENTRYPOINTS,
     MILESTONE_ID,
@@ -25,7 +37,7 @@ from causal4d.real_experiment_freeze import (
 )
 from causal4d.real_protocol import load_protocol, validate_protocol
 
-REGISTERED_ANALYSIS_SCHEMA_VERSION: Final = 2
+REGISTERED_ANALYSIS_SCHEMA_VERSION: Final = 3
 REGISTERED_ANALYSIS_ARTIFACT_KIND: Final = "Causal4DRegisteredRealAnalysisManifest"
 REGISTERED_ANALYSIS_STATUS: Final = "sealed"
 EXPECTED_PROTOCOL_ID: Final = "causal4d-sloth-multi-action-v1"
@@ -36,9 +48,9 @@ EXPECTED_PREACQUISITION_SHA256: Final = (
     "0e167538a7824e5ec053031d8359d4e9b4ff89ad61a85666400a86c2a88ac42f"
 )
 EXPECTED_OBJECT_ID: Final = "sloth_plush_instance_1"
-BOOTSTRAP_REPLICATES: Final = 20_000
-BOOTSTRAP_SEED: Final = 20_260_726
-BOOTSTRAP_CONFIDENCE_LEVEL: Final = 0.95
+BOOTSTRAP_REPLICATES: Final = REAL_EFFECT_BOOTSTRAP_REPLICATES
+BOOTSTRAP_SEED: Final = REAL_EFFECT_BOOTSTRAP_SEED
+BOOTSTRAP_CONFIDENCE_LEVEL: Final = REAL_EFFECT_CONFIDENCE_LEVEL
 
 _TOP_LEVEL_FIELDS = frozenset(
     {
@@ -53,6 +65,7 @@ _TOP_LEVEL_FIELDS = frozenset(
         "protocol_design_sha256",
         "preacquisition_amendment_sha256",
         "method_freeze_sha256",
+        "interval_amendment",
         "software",
         "primary_analysis_locked",
         "locked_before_target_access",
@@ -103,6 +116,18 @@ _COMPARISON_ARMS = [
         "realized_intervention_inference": True,
     },
     {
+        "arm_id": "causal4d_map_joint_component",
+        "role": "diagnostic_only",
+        "twin_uncertainty": "single_joint_component",
+        "realized_intervention_inference": "joint_map",
+    },
+    {
+        "arm_id": "causal4d_z_with_prior_twin",
+        "role": "diagnostic_only",
+        "twin_uncertainty": "prior_parameter_weights",
+        "realized_intervention_inference": True,
+    },
+    {
         "arm_id": "intervention_oracle",
         "role": "diagnostic_only",
         "twin_uncertainty": True,
@@ -116,7 +141,7 @@ _EXPECTED_ENDPOINT_INVENTORY = [
         "registered_units": 36,
         "target_sessions": 18,
         "primary_estimate": "equal_target_session_mean_candidate_minus_baseline",
-        "interval_method": "target_session_percentile_bootstrap",
+        "interval_method": "target_session_bootstrap_t",
     },
     {
         "endpoint_id": "same_grasp_transfer",
@@ -124,7 +149,7 @@ _EXPECTED_ENDPOINT_INVENTORY = [
         "registered_units": 18,
         "target_sessions": 18,
         "primary_estimate": "equal_target_session_mean_candidate_minus_baseline",
-        "interval_method": "target_session_percentile_bootstrap",
+        "interval_method": "target_session_bootstrap_t",
     },
     {
         "endpoint_id": "new_contact_transfer",
@@ -132,7 +157,7 @@ _EXPECTED_ENDPOINT_INVENTORY = [
         "registered_units": 12,
         "target_sessions": 12,
         "primary_estimate": "equal_target_session_mean_candidate_minus_baseline",
-        "interval_method": "target_session_percentile_bootstrap",
+        "interval_method": "target_session_bootstrap_t",
     },
 ]
 _EFFECT_REPORTING = {
@@ -141,6 +166,13 @@ _EFFECT_REPORTING = {
     "bootstrap_replicates": BOOTSTRAP_REPLICATES,
     "bootstrap_seed": BOOTSTRAP_SEED,
     "confidence_level": BOOTSTRAP_CONFIDENCE_LEVEL,
+    "primary_interval_method": "target_session_bootstrap_t",
+    "required_robustness_interval_method": "student_t_mean",
+    "historical_sensitivity_interval_method": ("target_session_percentile_bootstrap"),
+    "positive_claim_interval_rule": (
+        "primary_and_required_robustness_lower_bounds_strictly_positive"
+    ),
+    "robustness_interval_may_rescue_primary_failure": False,
     "execution_mean_role": "diagnostic_only",
     "endpoint_inventory": _EXPECTED_ENDPOINT_INVENTORY,
 }
@@ -168,6 +200,8 @@ _REPORTING_CONTRACT = {
     "report_all_36_executions_or_preregistered_exclusions": True,
     "report_independent_execution_calibration": True,
     "report_effect_intervals_and_replay_reset_variance": True,
+    "positive_claim_requires_primary_and_robustness_intervals": True,
+    "historical_percentile_interval_is_sensitivity_only": True,
     "optional_semantic_or_public_data_results_cannot_rescue_primary_failure": True,
     "factual_same_grasp_new_contact_and_calibration_reported_separately": True,
     "calibration_cannot_rescue_failed_prediction_gates": True,
@@ -220,6 +254,98 @@ def _sha(value: Any, *, name: str, length: int) -> str:
         f"{name} must be a lowercase {length}-hex digest",
     )
     return value
+
+
+def _interval_amendment_binding(value: Any) -> dict[str, Any]:
+    binding = _mapping(value, name="interval amendment binding")
+    expected_fields = {
+        "repository_path",
+        "amendment_id",
+        "sha256",
+        "bytes",
+        "contract",
+        "operating_characteristic_evidence",
+    }
+    _require_equal(
+        set(binding),
+        expected_fields,
+        name="interval amendment binding fields",
+    )
+    _require_equal(
+        binding.get("repository_path"),
+        REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH,
+        name="interval amendment path",
+    )
+    contract = validate_real_analysis_interval_amendment(
+        _mapping(binding.get("contract"), name="interval amendment contract")
+    )
+    amendment_id = _sha(
+        binding.get("amendment_id"),
+        name="interval amendment ID",
+        length=64,
+    )
+    _require_equal(
+        amendment_id,
+        contract["amendment_id"],
+        name="interval amendment ID",
+    )
+    digest = _sha(
+        binding.get("sha256"),
+        name="interval amendment SHA-256",
+        length=64,
+    )
+    byte_count = binding.get("bytes")
+    _require(
+        type(byte_count) is int and byte_count > 0,
+        "interval amendment byte count must be a positive integer",
+    )
+    evidence = _mapping(
+        binding.get("operating_characteristic_evidence"),
+        name="interval operating-characteristic evidence binding",
+    )
+    _require_equal(
+        set(evidence),
+        {"repository_path", "result_sha256", "sha256", "bytes"},
+        name="interval evidence binding fields",
+    )
+    _require_equal(
+        evidence.get("repository_path"),
+        REAL_ANALYSIS_INTERVAL_EVIDENCE_REPOSITORY_PATH,
+        name="interval evidence path",
+    )
+    evidence_result = _sha(
+        evidence.get("result_sha256"),
+        name="interval evidence result SHA-256",
+        length=64,
+    )
+    _require_equal(
+        evidence_result,
+        contract["operating_characteristic_evidence"]["result_sha256"],
+        name="interval evidence result SHA-256",
+    )
+    evidence_digest = _sha(
+        evidence.get("sha256"),
+        name="interval evidence file SHA-256",
+        length=64,
+    )
+    evidence_bytes = evidence.get("bytes")
+    _require(
+        type(evidence_bytes) is int and evidence_bytes > 0,
+        "interval evidence byte count must be a positive integer",
+    )
+    return {
+        "repository_path": REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH,
+        "amendment_id": amendment_id,
+        "sha256": digest,
+        "bytes": byte_count,
+        "contract": contract,
+        "operating_characteristic_evidence": {
+            "repository_path": REAL_ANALYSIS_INTERVAL_EVIDENCE_REPOSITORY_PATH,
+            "result_sha256": evidence_result,
+            "sha256": evidence_digest,
+            "bytes": evidence_bytes,
+        },
+    }
 
 
 def _utc_timestamp(value: Any, *, name: str) -> str:
@@ -300,14 +426,18 @@ def _endpoint_inventory(protocol: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "primary_estimate": (
                     "equal_target_session_mean_candidate_minus_baseline"
                 ),
-                "interval_method": "target_session_percentile_bootstrap",
+                "interval_method": "target_session_bootstrap_t",
             }
         )
     _require_equal(inventory, _EXPECTED_ENDPOINT_INVENTORY, name="endpoint inventory")
     return inventory
 
 
-def _validate_freeze_contract(freeze: Mapping[str, Any]) -> Mapping[str, Any]:
+def _validate_freeze_contract(
+    freeze: Mapping[str, Any],
+    *,
+    interval_amendment_binding: Mapping[str, Any],
+) -> Mapping[str, Any]:
     _require_equal(
         freeze.get("schema_version"),
         METHOD_FREEZE_SCHEMA_VERSION,
@@ -315,6 +445,11 @@ def _validate_freeze_contract(freeze: Mapping[str, Any]) -> Mapping[str, Any]:
     )
     _require_equal(freeze.get("milestone_id"), MILESTONE_ID, name="milestone")
     _require_equal(freeze.get("status"), "sealed", name="method-freeze status")
+    _require_equal(
+        _interval_amendment_binding(freeze.get("interval_amendment")),
+        _interval_amendment_binding(interval_amendment_binding),
+        name="method freeze interval amendment",
+    )
     analysis = _mapping(freeze.get("analysis_contract"), name="analysis contract")
     _require_equal(
         analysis.get("entrypoints"),
@@ -330,6 +465,25 @@ def _validate_freeze_contract(freeze: Mapping[str, Any]) -> Mapping[str, Any]:
         analysis.get("allowed_observation_prefix_frames"),
         6,
         name="observation prefix",
+    )
+    interval_amendment = validate_real_analysis_interval_amendment(
+        _mapping(
+            expected_real_analysis_interval_amendment(),
+            name="expected interval amendment",
+        )
+    )
+    _require_equal(
+        analysis.get("effect_interval"),
+        {
+            "amendment_path": (REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH),
+            "amendment_id": interval_amendment["amendment_id"],
+            "primary_method": "target_session_bootstrap_t",
+            "required_robustness_method": "student_t_mean",
+            "historical_sensitivity_method": ("target_session_percentile_bootstrap"),
+            "positive_claim_requires_both_lower_bounds_positive": True,
+            "robustness_may_rescue_primary_failure": False,
+        },
+        name="effect interval",
     )
     _require_equal(
         analysis.get("confirmatory_calibration"),
@@ -354,6 +508,7 @@ def build_registered_real_analysis_manifest(
     method_freeze: Mapping[str, Any],
     *,
     method_freeze_sha256: str,
+    interval_amendment_binding: Mapping[str, Any],
     registered_by: str,
     registered_at_utc: str | None = None,
 ) -> dict[str, Any]:
@@ -369,7 +524,11 @@ def build_registered_real_analysis_manifest(
     object_record = _mapping(protocol.get("object"), name="protocol object")
     _require_equal(object_record.get("object_id"), EXPECTED_OBJECT_ID, name="object")
     _sha(method_freeze_sha256, name="method freeze SHA-256", length=64)
-    _validate_freeze_contract(method_freeze)
+    interval_amendment = _interval_amendment_binding(interval_amendment_binding)
+    _validate_freeze_contract(
+        method_freeze,
+        interval_amendment_binding=interval_amendment,
+    )
     protocol_record = _mapping(method_freeze.get("protocol"), name="freeze protocol")
     preacquisition = _mapping(
         method_freeze.get("preacquisition"),
@@ -420,6 +579,7 @@ def build_registered_real_analysis_manifest(
         "protocol_design_sha256": EXPECTED_PROTOCOL_DESIGN_SHA256,
         "preacquisition_amendment_sha256": EXPECTED_PREACQUISITION_SHA256,
         "method_freeze_sha256": method_freeze_sha256,
+        "interval_amendment": interval_amendment,
         "software": {
             "causal4d_commit_sha": _sha(
                 causal4d.get("commit_sha"),
@@ -494,6 +654,7 @@ def validate_registered_real_analysis_manifest(
     )
     if expected_method_freeze_sha256 is not None:
         _require_equal(method_sha, expected_method_freeze_sha256, name="freeze digest")
+    _interval_amendment_binding(values["interval_amendment"])
 
     software = _mapping(values["software"], name="software")
     _require_equal(
@@ -591,10 +752,12 @@ def seal_registered_real_analysis_manifest(
     freeze = load_strict_json_object(freeze_snapshot.payload, name="method freeze")
     validate_method_freeze_manifest(freeze, root, verify_files=True)
     validate_repository_checkout(freeze, root)
+    interval_amendment = bind_repository_interval_amendment(root)
     manifest = build_registered_real_analysis_manifest(
         protocol,
         freeze,
         method_freeze_sha256=freeze_snapshot.sha256,
+        interval_amendment_binding=interval_amendment,
         registered_by=registered_by,
         registered_at_utc=registered_at_utc,
     )
@@ -607,6 +770,8 @@ def seal_registered_real_analysis_manifest(
         "sha256": snapshot.sha256,
         "bytes": snapshot.byte_count,
         "method_freeze_sha256": freeze_snapshot.sha256,
+        "interval_amendment_id": interval_amendment["amendment_id"],
+        "interval_amendment_sha256": interval_amendment["sha256"],
         "target_outcomes_used": False,
     }
 
@@ -638,6 +803,12 @@ def validate_registered_real_analysis_sources(
         ),
         expected_method_freeze_sha256=freeze_snapshot.sha256,
     )
+    interval_amendment = bind_repository_interval_amendment(root)
+    _require_equal(
+        manifest["interval_amendment"],
+        interval_amendment,
+        name="interval amendment binding",
+    )
     _require_equal(
         manifest["software"]["causal4d_commit_sha"],
         freeze["causal4d"]["commit_sha"],
@@ -654,6 +825,8 @@ def validate_registered_real_analysis_sources(
         "analysis_manifest_sha256": manifest_sha,
         "analysis_manifest_bytes": manifest_bytes,
         "method_freeze_sha256": freeze_snapshot.sha256,
+        "interval_amendment_id": interval_amendment["amendment_id"],
+        "interval_amendment_sha256": interval_amendment["sha256"],
         "target_outcomes_used": False,
     }
 

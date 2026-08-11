@@ -108,6 +108,13 @@ with probability `25.29%`; the gain comes from marginalization, not a claim
 that the real attachment was recovered. Controlled tests with known latent
 interventions verify recovery directly.
 
+The factual evaluator also reports two diagnostic-only arms. The first predicts
+with the maximum-posterior joint `(z, theta)` component. The second keeps the
+inferred intervention marginal but restores the original physical-parameter
+weights. These arms distinguish posterior marginalization from MAP selection
+and intervention inference from physical-twin updating. They cannot replace or
+rescue the frozen posterior-mixture Causal4D primary candidate.
+
 ## Counterfactual operator
 
 The operator implements the three causal steps explicitly:
