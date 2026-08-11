@@ -6,7 +6,7 @@ import hashlib
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, BinaryIO, ClassVar, Literal, Mapping, Sequence
+from typing import Any, BinaryIO, Callable, ClassVar, Literal, Mapping, Sequence, cast
 
 import numpy as np
 
@@ -89,7 +89,7 @@ def _require_integer(value: Any, *, name: str, minimum: int = 0) -> int:
 def _require_finite_json_number(value: Any, *, name: str) -> int | float:
     if type(value) not in {int, float} or not np.isfinite(value):
         raise ValueError(f"{name} must be a finite JSON number")
-    return value
+    return cast(int | float, value)
 
 
 def _validated_string_tuple(
@@ -150,7 +150,7 @@ def _validated_weights(values: np.ndarray, *, name: str) -> np.ndarray:
         raise ValueError(f"{name} must be finite and nonnegative")
     if not np.isclose(np.sum(weights), 1.0, atol=1e-10, rtol=1e-10):
         raise ValueError(f"{name} must sum to one")
-    return weights
+    return cast(np.ndarray, weights)
 
 
 @dataclass(frozen=True)
@@ -1073,7 +1073,11 @@ def save_contract(
     arrays = artifact._array_payload()
 
     def write_archive(handle: BinaryIO) -> None:
-        np.savez_compressed(
+        # NumPy's stubs reserve ``allow_pickle`` as a Boolean keyword, while
+        # the runtime accepts arbitrary named archive members through ``**kwds``.
+        # Contract array names are schema-locked and cannot use that reserved name.
+        savez_compressed = cast(Callable[..., None], np.savez_compressed)
+        savez_compressed(
             handle,
             descriptor_json=np.asarray(
                 json.dumps(descriptor, sort_keys=True, separators=(",", ":"))

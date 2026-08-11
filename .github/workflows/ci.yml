@@ -96,6 +96,7 @@ jobs:
             src/causal4d/api/v1.py \
             src/causal4d/provider_contract.py \
             src/causal4d/replay_provider_contract.py
+          python scripts/ci/run_stable_core_mypy.py
 
   core:
     name: Core-only / Python ${{ matrix.python-version }}

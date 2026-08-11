@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import numpy as np
 
@@ -143,7 +143,10 @@ def physical_readout_components(
     """Return state rollouts plus delta without modifying simulator trajectories."""
 
     discrepancy, _ = _belief_readout(bank, belief)
-    return bank.trajectories.astype(float) + discrepancy[None, :, None]
+    return cast(
+        np.ndarray,
+        bank.trajectories.astype(float) + discrepancy[None, :, None],
+    )
 
 
 def _grouped_diagnostics_summary(
@@ -250,7 +253,7 @@ def _posterior_weights_from_grouped_evidence_batched(
 
     for start in range(0, component_count, component_batch_size):
         stop = min(start + component_batch_size, component_count)
-        flat_indices = np.arange(start, stop, dtype=np.int64)
+        flat_indices: np.ndarray = np.arange(start, stop, dtype=np.int64)
         hypothesis_indices = flat_indices // particle_count
         particle_indices = flat_indices % particle_count
         components = trajectories[hypothesis_indices, particle_indices].astype(float)
@@ -584,13 +587,13 @@ def abduct_factual_intervention(
     kappa = []
     hypothesis_indices = []
     particle_indices = []
-    for hypothesis_index, (hypothesis_id, metadata) in enumerate(
+    for hypothesis_index, (hypothesis_id, hypothesis_metadata) in enumerate(
         zip(bank.hypothesis_ids, bank.hypothesis_metadata, strict=True)
     ):
-        action = metadata["action"]
+        action = hypothesis_metadata["action"]
         if not bool(action["future_action_observed"]):
             raise ValueError("factual abduction requires the observed u_obs action")
-        contact = metadata["contact"]
+        contact = hypothesis_metadata["contact"]
         persistent = (
             float(contact["gain_multiplier"]),
             float(contact["delay_steps"]),
@@ -661,7 +664,7 @@ def factual_joint_weights(
         factual.twin_particle_indices >= particle_count
     ):
         raise ValueError("factual support exceeds the requested rollout bank")
-    result = np.zeros((hypothesis_count, particle_count), dtype=float)
+    result: np.ndarray = np.zeros((hypothesis_count, particle_count), dtype=float)
     np.add.at(
         result,
         (factual.hypothesis_indices, factual.twin_particle_indices),

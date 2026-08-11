@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Hashable, Sequence
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
 import numpy as np
 
@@ -68,7 +68,7 @@ def _conditional_hypothesis_prior_weights(
         denominator = denominators[key]
         if denominator > 0.0:
             conditional[index] = priors[index] / denominator
-    return conditional
+    return cast(np.ndarray, conditional)
 
 
 def _validate_factual_context(
@@ -95,13 +95,13 @@ def _validated_query_node_indices(
     node_count: int,
 ) -> np.ndarray:
     if query.query_node_indices is None:
-        return np.arange(node_count, dtype=np.int64)
+        return cast(np.ndarray, np.arange(node_count, dtype=np.int64))
     nodes = np.asarray(query.query_node_indices, dtype=np.int64)
     if np.any(nodes >= node_count):
         raise ValueError("query_node_indices exceed the rollout-bank node count")
     if len(np.unique(nodes)) != len(nodes):
         raise ValueError("query_node_indices must not contain duplicates")
-    return nodes
+    return cast(np.ndarray, nodes)
 
 
 def _validate_query_bank(
@@ -297,19 +297,19 @@ def apply_counterfactual_operator(
         bank.coordinate_count,
     )
     readout = physical_readout_components(bank, belief).reshape(state.shape)
-    hypothesis_indices = np.repeat(
+    hypothesis_indices: np.ndarray = np.repeat(
         np.arange(len(bank.hypothesis_ids), dtype=np.int64),
         len(bank.parameter_weights),
     )
-    particle_indices = np.tile(
+    particle_indices: np.ndarray = np.tile(
         np.arange(len(bank.parameter_weights), dtype=np.int64),
         len(bank.hypothesis_ids),
     )
-    phi_by_hypothesis = np.asarray(
+    phi_by_hypothesis: np.ndarray = np.asarray(
         [_phi_from_metadata(value) for value in bank.hypothesis_metadata],
         dtype=float,
     )
-    kappa_by_hypothesis = np.asarray(
+    kappa_by_hypothesis: np.ndarray = np.asarray(
         [_kappa_from_metadata(value) for value in bank.hypothesis_metadata],
         dtype=float,
     )
@@ -459,4 +459,7 @@ def physical_posterior_mean(
     values = (
         posterior.readout_trajectories_m if readout else posterior.state_trajectories_m
     )
-    return np.einsum("k,ktnc->tnc", posterior.weights, values)
+    return cast(
+        np.ndarray,
+        np.einsum("k,ktnc->tnc", posterior.weights, values),
+    )
