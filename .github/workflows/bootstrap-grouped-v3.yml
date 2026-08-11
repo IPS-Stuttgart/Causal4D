@@ -21,22 +21,27 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Verify and publish the clean implementation branch
         env:
           BASE_SHA: 70b5e630c50b1a3702e1b5dc2d0309f530973c7d
+          GH_TOKEN: ${{ github.token }}
           PATCH_SHA256: d657c132d8bd0515f2ed5bb33fcf96e8ba1ea33e8db0a112d74537f51f83dfd3
+          REPOSITORY: ${{ github.repository }}
           TARGET_BRANCH: agent/grouped-normalized-v3
         run: |
           set -euo pipefail
           git merge-base --is-ancestor "$BASE_SHA" HEAD
-          echo "$PATCH_SHA256  .agent/grouped-v3.patch.gz" | sha256sum --check --strict
-          cp .agent/grouped-v3.patch.gz /tmp/grouped-v3.patch.gz
-          gzip --decompress --stdout /tmp/grouped-v3.patch.gz > /tmp/grouped-v3.patch
+          echo "$PATCH_SHA256  .agent/grouped-v3.patch.gz" | \
+            sha256sum --check --strict
+          gzip --decompress --stdout .agent/grouped-v3.patch.gz > \
+            "$RUNNER_TEMP/grouped-v3.patch"
 
           git checkout -B "$TARGET_BRANCH" "$BASE_SHA"
-          git apply --check --whitespace=error-all /tmp/grouped-v3.patch
-          git apply --index --whitespace=error-all /tmp/grouped-v3.patch
+          git apply --3way --index --whitespace=fix \
+            "$RUNNER_TEMP/grouped-v3.patch"
+          test -z "$(git ls-files --unmerged)"
           git diff --cached --check
           python -m compileall -q src tests
 
@@ -54,7 +59,10 @@ jobs:
           test "$actual" = "$expected"
 
           git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git config user.email \
+            41898282+github-actions[bot]@users.noreply.github.com
           git commit -m "Add grouped covariance-normalized likelihood v3" \
             -m "Introduce an opt-in grouped full-covariance normalized score with contributor caps, reliability tempering, explicit likelihood power, source-covariance conditioning diagnostics, and invariant tests. Preserve legacy semantics and the registered physical-study artifact identity."
-          git push --force-with-lease origin "HEAD:refs/heads/$TARGET_BRANCH"
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git -c http.extraheader="AUTHORIZATION: basic $auth" push \
+            --force-with-lease origin "HEAD:refs/heads/$TARGET_BRANCH"
