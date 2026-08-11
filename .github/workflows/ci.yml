@@ -88,6 +88,12 @@ jobs:
             src/causal4d/immutable_array.py \
             src/causal4d/immutable_json.py \
             src/causal4d/low_rank_numerics.py \
+            src/causal4d/contracts.py \
+            src/causal4d/counterfactual.py \
+            src/causal4d/grouped_likelihood.py \
+            src/causal4d/intervention_abduction.py \
+            src/causal4d/observation_evidence.py \
+            src/causal4d/api/v1.py \
             src/causal4d/provider_contract.py \
             src/causal4d/replay_provider_contract.py
 
