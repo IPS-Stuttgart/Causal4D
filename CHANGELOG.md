@@ -4,6 +4,15 @@
 
 ### Added
 
+- Formalize the Causal4D structural causal model, transport assumptions,
+  contact-policy semantics, cross-world coupling requirements, and the boundary
+  between controlled counterfactuals and repeated real interventions.
+- Add a content-addressed, analysis-only interventional-contrast posterior for
+  coupled `Q(left) - Q(right)` queries. Automatic same-grasp and new-contact
+  couplings preserve both source posterior marginals, readout-error correlation
+  remains explicit, and non-pickled artifacts fail closed on lineage, support,
+  dtype, inventory, and identity drift.
+
 - Register two diagnostic factual-abduction arms: the maximum-posterior joint
   intervention/twin component and the inferred intervention marginal combined
   with the untouched physical-parameter prior. They separate MAP selection,
