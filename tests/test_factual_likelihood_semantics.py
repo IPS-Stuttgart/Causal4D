@@ -275,6 +275,8 @@ def test_normalized_v2_evaluation_records_effective_model() -> None:
         ("degrees_of_freedom", np.inf),
         ("difference_correlation", np.nan),
         ("difference_correlation", 1.0),
+        ("grouped_covariance_condition_number_limit", np.nan),
+        ("grouped_covariance_condition_number_limit", 0.5),
     ],
 )
 def test_factual_abduction_config_rejects_nonfinite_or_invalid_values(
@@ -283,6 +285,11 @@ def test_factual_abduction_config_rejects_nonfinite_or_invalid_values(
 ) -> None:
     with pytest.raises(ValueError):
         FactualAbductionConfig(**{keyword: value})
+
+
+def test_factual_abduction_config_rejects_unknown_grouped_semantics() -> None:
+    with pytest.raises(ValueError, match="unsupported grouped likelihood semantics"):
+        FactualAbductionConfig(grouped_likelihood_semantics="unknown")
 
 
 def test_difference_correlation_requires_normalized_v2() -> None:
@@ -333,3 +340,90 @@ def test_cli_defaults_to_legacy_and_exposes_normalized_v2() -> None:
     assert default.difference_correlation == 0.0
     assert normalized.likelihood_semantics == "normalized_v2"
     assert normalized.difference_correlation == 0.25
+
+
+def test_grouped_normalized_v3_records_effective_model_and_diagnostics() -> None:
+    bank, belief, observations, mask, _ = _registered_problem()
+    grouped = GroupedObservationEvidence.from_dense_prefix(
+        observations,
+        prefix_frame_count=4,
+        scale_m=0.001,
+        mask=mask,
+        source_id="unit",
+    )
+    config = FactualAbductionConfig(
+        observation_scale_m=0.001,
+        likelihood_power=12.0,
+        grouped_likelihood_semantics="normalized_v3",
+    )
+
+    factual = abduct_factual_intervention(
+        bank,
+        belief,
+        observations,
+        prefix_frame_count=4,
+        observation_mask=mask,
+        config=config,
+        grouped_evidence=grouped,
+    )
+    result = evaluate_factual_abduction(
+        bank,
+        belief,
+        factual,
+        observations,
+        observation_mask=mask,
+        prefix_frame_count=4,
+        config=config,
+        grouped_evidence=grouped,
+    )
+
+    assert result["evidence_model"] == "grouped_normalized_v3"
+    assert factual.metadata["abduction_likelihood"] == {
+        "observation_scale_m": 0.001,
+        "likelihood_power": 12.0,
+        "dynamic_likelihood_weight": 0.25,
+        "degrees_of_freedom": 4.0,
+        "grouped_likelihood_semantics": "normalized_v3",
+        "grouped_covariance_condition_number_limit": 1.0e12,
+    }
+    diagnostics = factual.metadata["grouped_observation_evidence"]["diagnostics"]
+    assert diagnostics["score_semantics"] == "normalized_coordinate_mean_v3"
+    assert diagnostics["likelihood_power"] == 12.0
+    assert np.isclose(sum(diagnostics["normalization_coordinate_fractions"]), 1.0)
+
+
+def test_grouped_normalized_v3_requires_grouped_evidence() -> None:
+    bank, belief, observations, mask, _ = _registered_problem()
+
+    with pytest.raises(ValueError, match="requires grouped observation evidence"):
+        abduct_factual_intervention(
+            bank,
+            belief,
+            observations,
+            prefix_frame_count=4,
+            observation_mask=mask,
+            config=FactualAbductionConfig(
+                grouped_likelihood_semantics="normalized_v3"
+            ),
+        )
+
+
+def test_cli_exposes_grouped_normalized_v3_separately() -> None:
+    parsed = build_parser().parse_args(
+        [
+            "bank",
+            "belief",
+            "data",
+            "factual",
+            "evaluation",
+            "--grouped-observation-likelihood",
+            "--grouped-likelihood-semantics",
+            "normalized_v3",
+            "--grouped-covariance-condition-number-limit",
+            "1000000",
+        ]
+    )
+
+    assert parsed.likelihood_semantics == "legacy_v1"
+    assert parsed.grouped_likelihood_semantics == "normalized_v3"
+    assert parsed.grouped_covariance_condition_number_limit == 1.0e6

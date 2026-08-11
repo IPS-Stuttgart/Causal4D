@@ -22,6 +22,7 @@ from causal4d.rollout_bank import JointRolloutBank
 
 
 DenseLikelihoodSemantics = Literal["legacy_v1", "normalized_v2"]
+GroupedLikelihoodSemantics = Literal["legacy_v1", "normalized_v3"]
 
 
 @dataclass(frozen=True)
@@ -30,7 +31,10 @@ class FactualAbductionConfig:
 
     ``legacy_v1`` preserves the registered dense score exactly. ``normalized_v2``
     is an opt-in development path that uses the endpoint-inclusive, scale-normalized
-    prefix likelihood. The legacy defaults remain unchanged.
+    prefix likelihood. ``grouped_likelihood_semantics`` independently controls the
+    full-covariance grouped path; ``normalized_v3`` is a contributor-capped,
+    coordinate-normalized development comparator. All legacy defaults remain
+    unchanged.
     """
 
     observation_scale_m: float = 0.01
@@ -39,6 +43,8 @@ class FactualAbductionConfig:
     degrees_of_freedom: float = 4.0
     likelihood_semantics: DenseLikelihoodSemantics = "legacy_v1"
     difference_correlation: float = 0.0
+    grouped_likelihood_semantics: GroupedLikelihoodSemantics = "legacy_v1"
+    grouped_covariance_condition_number_limit: float = 1.0e12
 
     def __post_init__(self) -> None:
         positive = (
@@ -58,6 +64,16 @@ class FactualAbductionConfig:
             raise ValueError("dynamic_likelihood_weight must be finite and nonnegative")
         if self.likelihood_semantics not in {"legacy_v1", "normalized_v2"}:
             raise ValueError("unsupported dense likelihood semantics")
+        if self.grouped_likelihood_semantics not in {"legacy_v1", "normalized_v3"}:
+            raise ValueError("unsupported grouped likelihood semantics")
+        if (
+            not np.isfinite(self.grouped_covariance_condition_number_limit)
+            or self.grouped_covariance_condition_number_limit < 1.0
+        ):
+            raise ValueError(
+                "grouped covariance condition-number limit must be finite and at "
+                "least one"
+            )
         if not np.isfinite(self.difference_correlation) or not (
             -1.0 < self.difference_correlation < 1.0
         ):
@@ -82,6 +98,13 @@ class FactualAbductionConfig:
         if self.likelihood_semantics != "legacy_v1":
             result["likelihood_semantics"] = self.likelihood_semantics
             result["difference_correlation"] = self.difference_correlation
+        if self.grouped_likelihood_semantics != "legacy_v1":
+            result["grouped_likelihood_semantics"] = (
+                self.grouped_likelihood_semantics
+            )
+            result["grouped_covariance_condition_number_limit"] = (
+                self.grouped_covariance_condition_number_limit
+            )
         return result
 
 
@@ -125,7 +148,7 @@ def _grouped_diagnostics_summary(
 ) -> dict[str, Any]:
     responsibilities = np.asarray(diagnostics.nominal_responsibilities, dtype=float)
     reduction_axes = tuple(range(responsibilities.ndim - 1))
-    return {
+    result: dict[str, Any] = {
         "group_ids": list(diagnostics.group_ids),
         "effective_group_weights": list(diagnostics.effective_group_weights),
         "mean_nominal_responsibility_by_group": np.mean(
@@ -135,6 +158,29 @@ def _grouped_diagnostics_summary(
             responsibilities, axis=reduction_axes
         ).tolist(),
     }
+    if diagnostics.score_semantics != "legacy_sum_v1":
+        result.update(
+            {
+                "score_semantics": diagnostics.score_semantics,
+                "likelihood_power": diagnostics.likelihood_power,
+                "contributor_power_caps": list(
+                    diagnostics.contributor_power_caps
+                ),
+                "group_coordinate_counts": list(
+                    diagnostics.group_coordinate_counts
+                ),
+                "normalization_coordinate_mass": (
+                    diagnostics.normalization_coordinate_mass
+                ),
+                "source_covariance_condition_numbers": list(
+                    diagnostics.source_covariance_condition_numbers
+                ),
+                "normalization_coordinate_fractions": list(
+                    diagnostics.normalization_coordinate_fractions
+                ),
+            }
+        )
+    return result
 
 
 def _update_joint_weights(
@@ -152,6 +198,11 @@ def _update_joint_weights(
         raise ValueError(
             "normalized_v2 cannot be combined with grouped observation evidence"
         )
+    if (
+        grouped_evidence is None
+        and settings.grouped_likelihood_semantics != "legacy_v1"
+    ):
+        raise ValueError("normalized_v3 requires grouped observation evidence")
     discrepancy, discrepancy_variance = _belief_readout(bank, belief)
     if grouped_evidence is None:
         if settings.likelihood_semantics == "legacy_v1":
@@ -191,12 +242,22 @@ def _update_joint_weights(
         discrepancy_variance[None, :, None], components.shape
     )
     prior = bank.prior_joint_weights if base_weights is None else base_weights
+    normalized_grouped = settings.grouped_likelihood_semantics == "normalized_v3"
     return posterior_weights_from_grouped_evidence(
         prior,
         components,
         grouped_evidence,
         prefix_frame_count=prefix_frame_count,
         component_variance_m2=component_variance,
+        score_semantics=(
+            "normalized_coordinate_mean_v3"
+            if normalized_grouped
+            else "legacy_sum_v1"
+        ),
+        likelihood_power=settings.likelihood_power if normalized_grouped else 1.0,
+        max_source_covariance_condition_number=(
+            settings.grouped_covariance_condition_number_limit
+        ),
     )
 
 
@@ -467,7 +528,11 @@ def evaluate_factual_abduction(
         "abduction_prefix_frame_count_including_endpoint": prefix_frame_count,
         "held_out_rollout_interval": [prefix_frame_count, bank.frame_count],
         "evidence_model": (
-            "grouped_robust_composite"
+            (
+                "grouped_normalized_v3"
+                if settings.grouped_likelihood_semantics == "normalized_v3"
+                else "grouped_robust_composite"
+            )
             if grouped_evidence is not None
             else (
                 "legacy_dense"

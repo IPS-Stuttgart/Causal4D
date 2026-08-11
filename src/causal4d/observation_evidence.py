@@ -250,12 +250,31 @@ class GroupedObservationEvidence:
         return result
 
     @property
-    def effective_group_weights(self) -> tuple[float, ...]:
+    def contributor_power_caps(self) -> tuple[float, ...]:
+        """Return duplicate-evidence caps before source reliability weighting.
+
+        The cap is one over the largest contributor multiplicity in each group.
+        Keeping it separate from ``composite_weight`` lets normalized composite
+        scores preserve both duplicate invariance and source-calibrated
+        reliability temperatures.
+        """
+
         multiplicity = self.contributor_multiplicity
         return tuple(
-            group.composite_weight
+            1.0
             / max(multiplicity[contributor] for contributor in group.contributor_ids)
             for group in self.groups
+        )
+
+    @property
+    def effective_group_weights(self) -> tuple[float, ...]:
+        return tuple(
+            group.composite_weight * cap
+            for group, cap in zip(
+                self.groups,
+                self.contributor_power_caps,
+                strict=True,
+            )
         )
 
     def validate_prefix(
