@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: apply-single-operator-remediation-v2
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   patch:
