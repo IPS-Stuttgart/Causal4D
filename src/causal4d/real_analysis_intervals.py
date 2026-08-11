@@ -386,15 +386,11 @@ def registered_positive_effect_interval_decision(
         "sample_count": sample_count,
         "registered_interval_inputs_match": True,
         "primary_interval_estimable": primary.get("estimable") is True,
-        "required_robustness_interval_estimable": (
-            robustness.get("estimable") is True
-        ),
+        "required_robustness_interval_estimable": (robustness.get("estimable") is True),
         "degenerate_session_panel": degenerate,
         "degenerate_session_panel_blocks_positive_claim": True,
         "primary_interval_excludes_nonpositive_effect": primary_passed,
-        "required_robustness_interval_excludes_nonpositive_effect": (
-            robustness_passed
-        ),
+        "required_robustness_interval_excludes_nonpositive_effect": (robustness_passed),
         "positive_claim_interval_gate_passed": (
             primary_passed and robustness_passed and not degenerate
         ),
