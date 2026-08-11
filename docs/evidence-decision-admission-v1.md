@@ -50,9 +50,10 @@ decision are rejected rather than guessed between.
 
 A Prob4D binding is optional for decisions whose evidence path genuinely does
 not use Prob4D. When one is present, it is still validated. Set
-`require_prob4d_binding=True` to make it mandatory for a registered lane. A mandatory Prob4D lane must also provide
-`expected_prob4d_revision`; presence without an exact revision lock is
-rejected.
+`require_prob4d_binding=True` to make it mandatory for a registered lane. A
+mandatory Prob4D lane must also provide `expected_prob4d_revision`; presence
+without an exact revision lock is rejected. The requirement flag itself must be
+a Boolean and is never interpreted through Python truthiness.
 
 ## Source and integration locks
 
