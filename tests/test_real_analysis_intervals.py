@@ -29,6 +29,24 @@ from causal4d.real_analysis_intervals import (
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _interval(
+    *,
+    method: str,
+    lower: float,
+    sample_count: int = 12,
+    point_estimate: float = 0.2,
+) -> dict[str, object]:
+    return {
+        "estimable": True,
+        "method": method,
+        "confidence_level": 0.95,
+        "sample_count": sample_count,
+        "point_estimate": point_estimate,
+        "lower": lower,
+        "degenerate_sample": False,
+    }
+
+
 def test_registered_interval_implementations_are_deterministic() -> None:
     values = np.linspace(-0.25, 0.75, 18).tolist()
 
@@ -46,31 +64,42 @@ def test_registered_interval_implementations_are_deterministic() -> None:
     assert robustness["method"] == "student_t_mean"
 
 
-def test_degenerate_session_panels_have_exact_point_intervals() -> None:
+def test_degenerate_session_panel_cannot_authorize_a_positive_claim() -> None:
     values = [1.25] * 12
 
-    for interval in (
-        bootstrap_t_mean_interval(values),
-        percentile_bootstrap_mean_interval(values),
-        student_t_mean_interval(values),
-    ):
-        assert interval["estimable"] is True
+    primary = bootstrap_t_mean_interval(values)
+    robustness = student_t_mean_interval(values)
+    historical = percentile_bootstrap_mean_interval(values)
+
+    for interval in (primary, robustness):
+        assert interval["estimable"] is False
         assert interval["point_estimate"] == pytest.approx(1.25)
-        assert interval["lower"] == pytest.approx(1.25)
-        assert interval["upper"] == pytest.approx(1.25)
+        assert interval["lower"] is None
+        assert interval["upper"] is None
+        assert interval["degenerate_sample"] is True
+
+    assert historical["estimable"] is True
+    assert historical["point_estimate"] == pytest.approx(1.25)
+    assert historical["lower"] == pytest.approx(1.25)
+    assert historical["upper"] == pytest.approx(1.25)
+    assert historical["degenerate_sample"] is True
+
+    decision = registered_positive_effect_interval_decision(primary, robustness)
+    assert decision["registered_interval_inputs_match"] is True
+    assert decision["degenerate_session_panel"] is True
+    assert decision["degenerate_session_panel_blocks_positive_claim"] is True
+    assert decision["positive_claim_interval_gate_passed"] is False
 
 
 def test_student_t_can_veto_but_never_rescue_primary_interval() -> None:
-    primary_pass = {
-        "estimable": True,
-        "method": "target_session_bootstrap_t",
-        "lower": 0.1,
-    }
-    robustness_fail = {
-        "estimable": True,
-        "method": "student_t_mean",
-        "lower": -0.01,
-    }
+    primary_pass = _interval(
+        method="target_session_bootstrap_t",
+        lower=0.1,
+    )
+    robustness_fail = _interval(
+        method="student_t_mean",
+        lower=-0.01,
+    )
     decision = registered_positive_effect_interval_decision(
         primary_pass,
         robustness_fail,
@@ -87,6 +116,38 @@ def test_student_t_can_veto_but_never_rescue_primary_interval() -> None:
     )
     assert decision["positive_claim_interval_gate_passed"] is False
     assert decision["robustness_interval_may_rescue_primary_failure"] is False
+
+
+@pytest.mark.parametrize(
+    ("primary_update", "robustness_update", "message"),
+    [
+        (
+            {"method": "target_session_percentile_bootstrap"},
+            {},
+            "primary interval method",
+        ),
+        ({}, {"method": "bootstrap_t_mean"}, "robustness interval method"),
+        ({"sample_count": 11}, {}, "same session sample"),
+        ({"confidence_level": 0.9}, {}, "registered value"),
+        ({"point_estimate": 0.3}, {}, "same session mean"),
+    ],
+)
+def test_positive_claim_gate_rejects_mismatched_interval_inputs(
+    primary_update: dict[str, object],
+    robustness_update: dict[str, object],
+    message: str,
+) -> None:
+    primary = {
+        **_interval(method="target_session_bootstrap_t", lower=0.1),
+        **primary_update,
+    }
+    robustness = {
+        **_interval(method="student_t_mean", lower=0.1),
+        **robustness_update,
+    }
+
+    with pytest.raises(ValueError, match=message):
+        registered_positive_effect_interval_decision(primary, robustness)
 
 
 @pytest.mark.parametrize(

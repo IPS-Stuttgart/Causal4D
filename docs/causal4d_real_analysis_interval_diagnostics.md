@@ -24,6 +24,14 @@ bootstrap-t interval containing zero, or a Student-t interval containing zero
 precludes a positive claim. The complete negative or bounded result remains
 reportable.
 
+The decision gate validates that the two required interval records use the exact
+registered methods, confidence level, session count, and point estimate. It
+rejects mixed or relabelled interval objects rather than combining incomparable
+results. A zero between-session variance panel is also non-estimable for the two
+claim-bearing intervals: it may be reported descriptively through the historical
+sensitivity interval, but a zero-width interval cannot authorize a positive
+claim because between-session uncertainty was not estimated.
+
 ## Target-free evidence
 
 All interval-selection studies evaluated the immutable implementation at
