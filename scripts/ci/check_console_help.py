@@ -96,6 +96,25 @@ def verify_console_help(
 ) -> None:
     typing_marker = _require_installed_file(distribution, "causal4d/py.typed")
     print(f"verified installed PEP 561 marker: {typing_marker}")
+    typing_stub = _require_installed_file(distribution, "causal4d/__init__.pyi")
+    print(f"verified installed package-root typing stub: {typing_stub}")
+
+    environment = _clean_environment()
+    root_surface_script = Path(__file__).with_name("check_installed_root_surface.py")
+    root_surface = _run(
+        [
+            sys.executable,
+            str(root_surface_script),
+            "--repository-root",
+            str(pyproject.resolve().parent),
+        ],
+        cwd=str(pyproject.resolve().parent),
+        environment=environment,
+        timeout_seconds=timeout_seconds,
+    )
+    if root_surface.returncode != 0:
+        raise RuntimeError(root_surface.stdout + root_surface.stderr)
+    print(root_surface.stdout.strip())
 
     declared = _declared_scripts(pyproject)
     expected = {"causal4d": "causal4d.cli.root:main"}
@@ -114,7 +133,6 @@ def verify_console_help(
     executable = shutil.which("causal4d")
     if executable is None:
         raise RuntimeError("causal4d executable is not on PATH")
-    environment = _clean_environment()
     failures: list[str] = []
     with tempfile.TemporaryDirectory(prefix="causal4d-cli-help-") as directory:
         validation = _run(

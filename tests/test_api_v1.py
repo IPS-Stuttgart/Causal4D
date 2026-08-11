@@ -36,6 +36,7 @@ EXPECTED_V1_EXPORTS = (
     "TwinBelief",
     "abduct_hierarchical_interventions",
     "apply_counterfactual_operator",
+    "project_physical_posterior",
     "block_diagonalize_covariance",
     "build_interventional_contrast",
     "joint_component_log_likelihoods",
