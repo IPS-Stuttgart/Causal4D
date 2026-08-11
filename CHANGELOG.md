@@ -4,6 +4,12 @@
 
 ### Added
 
+- Formalize Causal4D's structural causal model and identification assumptions,
+  and add a typed, content-addressed, analysis-only posterior for explicit
+  `Q(branch_a) - Q(branch_b)` interventional trajectory contrasts. The API
+  records its cross-world coupling, preserves both source marginals, supports
+  exact mixture summaries and strict non-pickled archives, and changes no
+  estimator, registered protocol, target boundary, or physical evidence count.
 - Register two diagnostic factual-abduction arms: the maximum-posterior joint
   intervention/twin component and the inferred intervention marginal combined
   with the untouched physical-parameter prior. They separate MAP selection,
