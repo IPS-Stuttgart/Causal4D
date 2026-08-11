@@ -1,0 +1,20 @@
+{
+  "bundle_schema": "causal4d.evidence_decision_contract_bundle",
+  "bundle_version": 1,
+  "consumer_module": "causal4d.evidence_decision_v1",
+  "json_schema": {
+    "path": "evidence-decision-v1.schema.json",
+    "sha256": "d5615258c6cf666d0ed9684a87930989adf91817fe99b0387e83a31479dcd465"
+  },
+  "scientific_boundary": "Contract conformance only; the bundle is not physical, causal, calibration, transfer, or deployment evidence.",
+  "source_repository": "IPS-Stuttgart/BayesianPhysTwin",
+  "source_revision": "4ee702f5130cfedbea7bce6be5e72483c92f63da",
+  "vectors": {
+    "authorized": {
+      "path": "vectors/authorized.json",
+      "sha256": "3913156de73b6d92512df7e6975852b27d8ac21a8431caaf04e41069c935d902"
+    }
+  },
+  "wire_schema": "bayesian_phystwin.evidence_decision",
+  "wire_schema_version": 1
+}
