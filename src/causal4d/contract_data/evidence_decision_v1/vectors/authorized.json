@@ -1,0 +1,49 @@
+{
+  "claim_authorized": true,
+  "claim_id": "contract.conformance.authorized",
+  "created_utc": "2026-08-10T12:00:00+00:00",
+  "decision_id": "702f941a2dc113dd79de53acc5eabcf7e250d375907735621917d745cc635baf",
+  "evidence_fingerprint": "5555555555555555555555555555555555555555555555555555555555555555",
+  "evidence_level": 3,
+  "evidence_summary_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+  "limitations": [
+    "synthetic contract vector; not scientific evidence"
+  ],
+  "metadata": {
+    "synthetic": true
+  },
+  "metric": {
+    "comparison": "reference_contract",
+    "name": "synthetic_contract_metric",
+    "observed_value": 1.0,
+    "rule": "observed_value_ge_threshold",
+    "threshold_value": 1.0,
+    "unit": "dimensionless"
+  },
+  "protocol_id": "evidence-decision-conformance-v1",
+  "repositories": [
+    {
+      "dirty": false,
+      "repository": "IPS-Stuttgart/BayesianPhysTwin",
+      "revision": "4ee702f5130cfedbea7bce6be5e72483c92f63da",
+      "role": "primary"
+    },
+    {
+      "dirty": false,
+      "repository": "IPS-Stuttgart/Causal4D",
+      "revision": "9432fef79a9dec7ca7977c29b9fc6a9e4517939d",
+      "role": "downstream"
+    },
+    {
+      "dirty": false,
+      "repository": "IPS-Stuttgart/Prob4D",
+      "revision": "c9273e8a55f812c532105a86c885a5a7627d3df3",
+      "role": "observation"
+    }
+  ],
+  "run_classification": "confirmatory",
+  "run_manifest_id": "4444444444444444444444444444444444444444444444444444444444444444",
+  "schema_name": "bayesian_phystwin.evidence_decision",
+  "schema_version": 1,
+  "status": "pass"
+}
