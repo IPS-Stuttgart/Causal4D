@@ -184,9 +184,7 @@ def build_preacquisition_next_action_packet_manifest(
         "protocol_id": decision["protocol_id"],
         "protocol_design_sha256": decision["protocol_design_sha256"],
         "preacquisition_plan_id": decision["preacquisition_plan_id"],
-        "preacquisition_amendment_sha256": decision[
-            "preacquisition_amendment_sha256"
-        ],
+        "preacquisition_amendment_sha256": decision["preacquisition_amendment_sha256"],
         "decision_evidence_sha256": decision["evidence_sha256"],
         "decision_status_sha256": decision["status_sha256"],
         "decision_valid": decision.get("valid") is True,
@@ -469,7 +467,9 @@ def validate_preacquisition_next_action_packet(
     decision_bytes = inspected["decision_bytes"]
     assert isinstance(decision_bytes, bytes)
 
-    with tempfile.TemporaryDirectory(prefix="causal4d-next-action-packet-") as directory:
+    with tempfile.TemporaryDirectory(
+        prefix="causal4d-next-action-packet-"
+    ) as directory:
         decision_path = Path(directory) / _DECISION_MEMBER
         decision_path.write_bytes(decision_bytes)
         freshness = validate_preacquisition_next_action_report(
@@ -491,9 +491,7 @@ def validate_preacquisition_next_action_packet(
         "protocol_id": decision["protocol_id"],
         "protocol_design_sha256": decision["protocol_design_sha256"],
         "preacquisition_plan_id": decision["preacquisition_plan_id"],
-        "preacquisition_amendment_sha256": decision[
-            "preacquisition_amendment_sha256"
-        ],
+        "preacquisition_amendment_sha256": decision["preacquisition_amendment_sha256"],
         "repository_root": str(repository),
         "dataset_root": str(dataset),
         "packet_path": inspected["path"],
