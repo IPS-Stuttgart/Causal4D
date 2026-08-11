@@ -8,11 +8,10 @@ from typing import Any, Literal
 import numpy as np
 
 from causal4d.contracts import FactualIntervention, TwinBelief, array_sha256
-from causal4d.factual_abduction_uncertainty import (
-    FactualAbductionUncertaintyV1,
-)
+from causal4d.factual_abduction_uncertainty import FactualAbductionUncertaintyV1
 from causal4d.grouped_likelihood import (
     GroupLikelihoodDiagnostics,
+    GroupedScoreSemantics,
     grouped_component_log_likelihoods,
     posterior_weights_from_grouped_evidence,
 )
@@ -27,6 +26,7 @@ from causal4d.weighting import log_weights_from_probabilities
 
 
 DenseLikelihoodSemantics = Literal["legacy_v1", "normalized_v2"]
+GroupedLikelihoodSemantics = Literal["legacy_v1", "normalized_v3"]
 IdentifiabilityPolicy = Literal["full_parameter", "registered_query"]
 
 
@@ -36,7 +36,10 @@ class FactualAbductionConfig:
 
     ``legacy_v1`` preserves the registered dense score exactly. ``normalized_v2``
     is an opt-in development path that uses the endpoint-inclusive, scale-normalized
-    prefix likelihood. The legacy defaults remain unchanged.
+    prefix likelihood. ``grouped_likelihood_semantics`` independently controls the
+    full-covariance grouped path; ``normalized_v3`` is a contributor-capped,
+    coordinate-normalized development comparator. All legacy defaults remain
+    unchanged.
     """
 
     observation_scale_m: float = 0.01
@@ -45,6 +48,8 @@ class FactualAbductionConfig:
     degrees_of_freedom: float = 4.0
     likelihood_semantics: DenseLikelihoodSemantics = "legacy_v1"
     difference_correlation: float = 0.0
+    grouped_likelihood_semantics: GroupedLikelihoodSemantics = "legacy_v1"
+    grouped_covariance_condition_number_limit: float = 1.0e12
 
     def __post_init__(self) -> None:
         positive = (
@@ -64,6 +69,16 @@ class FactualAbductionConfig:
             raise ValueError("dynamic_likelihood_weight must be finite and nonnegative")
         if self.likelihood_semantics not in {"legacy_v1", "normalized_v2"}:
             raise ValueError("unsupported dense likelihood semantics")
+        if self.grouped_likelihood_semantics not in {"legacy_v1", "normalized_v3"}:
+            raise ValueError("unsupported grouped likelihood semantics")
+        if (
+            not np.isfinite(self.grouped_covariance_condition_number_limit)
+            or self.grouped_covariance_condition_number_limit < 1.0
+        ):
+            raise ValueError(
+                "grouped covariance condition-number limit must be finite and at "
+                "least one"
+            )
         if not np.isfinite(self.difference_correlation) or not (
             -1.0 < self.difference_correlation < 1.0
         ):
@@ -88,6 +103,11 @@ class FactualAbductionConfig:
         if self.likelihood_semantics != "legacy_v1":
             result["likelihood_semantics"] = self.likelihood_semantics
             result["difference_correlation"] = self.difference_correlation
+        if self.grouped_likelihood_semantics != "legacy_v1":
+            result["grouped_likelihood_semantics"] = self.grouped_likelihood_semantics
+            result["grouped_covariance_condition_number_limit"] = (
+                self.grouped_covariance_condition_number_limit
+            )
         return result
 
 
@@ -131,7 +151,7 @@ def _grouped_diagnostics_summary(
 ) -> dict[str, Any]:
     responsibilities = np.asarray(diagnostics.nominal_responsibilities, dtype=float)
     reduction_axes = tuple(range(responsibilities.ndim - 1))
-    result = {
+    result: dict[str, Any] = {
         "group_ids": list(diagnostics.group_ids),
         "effective_group_weights": list(diagnostics.effective_group_weights),
         "mean_nominal_responsibility_by_group": np.mean(
@@ -149,12 +169,28 @@ def _grouped_diagnostics_summary(
         result["low_rank_covariance_group_ids"] = list(
             diagnostics.low_rank_covariance_group_ids
         )
+    if diagnostics.score_semantics != "legacy_sum_v1":
+        result.update(
+            {
+                "score_semantics": diagnostics.score_semantics,
+                "likelihood_power": diagnostics.likelihood_power,
+                "contributor_power_caps": list(diagnostics.contributor_power_caps),
+                "group_coordinate_counts": list(diagnostics.group_coordinate_counts),
+                "normalization_coordinate_mass": (
+                    diagnostics.normalization_coordinate_mass
+                ),
+                "source_covariance_condition_numbers": list(
+                    diagnostics.source_covariance_condition_numbers
+                ),
+                "normalization_coordinate_fractions": list(
+                    diagnostics.normalization_coordinate_fractions
+                ),
+            }
+        )
     return result
 
 
-def _validated_grouped_component_batch_size(
-    value: int | None,
-) -> int | None:
+def _validated_grouped_component_batch_size(value: int | None) -> int | None:
     if value is None:
         return None
     if type(value) is not int or value < 1:
@@ -173,6 +209,9 @@ def _posterior_weights_from_grouped_evidence_batched(
     group_covariance_m2: dict[str, np.ndarray],
     group_covariance_factor_m: dict[str, np.ndarray],
     component_batch_size: int,
+    score_semantics: GroupedScoreSemantics,
+    likelihood_power: float,
+    max_source_covariance_condition_number: float,
 ) -> tuple[np.ndarray, GroupLikelihoodDiagnostics]:
     """Evaluate grouped evidence without a full discrepancy-aware rollout copy."""
 
@@ -201,6 +240,13 @@ def _posterior_weights_from_grouped_evidence_batched(
     effective_group_weights: tuple[float, ...] | None = None
     full_covariance_group_ids: tuple[str, ...] | None = None
     low_rank_covariance_group_ids: tuple[str, ...] | None = None
+    diagnostic_score_semantics: GroupedScoreSemantics | None = None
+    diagnostic_likelihood_power: float | None = None
+    contributor_power_caps: tuple[float, ...] | None = None
+    group_coordinate_counts: tuple[int, ...] | None = None
+    normalization_coordinate_mass: float | None = None
+    source_covariance_condition_numbers: tuple[float, ...] | None = None
+    normalization_coordinate_fractions: tuple[float, ...] | None = None
 
     for start in range(0, component_count, component_batch_size):
         stop = min(start + component_batch_size, component_count)
@@ -216,12 +262,10 @@ def _posterior_weights_from_grouped_evidence_batched(
         if additional_independent_variance_m2 is not None:
             component_variance = (
                 component_variance
-                + (
-                    additional_independent_variance_m2[
-                        hypothesis_indices,
-                        particle_indices,
-                    ]
-                )
+                + additional_independent_variance_m2[
+                    hypothesis_indices,
+                    particle_indices,
+                ]
             )
         dense_batch = {
             group_id: covariance[hypothesis_indices, particle_indices]
@@ -238,6 +282,11 @@ def _posterior_weights_from_grouped_evidence_batched(
             component_variance_m2=component_variance,
             component_group_covariance_m2=dense_batch,
             component_group_covariance_factor_m=factor_batch,
+            score_semantics=score_semantics,
+            likelihood_power=likelihood_power,
+            max_source_covariance_condition_number=(
+                max_source_covariance_condition_number
+            ),
         )
         scores[start:stop] = batch_scores.reshape(-1)
         batch_responsibilities = np.asarray(
@@ -253,12 +302,33 @@ def _posterior_weights_from_grouped_evidence_batched(
             effective_group_weights = diagnostics.effective_group_weights
             full_covariance_group_ids = diagnostics.full_covariance_group_ids
             low_rank_covariance_group_ids = diagnostics.low_rank_covariance_group_ids
+            diagnostic_score_semantics = diagnostics.score_semantics
+            diagnostic_likelihood_power = diagnostics.likelihood_power
+            contributor_power_caps = diagnostics.contributor_power_caps
+            group_coordinate_counts = diagnostics.group_coordinate_counts
+            normalization_coordinate_mass = diagnostics.normalization_coordinate_mass
+            source_covariance_condition_numbers = (
+                diagnostics.source_covariance_condition_numbers
+            )
+            normalization_coordinate_fractions = (
+                diagnostics.normalization_coordinate_fractions
+            )
         elif (
             diagnostics.group_ids != group_ids
             or diagnostics.effective_group_weights != effective_group_weights
             or diagnostics.full_covariance_group_ids != full_covariance_group_ids
             or diagnostics.low_rank_covariance_group_ids
             != low_rank_covariance_group_ids
+            or diagnostics.score_semantics != diagnostic_score_semantics
+            or diagnostics.likelihood_power != diagnostic_likelihood_power
+            or diagnostics.contributor_power_caps != contributor_power_caps
+            or diagnostics.group_coordinate_counts != group_coordinate_counts
+            or diagnostics.normalization_coordinate_mass
+            != normalization_coordinate_mass
+            or diagnostics.source_covariance_condition_numbers
+            != source_covariance_condition_numbers
+            or diagnostics.normalization_coordinate_fractions
+            != normalization_coordinate_fractions
         ):
             raise RuntimeError("grouped diagnostics changed between component batches")
         responsibilities[start:stop] = batch_responsibilities
@@ -269,6 +339,12 @@ def _posterior_weights_from_grouped_evidence_batched(
         or effective_group_weights is None
         or full_covariance_group_ids is None
         or low_rank_covariance_group_ids is None
+        or diagnostic_score_semantics is None
+        or diagnostic_likelihood_power is None
+        or contributor_power_caps is None
+        or group_coordinate_counts is None
+        or source_covariance_condition_numbers is None
+        or normalization_coordinate_fractions is None
     ):
         raise RuntimeError("grouped batched abduction produced no component scores")
     log_posterior = (
@@ -291,6 +367,13 @@ def _posterior_weights_from_grouped_evidence_batched(
         ),
         full_covariance_group_ids=full_covariance_group_ids,
         low_rank_covariance_group_ids=low_rank_covariance_group_ids,
+        score_semantics=diagnostic_score_semantics,
+        likelihood_power=diagnostic_likelihood_power,
+        contributor_power_caps=contributor_power_caps,
+        group_coordinate_counts=group_coordinate_counts,
+        normalization_coordinate_mass=normalization_coordinate_mass,
+        source_covariance_condition_numbers=source_covariance_condition_numbers,
+        normalization_coordinate_fractions=normalization_coordinate_fractions,
     )
     return posterior.reshape(hypothesis_count, particle_count), diagnostics
 
@@ -312,6 +395,11 @@ def _update_joint_weights(
         raise ValueError(
             "normalized_v2 cannot be combined with grouped observation evidence"
         )
+    if (
+        grouped_evidence is None
+        and settings.grouped_likelihood_semantics != "legacy_v1"
+    ):
+        raise ValueError("normalized_v3 requires grouped observation evidence")
     batch_size = _validated_grouped_component_batch_size(grouped_component_batch_size)
     if batch_size is not None and grouped_evidence is None:
         raise ValueError(
@@ -363,6 +451,11 @@ def _update_joint_weights(
             )
         )
     prior = bank.prior_joint_weights if base_weights is None else base_weights
+    normalized_grouped = settings.grouped_likelihood_semantics == "normalized_v3"
+    grouped_score_semantics: GroupedScoreSemantics = (
+        "normalized_coordinate_mean_v3" if normalized_grouped else "legacy_sum_v1"
+    )
+    grouped_likelihood_power = settings.likelihood_power if normalized_grouped else 1.0
     if batch_size is not None:
         return _posterior_weights_from_grouped_evidence_batched(
             bank,
@@ -374,6 +467,11 @@ def _update_joint_weights(
             group_covariance_m2=group_covariance,
             group_covariance_factor_m=group_covariance_factor,
             component_batch_size=batch_size,
+            score_semantics=grouped_score_semantics,
+            likelihood_power=grouped_likelihood_power,
+            max_source_covariance_condition_number=(
+                settings.grouped_covariance_condition_number_limit
+            ),
         )
     components = physical_readout_components(bank, belief)
     component_variance = np.broadcast_to(
@@ -389,6 +487,11 @@ def _update_joint_weights(
         component_variance_m2=component_variance,
         component_group_covariance_m2=group_covariance,
         component_group_covariance_factor_m=group_covariance_factor,
+        score_semantics=grouped_score_semantics,
+        likelihood_power=grouped_likelihood_power,
+        max_source_covariance_condition_number=(
+            settings.grouped_covariance_condition_number_limit
+        ),
     )
 
 
@@ -703,7 +806,11 @@ def evaluate_factual_abduction(
         "abduction_prefix_frame_count_including_endpoint": prefix_frame_count,
         "held_out_rollout_interval": [prefix_frame_count, bank.frame_count],
         "evidence_model": (
-            "grouped_robust_composite"
+            (
+                "grouped_normalized_v3"
+                if settings.grouped_likelihood_semantics == "normalized_v3"
+                else "grouped_robust_composite"
+            )
             if grouped_evidence is not None
             else (
                 "legacy_dense"
