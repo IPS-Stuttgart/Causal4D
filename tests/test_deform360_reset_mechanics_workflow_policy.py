@@ -12,7 +12,9 @@ def test_reset_mechanics_workflow_is_read_only_and_source_scoped() -> None:
     assert "permissions:\n  contents: read" in text
     assert "runs-on: [self-hosted, Linux, X64, nvidia-smi]" in text
     assert "github.ref == 'refs/heads/main'" in text
-    assert "github.event.pull_request.head.repo.full_name == github.repository" not in text
+    assert (
+        "github.event.pull_request.head.repo.full_name == github.repository" not in text
+    )
     assert "workflow_dispatch:" in text
     assert "run_source_diagnostic:" in text
     assert "Check out pinned public BayesianPhysTwin" in text
