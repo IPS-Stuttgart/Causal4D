@@ -46,6 +46,7 @@ def _readiness() -> dict:
             "method_freeze_validation",
         )
     }
+    prerequisites["operator_registry"]["independent_verifier_available"] = True
     gates = {
         name: _gate()
         for name in (
@@ -173,6 +174,31 @@ def test_existing_operator_registry_template_advances_to_human_seal() -> None:
         "/data/run/preacquisition/operator_registry.template.json"
     ]
     assert action["output_paths"] == ["/data/run/preacquisition/operator_registry.json"]
+
+
+def test_single_person_registry_blocks_before_manual_or_physical_work() -> None:
+    readiness = _readiness()
+    readiness["prerequisites"]["operator_registry"][
+        "independent_verifier_available"
+    ] = False
+    readiness["prerequisites"]["object_registration"] = _prerequisite(
+        present=False,
+        valid=False,
+    )
+    readiness["missing_prerequisites"] = ["object_registration"]
+
+    decision = _derive(readiness, _source_panel())
+
+    action = decision["action"]
+    assert decision["valid"] is True
+    assert action["action_id"] == "stop_independent_verifier_unavailable"
+    assert action["category"] == "governance_blocker"
+    assert action["automatable"] is False
+    assert action["physical_acquisition_required"] is False
+    assert action["target_outcomes_permitted"] is False
+    assert action["blocking_items"] == [
+        "single_operator_project_cannot_satisfy_independent_verification"
+    ]
 
 
 def test_invalid_operator_registry_template_requires_repair() -> None:

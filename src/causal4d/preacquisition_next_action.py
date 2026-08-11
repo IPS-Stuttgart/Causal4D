@@ -358,6 +358,18 @@ def _derive_action(
             automatable=operation.startswith("scaffold"),
         )
 
+    if registry.get("independent_verifier_available") is not True:
+        return _action(
+            "stop_independent_verifier_unavailable",
+            "Stop: independent verification is unavailable in a single-person project",
+            "principal_investigator",
+            category="governance_blocker",
+            completion=next_check,
+            blockers=[
+                "single_operator_project_cannot_satisfy_independent_verification"
+            ],
+        )
+
     if readiness.get("valid") is not True:
         return _action(
             "stop_and_repair_invalid_evidence",

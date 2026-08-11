@@ -365,7 +365,7 @@ def validate_operator_registry(
         role: sum(role in record["roles"] for record in active)
         for role in sorted(ALLOWED_OPERATOR_ROLES)
     }
-    for role in (ROLE_FREEZER, ROLE_INDEPENDENT_VERIFIER, ROLE_GATE_APPROVER):
+    for role in (ROLE_FREEZER, ROLE_GATE_APPROVER):
         _require(
             role_counts[role] > 0,
             f"operator registry has no active operator for role: {role}",
@@ -380,13 +380,10 @@ def validate_operator_registry(
         for record in active
         if ROLE_INDEPENDENT_VERIFIER in record["roles"]
     }
-    _require(
-        any(
-            freezer_digest != verifier_digest
-            for freezer_digest in freezer_digests
-            for verifier_digest in verifier_digests
-        ),
-        "operator registry cannot provide an independent freeze verifier",
+    independent_verifier_available = any(
+        freezer_digest != verifier_digest
+        for freezer_digest in freezer_digests
+        for verifier_digest in verifier_digests
     )
 
     sealed_by = registry.get("sealed_by_operator_id")
@@ -417,6 +414,7 @@ def validate_operator_registry(
         "operator_count": len(operators),
         "active_operator_count": len(active),
         "active_role_counts": role_counts,
+        "independent_verifier_available": independent_verifier_available,
         "target_outcomes_used": False,
         "person_identity_digest_method": PERSON_IDENTITY_DIGEST_METHOD,
         "_sealed_at": sealed_at,

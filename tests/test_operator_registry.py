@@ -85,6 +85,33 @@ def _sealed_registry() -> dict:
     return registry
 
 
+def _single_operator_registry() -> dict:
+    protocol, v4 = _registered_values()
+    registry = operator_registry_template(protocol, v4)
+    registry.update(
+        {
+            "artifact_kind": OPERATOR_REGISTRY_ARTIFACT_KIND,
+            "status": "sealed",
+            "sealed_at_utc": "2026-07-30T08:00:00Z",
+            "sealed_by_operator_id": "florianpfaff",
+            "operators": [
+                {
+                    "operator_id": "florianpfaff",
+                    "person_identity_sha256": "3" * 64,
+                    "active": True,
+                    "roles": [
+                        ROLE_FREEZER,
+                        ROLE_GATE_APPROVER,
+                        ROLE_SOFTWARE_ENVIRONMENT_APPROVER,
+                    ],
+                }
+            ],
+        }
+    )
+    registry["artifact_sha256"] = operator_registry_sha256(registry)
+    return registry
+
+
 def _draft() -> dict:
     protocol, v4 = _registered_values()
     draft = operator_registry_template(protocol, v4)
@@ -108,6 +135,18 @@ def test_valid_registry_binds_roles_without_raw_identity_fields() -> None:
         "active",
         "roles",
     }
+
+
+def test_single_person_registry_is_truthful_but_not_independent() -> None:
+    protocol, v4 = _registered_values()
+    registry = _single_operator_registry()
+
+    result = validate_operator_registry(protocol, v4, registry)
+
+    assert result["passed"] is True
+    assert result["operator_count"] == 1
+    assert result["active_role_counts"][ROLE_INDEPENDENT_VERIFIER] == 0
+    assert result["independent_verifier_available"] is False
 
 
 def test_duplicate_person_digest_rejects_operator_aliases() -> None:

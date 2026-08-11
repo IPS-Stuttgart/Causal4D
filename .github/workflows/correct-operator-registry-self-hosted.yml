@@ -1,4 +1,4 @@
-name: Self-hosted operator registry seal
+name: Self-hosted operator registry correction
 
 on:
   workflow_dispatch:
@@ -9,12 +9,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: seal-operator-registry-${{ github.sha }}
+  group: correct-operator-registry-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
-  seal:
-    name: Seal the registered operator roster on workstation2
+  correct:
+    name: Correct the registered operator roster on workstation2
     if: >-
       github.ref == 'refs/heads/main' &&
       (
@@ -25,23 +25,25 @@ jobs:
           github.event.issue.user.login == 'FlorianPfaff' &&
           github.event.issue.user.id == 6773539 &&
           github.event.issue.title ==
-            '[self-hosted] seal Causal4D operator registry'
+            '[self-hosted] correct Causal4D operator registry'
         )
       )
     runs-on: [self-hosted, Linux, X64, nvidia-smi]
     timeout-minutes: 45
     outputs:
-      already_sealed: ${{ steps.summary.outputs.already_sealed }}
+      already_corrected: ${{ steps.summary.outputs.already_corrected }}
       dataset_modified: ${{ steps.summary.outputs.dataset_modified }}
       registry_artifact_sha256: >-
         ${{ steps.summary.outputs.registry_artifact_sha256 }}
       registry_file_sha256: ${{ steps.summary.outputs.registry_file_sha256 }}
+      correction_artifact_sha256: >-
+        ${{ steps.summary.outputs.correction_artifact_sha256 }}
       operator_count: ${{ steps.summary.outputs.operator_count }}
+      independent_verifier_available: >-
+        ${{ steps.summary.outputs.independent_verifier_available }}
       next_action: ${{ steps.summary.outputs.next_action }}
-      next_physical: ${{ steps.summary.outputs.next_physical }}
-      next_automatable: ${{ steps.summary.outputs.next_automatable }}
-      key_created: ${{ steps.summary.outputs.key_created }}
-      roster_created: ${{ steps.summary.outputs.roster_created }}
+      private_material_replaced: >-
+        ${{ steps.summary.outputs.private_material_replaced }}
       physical_evidence_increment: >-
         ${{ steps.summary.outputs.physical_evidence_increment }}
     steps:
@@ -69,22 +71,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p outputs/operator-registry-seal/wheels
-          python -m venv .operator-registry-seal-venv
-          .operator-registry-seal-venv/bin/python -m pip install \
+          mkdir -p outputs/operator-registry-correction/wheels
+          python -m venv .operator-registry-correction-venv
+          .operator-registry-correction-venv/bin/python -m pip install \
             --upgrade pip "build>=1.2"
-          .operator-registry-seal-venv/bin/python -m build --wheel \
-            --outdir outputs/operator-registry-seal/wheels .
+          .operator-registry-correction-venv/bin/python -m build --wheel \
+            --outdir outputs/operator-registry-correction/wheels .
           wheel="$(
-            find outputs/operator-registry-seal/wheels -maxdepth 1 \
+            find outputs/operator-registry-correction/wheels -maxdepth 1 \
               -name 'causal4d-*.whl' -print -quit
           )"
           test -n "${wheel}"
           sha256sum "${wheel}" \
-            | tee outputs/operator-registry-seal/wheel-sha256.txt
-          .operator-registry-seal-venv/bin/python -m pip install "${wheel}"
-          .operator-registry-seal-venv/bin/python -m pip check
-          .operator-registry-seal-venv/bin/python - <<'PY'
+            | tee outputs/operator-registry-correction/wheel-sha256.txt
+          .operator-registry-correction-venv/bin/python -m pip install "${wheel}"
+          .operator-registry-correction-venv/bin/python -m pip check
+          .operator-registry-correction-venv/bin/python - <<'PY'
           from pathlib import Path
 
           import causal4d
@@ -98,56 +100,58 @@ jobs:
               )
           PY
 
-      - name: Populate and seal the fixed operator roster
+      - name: Replace the unsupported roster with the single real participant
         shell: bash
         run: |
           set -euo pipefail
-          PYTHONPATH="" .operator-registry-seal-venv/bin/python \
-            scripts/ci/seal_self_hosted_operator_registry.py \
+          PYTHONPATH="" .operator-registry-correction-venv/bin/python \
+            scripts/ci/correct_self_hosted_operator_registry.py \
             --repository-root \
               /mnt/lexar4tb/causal4d-physical/causal4d-frozen \
             --dataset-root \
               /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1 \
             --private-root \
               /mnt/lexar4tb/causal4d-physical/private/operator-registry-v1 \
-            --output outputs/operator-registry-seal/report.json \
-            | tee outputs/operator-registry-seal/report.txt
+            --output outputs/operator-registry-correction/report.json \
+            | tee outputs/operator-registry-correction/report.txt
 
       - name: Export sanitized result fields
         id: summary
         shell: bash
         run: |
           set -euo pipefail
-          .operator-registry-seal-venv/bin/python - <<'PY' >> "$GITHUB_OUTPUT"
+          .operator-registry-correction-venv/bin/python - <<'PY' >> "$GITHUB_OUTPUT"
           import json
           from pathlib import Path
 
           report = json.loads(
-              Path("outputs/operator-registry-seal/report.json").read_text(
+              Path("outputs/operator-registry-correction/report.json").read_text(
                   encoding="utf-8"
               )
           )
-          private = report["private_material"]
-          next_action = report["next_action"]
-          print(f"already_sealed={str(report['already_sealed']).lower()}")
+          print(
+              f"already_corrected={str(report['already_corrected']).lower()}"
+          )
           print(f"dataset_modified={str(report['dataset_modified']).lower()}")
           print(
               "registry_artifact_sha256="
               f"{report['registry_artifact_sha256']}"
           )
           print(f"registry_file_sha256={report['registry_file_sha256']}")
+          print(
+              "correction_artifact_sha256="
+              f"{report['correction_artifact_sha256']}"
+          )
           print(f"operator_count={len(report['operator_ids'])}")
-          print(f"next_action={next_action['action_id']}")
           print(
-              "next_physical="
-              f"{str(next_action['physical_acquisition_required']).lower()}"
+              "independent_verifier_available="
+              f"{str(report['independent_verifier_available']).lower()}"
           )
+          print(f"next_action={report['next_action']['action_id']}")
           print(
-              "next_automatable="
-              f"{str(next_action['automatable']).lower()}"
+              "private_material_replaced="
+              f"{str(report['private_material_replaced']).lower()}"
           )
-          print(f"key_created={str(private['key_created']).lower()}")
-          print(f"roster_created={str(private['roster_created']).lower()}")
           print(
               "physical_evidence_increment="
               f"{report['physical_evidence_increment']}"
@@ -166,21 +170,21 @@ jobs:
             echo "commit=${GITHUB_SHA}"
             echo "workflow_run_id=${GITHUB_RUN_ID}"
             uname -a
-          } | tee outputs/operator-registry-seal/runner.txt
+          } | tee outputs/operator-registry-correction/runner.txt
           nvidia-smi -L \
-            | tee outputs/operator-registry-seal/nvidia-smi-L.txt
+            | tee outputs/operator-registry-correction/nvidia-smi-L.txt
 
-      - name: Upload sanitized seal evidence
+      - name: Upload sanitized correction evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: causal4d-operator-registry-seal
+          name: causal4d-operator-registry-correction
           path: |
-            outputs/operator-registry-seal/report.json
-            outputs/operator-registry-seal/report.txt
-            outputs/operator-registry-seal/runner.txt
-            outputs/operator-registry-seal/nvidia-smi-L.txt
-            outputs/operator-registry-seal/wheel-sha256.txt
+            outputs/operator-registry-correction/report.json
+            outputs/operator-registry-correction/report.txt
+            outputs/operator-registry-correction/runner.txt
+            outputs/operator-registry-correction/nvidia-smi-L.txt
+            outputs/operator-registry-correction/wheel-sha256.txt
           if-no-files-found: error
           retention-days: 30
 
@@ -189,11 +193,11 @@ jobs:
         shell: bash
         run: |
           rm -rf \
-            .operator-registry-seal-venv \
-            outputs/operator-registry-seal/wheels
+            .operator-registry-correction-venv \
+            outputs/operator-registry-correction/wheels
 
   report:
-    name: Report the operator registry seal to the trigger issue
+    name: Report the operator registry correction to the trigger issue
     if: >-
       always() &&
       github.event_name == 'issues' &&
@@ -202,8 +206,8 @@ jobs:
       github.event.issue.user.login == 'FlorianPfaff' &&
       github.event.issue.user.id == 6773539 &&
       github.event.issue.title ==
-        '[self-hosted] seal Causal4D operator registry'
-    needs: seal
+        '[self-hosted] correct Causal4D operator registry'
+    needs: correct
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -211,43 +215,45 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       ISSUE_NUMBER: ${{ github.event.issue.number }}
-      SEAL_RESULT: ${{ needs.seal.result }}
-      ALREADY_SEALED: ${{ needs.seal.outputs.already_sealed }}
-      DATASET_MODIFIED: ${{ needs.seal.outputs.dataset_modified }}
+      CORRECTION_RESULT: ${{ needs.correct.result }}
+      ALREADY_CORRECTED: ${{ needs.correct.outputs.already_corrected }}
+      DATASET_MODIFIED: ${{ needs.correct.outputs.dataset_modified }}
       REGISTRY_ARTIFACT_SHA256: >-
-        ${{ needs.seal.outputs.registry_artifact_sha256 }}
-      REGISTRY_FILE_SHA256: ${{ needs.seal.outputs.registry_file_sha256 }}
-      OPERATOR_COUNT: ${{ needs.seal.outputs.operator_count }}
-      NEXT_ACTION: ${{ needs.seal.outputs.next_action }}
-      NEXT_PHYSICAL: ${{ needs.seal.outputs.next_physical }}
-      NEXT_AUTOMATABLE: ${{ needs.seal.outputs.next_automatable }}
-      KEY_CREATED: ${{ needs.seal.outputs.key_created }}
-      ROSTER_CREATED: ${{ needs.seal.outputs.roster_created }}
+        ${{ needs.correct.outputs.registry_artifact_sha256 }}
+      REGISTRY_FILE_SHA256: ${{ needs.correct.outputs.registry_file_sha256 }}
+      CORRECTION_ARTIFACT_SHA256: >-
+        ${{ needs.correct.outputs.correction_artifact_sha256 }}
+      OPERATOR_COUNT: ${{ needs.correct.outputs.operator_count }}
+      INDEPENDENT_VERIFIER_AVAILABLE: >-
+        ${{ needs.correct.outputs.independent_verifier_available }}
+      NEXT_ACTION: ${{ needs.correct.outputs.next_action }}
+      PRIVATE_MATERIAL_REPLACED: >-
+        ${{ needs.correct.outputs.private_material_replaced }}
       PHYSICAL_EVIDENCE_INCREMENT: >-
-        ${{ needs.seal.outputs.physical_evidence_increment }}
+        ${{ needs.correct.outputs.physical_evidence_increment }}
     steps:
-      - name: Comment with the sanitized seal result
+      - name: Comment with the sanitized correction result
         shell: bash
         run: |
           set -euo pipefail
           run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/"
           run_url+="${GITHUB_RUN_ID}"
           body="$(cat <<EOF
-          Self-hosted Causal4D operator registry seal: **${SEAL_RESULT}**
+          Self-hosted Causal4D operator registry correction: **${CORRECTION_RESULT}**
 
           - Exact reviewed main commit: \`${GITHUB_SHA}\`
-          - Already sealed before this run: \`${ALREADY_SEALED:-unknown}\`
+          - Already corrected before this run: \`${ALREADY_CORRECTED:-unknown}\`
           - Registered dataset modified: \`${DATASET_MODIFIED:-unknown}\`
           - Operator count: \`${OPERATOR_COUNT:-unknown}\`
+          - Only operator ID: \`florianpfaff\`
+          - Independent verifier available: \`${INDEPENDENT_VERIFIER_AVAILABLE:-unknown}\`
           - Registry artifact SHA-256: \`${REGISTRY_ARTIFACT_SHA256:-unavailable}\`
           - Registry file SHA-256: \`${REGISTRY_FILE_SHA256:-unavailable}\`
-          - Workstation-private HMAC key created: \`${KEY_CREATED:-unknown}\`
-          - Workstation-private principal roster created: \`${ROSTER_CREATED:-unknown}\`
+          - Correction artifact SHA-256: \`${CORRECTION_ARTIFACT_SHA256:-unavailable}\`
+          - Private identity material replaced: \`${PRIVATE_MATERIAL_REPLACED:-unknown}\`
           - Derived next action: \`${NEXT_ACTION:-unavailable}\`
-          - Next action automatable: \`${NEXT_AUTOMATABLE:-unknown}\`
-          - Next action physical: \`${NEXT_PHYSICAL:-unknown}\`
           - Workflow run: ${run_url}
-          - Artifact: \`causal4d-operator-registry-seal\`
+          - Artifact: \`causal4d-operator-registry-correction\`
           - Target outcomes used: \`false\`
           - Device nodes opened: \`false\`
           - Physical command sent: \`false\`
