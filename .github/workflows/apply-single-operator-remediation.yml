@@ -1,0 +1,300 @@
+name: Apply single-operator remediation
+
+on:
+  push:
+    branches:
+      - agent/correct-single-operator-registry
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-single-operator-remediation
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    if: >-
+      github.actor == 'FlorianPfaff' &&
+      hashFiles('.agent/apply-single-operator-remediation') != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/correct-single-operator-registry
+          fetch-depth: 1
+
+      - name: Apply the reviewed correction patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object src/causal4d/operator_registry.py)" = \
+            "2a81bf44fbc1b11a91be020f2a9341930840e83b"
+          test "$(git hash-object src/causal4d/preacquisition_next_action.py)" = \
+            "80df909700a35c67828ef71cb51982c7c790a18b"
+          test "$(git hash-object .github/self-hosted-jobs.json)" = \
+            "1bc9e25121b85bb7d954d0e4e8b4559a6daffbc4"
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          from pathlib import Path
+
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              if text.count(old) != 1:
+                  raise SystemExit(f"expected exactly one reviewed block in {path}")
+              target.write_text(text.replace(old, new), encoding="utf-8")
+
+
+          replace_once(
+              "src/causal4d/operator_registry.py",
+              '''    for role in (ROLE_FREEZER, ROLE_INDEPENDENT_VERIFIER, ROLE_GATE_APPROVER):
+              _require(
+                  role_counts[role] > 0,
+                  f"operator registry has no active operator for role: {role}",
+              )
+          freezer_digests = {
+              str(record["person_identity_sha256"])
+              for record in active
+              if ROLE_FREEZER in record["roles"]
+          }
+          verifier_digests = {
+              str(record["person_identity_sha256"])
+              for record in active
+              if ROLE_INDEPENDENT_VERIFIER in record["roles"]
+          }
+          _require(
+              any(
+                  freezer_digest != verifier_digest
+                  for freezer_digest in freezer_digests
+                  for verifier_digest in verifier_digests
+              ),
+              "operator registry cannot provide an independent freeze verifier",
+          )
+          '''.replace("          ", ""),
+              '''    for role in (ROLE_FREEZER, ROLE_GATE_APPROVER):
+              _require(
+                  role_counts[role] > 0,
+                  f"operator registry has no active operator for role: {role}",
+              )
+          freezer_digests = {
+              str(record["person_identity_sha256"])
+              for record in active
+              if ROLE_FREEZER in record["roles"]
+          }
+          verifier_digests = {
+              str(record["person_identity_sha256"])
+              for record in active
+              if ROLE_INDEPENDENT_VERIFIER in record["roles"]
+          }
+          independent_verifier_available = any(
+              freezer_digest != verifier_digest
+              for freezer_digest in freezer_digests
+              for verifier_digest in verifier_digests
+          )
+          '''.replace("          ", ""),
+          )
+          replace_once(
+              "src/causal4d/operator_registry.py",
+              '''        "active_role_counts": role_counts,
+                  "target_outcomes_used": False,
+          '''.replace("          ", ""),
+              '''        "active_role_counts": role_counts,
+                  "independent_verifier_available": independent_verifier_available,
+                  "target_outcomes_used": False,
+          '''.replace("          ", ""),
+          )
+          replace_once(
+              "src/causal4d/preacquisition_next_action.py",
+              '''    if readiness.get("valid") is not True:
+          '''.replace("          ", ""),
+              '''    if registry.get("independent_verifier_available") is not True:
+              return _action(
+                  "stop_independent_verifier_unavailable",
+                  "Stop: independent verification is unavailable in a single-person project",
+                  "principal_investigator",
+                  category="governance_blocker",
+                  completion=next_check,
+                  blockers=[
+                      "single_operator_project_cannot_satisfy_independent_verification"
+                  ],
+              )
+
+          if readiness.get("valid") is not True:
+          '''.replace("          ", ""),
+          )
+          replace_once(
+              "tests/test_operator_registry.py",
+              '''def _draft() -> dict:
+          '''.replace("          ", ""),
+              '''def _single_operator_registry() -> dict:
+              protocol, v4 = _registered_values()
+              registry = operator_registry_template(protocol, v4)
+              registry.update(
+                  {
+                      "artifact_kind": OPERATOR_REGISTRY_ARTIFACT_KIND,
+                      "status": "sealed",
+                      "sealed_at_utc": "2026-07-30T08:00:00Z",
+                      "sealed_by_operator_id": "florianpfaff",
+                      "operators": [
+                          {
+                              "operator_id": "florianpfaff",
+                              "person_identity_sha256": "3" * 64,
+                              "active": True,
+                              "roles": [
+                                  ROLE_FREEZER,
+                                  ROLE_GATE_APPROVER,
+                                  ROLE_SOFTWARE_ENVIRONMENT_APPROVER,
+                              ],
+                          }
+                      ],
+                  }
+              )
+              registry["artifact_sha256"] = operator_registry_sha256(registry)
+              return registry
+
+
+          def _draft() -> dict:
+          '''.replace("          ", ""),
+          )
+          replace_once(
+              "tests/test_operator_registry.py",
+              '''def test_duplicate_person_digest_rejects_operator_aliases() -> None:
+          '''.replace("          ", ""),
+              '''def test_single_person_registry_is_truthful_but_not_independent() -> None:
+              protocol, v4 = _registered_values()
+              registry = _single_operator_registry()
+
+              result = validate_operator_registry(protocol, v4, registry)
+
+              assert result["passed"] is True
+              assert result["operator_count"] == 1
+              assert result["active_role_counts"][ROLE_INDEPENDENT_VERIFIER] == 0
+              assert result["independent_verifier_available"] is False
+
+
+          def test_duplicate_person_digest_rejects_operator_aliases() -> None:
+          '''.replace("          ", ""),
+          )
+          replace_once(
+              "tests/test_preacquisition_next_action.py",
+              '''    gates = {
+          '''.replace("          ", ""),
+              '''    prerequisites["operator_registry"][
+              "independent_verifier_available"
+              ] = True
+              gates = {
+          '''.replace("          ", ""),
+          )
+          replace_once(
+              "tests/test_preacquisition_next_action.py",
+              '''def test_invalid_operator_registry_template_requires_repair() -> None:
+          '''.replace("          ", ""),
+              '''def test_single_person_registry_blocks_before_manual_or_physical_work() -> None:
+              readiness = _readiness()
+              readiness["prerequisites"]["operator_registry"][
+                  "independent_verifier_available"
+              ] = False
+              readiness["prerequisites"]["object_registration"] = _prerequisite(
+                  present=False,
+                  valid=False,
+              )
+              readiness["missing_prerequisites"] = ["object_registration"]
+
+              decision = _derive(readiness, _source_panel())
+
+              action = decision["action"]
+              assert decision["valid"] is True
+              assert action["action_id"] == "stop_independent_verifier_unavailable"
+              assert action["category"] == "governance_blocker"
+              assert action["automatable"] is False
+              assert action["physical_acquisition_required"] is False
+              assert action["target_outcomes_permitted"] is False
+              assert action["blocking_items"] == [
+                  "single_operator_project_cannot_satisfy_independent_verification"
+              ]
+
+
+          def test_invalid_operator_registry_template_requires_repair() -> None:
+          '''.replace("          ", ""),
+          )
+
+          jobs_path = Path(".github/self-hosted-jobs.json")
+          payload = json.loads(jobs_path.read_text(encoding="utf-8"))
+          payload["jobs"] = [
+              entry
+              for entry in payload["jobs"]
+              if entry["workflow"] != "seal-operator-registry-self-hosted.yml"
+          ]
+          payload["jobs"].append(
+              {
+                  "workflow": "correct-operator-registry-self-hosted.yml",
+                  "job": "correct",
+                  "authorization_model": "main-only",
+                  "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi"],
+                  "purpose": (
+                      "Replace the unsupported roster with the single real participant"
+                  ),
+                  "dataset_access": (
+                      "registered-local-preacquisition-operator-registry-correction"
+                  ),
+                  "secrets_allowed": False,
+              }
+          )
+          payload["jobs"].sort(key=lambda value: (value["workflow"], value["job"]))
+          jobs_path.write_text(
+              json.dumps(payload, indent=2, sort_keys=False) + "\n",
+              encoding="utf-8",
+          )
+          PY
+          rm -f \
+            .github/workflows/seal-operator-registry-self-hosted.yml \
+            docs/workstation2_operator_registry_seal.md \
+            scripts/ci/seal_self_hosted_operator_registry.py \
+            tests/test_operator_registry_seal_workflow.py \
+            tests/test_self_hosted_operator_registry_seal.py \
+            .github/workflows/apply-single-operator-remediation.yml \
+            .agent/apply-single-operator-remediation
+
+      - name: Format and validate the correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -e ".[dev]"
+          python -m ruff format \
+            scripts/ci/correct_self_hosted_operator_registry.py \
+            tests/test_operator_registry.py \
+            tests/test_preacquisition_next_action.py \
+            tests/test_self_hosted_operator_registry_correction.py \
+            tests/test_operator_registry_correction_workflow.py
+          python -m ruff check .
+          python -m mypy --python-version 3.12 \
+            scripts/ci/correct_self_hosted_operator_registry.py
+          python -m pytest -q \
+            tests/test_operator_registry.py \
+            tests/test_preacquisition_next_action.py \
+            tests/test_self_hosted_operator_registry_correction.py \
+            tests/test_operator_registry_correction_workflow.py \
+            tests/test_self_hosted_workflow_policy.py
+          git diff --check
+          if grep -R -n -E \
+            'Anna Seel|Markus Rummel|Michael Feurer|environment\.approver|freezer\.primary|gate\.operational|verifier\.independent' \
+            --exclude-dir=.git .; then
+            echo "Unsupported identities remain in the current tree" >&2
+            exit 1
+          fi
+
+      - name: Commit and push the product correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "Correct the operator registry to FlorianPfaff only"
+          git push origin HEAD:agent/correct-single-operator-registry
