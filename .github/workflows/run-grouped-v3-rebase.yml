@@ -1,0 +1,63 @@
+name: Run grouped-v3 current-main rebase
+
+on:
+  push:
+    branches:
+      - agent/grouped-v3-bootstrap
+
+permissions:
+  contents: write
+
+concurrency:
+  group: grouped-v3-current-main-rebase-push
+  cancel-in-progress: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Check out exact helper revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Extract the reviewed reconstruction script
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check "PyYAML==6.0.3"
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          import yaml
+
+          workflow = yaml.safe_load(
+              Path(".github/workflows/bootstrap-grouped-v3.yml").read_text(
+                  encoding="utf-8"
+              )
+          )
+          steps = workflow["jobs"]["rebase"]["steps"]
+          matches = [
+              step["run"]
+              for step in steps
+              if step.get("name")
+              == "Reconstruct, integrate, verify, and publish the review branch"
+          ]
+          if len(matches) != 1:
+              raise SystemExit("expected one reviewed grouped-v3 reconstruction step")
+          path = Path(os.environ["RUNNER_TEMP"]) / "grouped-v3-rebase.sh"
+          path.write_text("set -euo pipefail\n" + matches[0] + "\n", encoding="utf-8")
+          PY
+
+      - name: Execute the reviewed reconstruction script
+        env:
+          BASE_SHA: 308cbd92a11b602b9483b08aec655e385b3f6b1e
+          EXPECTED_TARGET_SHA: a01d5e98aeb41eac2d3e9d252aa5f683eb1d94e7
+          GH_TOKEN: ${{ github.token }}
+          PATCH_BASE_SHA: de5116f0bd7e6c04c1ccd4af6b5f4cc8b089f65f
+          SOURCE_PATCH_SHA: 4aa560ab74066c13efb5ae7d73102de4c244561e
+          TARGET_BRANCH: agent/grouped-normalized-v3-review
+        run: bash "$RUNNER_TEMP/grouped-v3-rebase.sh"
