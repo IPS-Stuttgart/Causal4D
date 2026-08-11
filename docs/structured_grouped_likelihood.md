@@ -98,5 +98,6 @@ The structured covariance representation is also supported by the opt-in
 score. That score preserves the dense/low-rank equivalence described here while
 adding contributor-capped coordinate normalization, an explicit likelihood
 power, conditioning diagnostics, and a fail-closed source-covariance threshold.
-`legacy_sum_v1` remains the default and the registered physical estimator is
-unchanged.
+Supplying dense or low-rank structured covariance alone never selects v3; callers
+must choose its score semantics explicitly. `legacy_sum_v1` remains the default
+and the registered physical estimator is unchanged.
