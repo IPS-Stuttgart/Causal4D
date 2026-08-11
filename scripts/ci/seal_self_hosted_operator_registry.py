@@ -236,21 +236,35 @@ def _operator_records(
     secret: bytes,
     private_roster: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
-    assignments = private_roster.get("assignments")
-    _require(isinstance(assignments, list), "private operator assignments are missing")
+    assignments_value = private_roster.get("assignments")
+    _require(
+        isinstance(assignments_value, list),
+        "private operator assignments are missing",
+    )
+    assignments = cast(list[Any], assignments_value)
     records: list[dict[str, Any]] = []
     for index, value in enumerate(assignments):
         _require(isinstance(value, Mapping), f"private assignment {index} is invalid")
         assignment = dict(cast(Mapping[str, Any], value))
-        operator_id = assignment.get("operator_id")
-        principal = assignment.get("canonical_principal")
-        roles = assignment.get("roles")
-        _require(isinstance(operator_id, str), "private operator id is invalid")
-        _require(isinstance(principal, str), "private principal is invalid")
+        operator_id_value = assignment.get("operator_id")
+        principal_value = assignment.get("canonical_principal")
+        roles_value = assignment.get("roles")
         _require(
-            isinstance(roles, list) and all(isinstance(role, str) for role in roles),
+            isinstance(operator_id_value, str),
+            "private operator id is invalid",
+        )
+        _require(
+            isinstance(principal_value, str),
+            "private principal is invalid",
+        )
+        _require(
+            isinstance(roles_value, list)
+            and all(isinstance(role, str) for role in roles_value),
             "private operator roles are invalid",
         )
+        operator_id = cast(str, operator_id_value)
+        principal = cast(str, principal_value)
+        roles = cast(list[str], roles_value)
         records.append(
             {
                 "operator_id": operator_id,
