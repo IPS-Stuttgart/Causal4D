@@ -178,6 +178,20 @@
       "secrets_allowed": false
     },
     {
+      "workflow": "seal-operator-registry-self-hosted.yml",
+      "job": "seal",
+      "authorization_model": "main-only",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi"
+      ],
+      "purpose": "Seal the registered operator roster from workstation-private identity material",
+      "dataset_access": "registered-local-preacquisition-operator-registry-write",
+      "secrets_allowed": false
+    },
+    {
       "workflow": "self-hosted-evaluation.yml",
       "job": "evaluate",
       "authorization_model": "main-only",
