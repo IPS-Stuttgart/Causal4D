@@ -40,6 +40,14 @@ latent-contact inference, intervention abduction, counterfactual operators,
 discrepancy transfer, semantic trust gates, physical validation, and
 prospective mechanism gates.
 
+The structural model, causal timing, transport assumptions, and real-data
+identification boundary are formalized in
+[docs/causal_model_and_identification.md](docs/causal_model_and_identification.md).
+Analysis-only action comparisons use the typed, content-addressed
+`InterventionalContrastPosteriorV1` API documented in
+[docs/interventional_contrast.md](docs/interventional_contrast.md); they do not
+change a source posterior or the frozen physical protocol.
+
 ### Bayesian-PhysTwin integration
 
 [Bayesian-PhysTwin](https://github.com/IPS-Stuttgart/BayesianPhysTwin) supplies
