@@ -89,6 +89,21 @@ def _validate_factual_context(
             raise ValueError(f"counterfactual artifacts disagree on factual {name}")
 
 
+def _validated_query_node_indices(
+    query: CounterfactualQuery,
+    *,
+    node_count: int,
+) -> np.ndarray:
+    if query.query_node_indices is None:
+        return np.arange(node_count, dtype=np.int64)
+    nodes = np.asarray(query.query_node_indices, dtype=np.int64)
+    if np.any(nodes >= node_count):
+        raise ValueError("query_node_indices exceed the rollout-bank node count")
+    if len(np.unique(nodes)) != len(nodes):
+        raise ValueError("query_node_indices must not contain duplicates")
+    return nodes
+
+
 def _validate_query_bank(
     bank: JointRolloutBank,
     query: CounterfactualQuery,
@@ -104,6 +119,13 @@ def _validate_query_bank(
     }
     if action_ids != {query.context.u_cf.action_id}:
         raise ValueError("rollout bank does not contain exactly the queried action")
+    expected_frame_count = query.horizon_frames + 1
+    if bank.frame_count != expected_frame_count:
+        raise ValueError(
+            "rollout bank must contain one intervention-endpoint frame plus "
+            "query.horizon_frames future frames"
+        )
+    _validated_query_node_indices(query, node_count=bank.node_count)
 
 
 def _new_contact_weights(
@@ -343,6 +365,87 @@ def apply_counterfactual_operator(
             "discrepancy_injected_into_simulator_state": False,
             "discrepancy_applied_to_readout": True,
         },
+    )
+
+
+def project_physical_posterior(
+    posterior: PhysicalPosterior,
+    query: CounterfactualQuery,
+    *,
+    include_endpoint: bool = False,
+) -> PhysicalPosterior:
+    """Project a dense posterior onto the registered query horizon and nodes.
+
+    Counterfactual rollout banks contain the factual intervention endpoint at
+    frame zero followed by exactly ``query.horizon_frames`` future frames.  The
+    default projection removes that endpoint and preserves the requested node
+    order.  The source posterior is not modified, and its identity is recorded
+    in the projected artifact metadata.
+    """
+
+    if type(include_endpoint) is not bool:
+        raise ValueError("include_endpoint must be boolean")
+    if posterior.source_query_id != query.artifact_id:
+        raise ValueError("physical posterior does not descend from the query")
+    if posterior.context != query.context:
+        raise ValueError("physical posterior and query contexts differ")
+    expected_frame_count = query.horizon_frames + 1
+    if posterior.state_trajectories_m.shape[1] != expected_frame_count:
+        raise ValueError(
+            "physical posterior must contain one endpoint frame plus the query horizon"
+        )
+    nodes = _validated_query_node_indices(
+        query,
+        node_count=posterior.state_trajectories_m.shape[2],
+    )
+    frame_start = 0 if include_endpoint else 1
+    state = np.take(
+        posterior.state_trajectories_m[:, frame_start:],
+        nodes,
+        axis=2,
+    )
+    readout = np.take(
+        posterior.readout_trajectories_m[:, frame_start:],
+        nodes,
+        axis=2,
+    )
+    variance = np.take(posterior.readout_variance_m2, nodes, axis=1)
+    metadata = dict(posterior.metadata)
+    metadata.update(
+        {
+            "operator": "physical-posterior-query-projection",
+            "source_physical_posterior_id": posterior.artifact_id,
+            "rollout_includes_pre_intervention_endpoint": include_endpoint,
+            "projection_includes_intervention_endpoint": include_endpoint,
+            "projection_frame_start_relative_to_endpoint": frame_start,
+            "projection_frame_stop_relative_to_endpoint": expected_frame_count,
+            "projection_node_selection": (
+                "all" if query.query_node_indices is None else "explicit"
+            ),
+            "projection_node_count": len(nodes),
+            "projection_node_indices": (
+                None if query.query_node_indices is None else nodes.tolist()
+            ),
+            "projection_preserves_component_weights": True,
+        }
+    )
+    return PhysicalPosterior(
+        context=posterior.context,
+        component_ids=posterior.component_ids,
+        state_trajectories_m=state,
+        readout_trajectories_m=readout,
+        readout_variance_m2=variance,
+        weights=posterior.weights,
+        phi=posterior.phi,
+        kappa_cf=posterior.kappa_cf,
+        hypothesis_indices=posterior.hypothesis_indices,
+        twin_particle_indices=posterior.twin_particle_indices,
+        phi_names=posterior.phi_names,
+        kappa_names=posterior.kappa_names,
+        source_twin_belief_id=posterior.source_twin_belief_id,
+        source_factual_intervention_id=posterior.source_factual_intervention_id,
+        source_query_id=posterior.source_query_id,
+        metadata=metadata,
     )
 
 

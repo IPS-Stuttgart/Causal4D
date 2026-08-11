@@ -13,6 +13,7 @@ from causal4d.factual_abduction_uncertainty import (
 )
 from causal4d.grouped_likelihood import (
     GroupLikelihoodDiagnostics,
+    grouped_component_log_likelihoods,
     posterior_weights_from_grouped_evidence,
 )
 from causal4d.identifiability import InterventionIdentifiabilityResult
@@ -22,6 +23,7 @@ from causal4d.prefix_likelihood import (
     update_joint_weights_from_prefix,
 )
 from causal4d.rollout_bank import JointRolloutBank
+from causal4d.weighting import log_weights_from_probabilities
 
 
 DenseLikelihoodSemantics = Literal["legacy_v1", "normalized_v2"]
@@ -150,6 +152,149 @@ def _grouped_diagnostics_summary(
     return result
 
 
+def _validated_grouped_component_batch_size(
+    value: int | None,
+) -> int | None:
+    if value is None:
+        return None
+    if type(value) is not int or value < 1:
+        raise ValueError("grouped_component_batch_size must be a positive integer")
+    return value
+
+
+def _posterior_weights_from_grouped_evidence_batched(
+    bank: JointRolloutBank,
+    belief: TwinBelief,
+    evidence: GroupedObservationEvidence,
+    *,
+    prefix_frame_count: int,
+    prior_weights: np.ndarray,
+    additional_independent_variance_m2: np.ndarray | None,
+    group_covariance_m2: dict[str, np.ndarray],
+    group_covariance_factor_m: dict[str, np.ndarray],
+    component_batch_size: int,
+) -> tuple[np.ndarray, GroupLikelihoodDiagnostics]:
+    """Evaluate grouped evidence without a full discrepancy-aware rollout copy."""
+
+    trajectories = np.asarray(bank.trajectories)
+    if trajectories.ndim != 5:
+        raise ValueError(
+            "grouped batched abduction requires rollout shape "
+            "(hypothesis, particle, frame, node, coordinate)"
+        )
+    hypothesis_count, particle_count = trajectories.shape[:2]
+    component_count = hypothesis_count * particle_count
+    prior = np.asarray(prior_weights, dtype=float)
+    if prior.shape != (hypothesis_count, particle_count):
+        raise ValueError("prior_weights must match rollout hypotheses and particles")
+    if (
+        not np.all(np.isfinite(prior))
+        or np.any(prior < 0.0)
+        or not np.isclose(np.sum(prior), 1.0)
+    ):
+        raise ValueError("prior_weights must be nonnegative and sum to one")
+    discrepancy, discrepancy_variance = _belief_readout(bank, belief)
+
+    scores = np.empty(component_count, dtype=float)
+    responsibilities: np.ndarray | None = None
+    group_ids: tuple[str, ...] | None = None
+    effective_group_weights: tuple[float, ...] | None = None
+    full_covariance_group_ids: tuple[str, ...] | None = None
+    low_rank_covariance_group_ids: tuple[str, ...] | None = None
+
+    for start in range(0, component_count, component_batch_size):
+        stop = min(start + component_batch_size, component_count)
+        flat_indices = np.arange(start, stop, dtype=np.int64)
+        hypothesis_indices = flat_indices // particle_count
+        particle_indices = flat_indices % particle_count
+        components = trajectories[hypothesis_indices, particle_indices].astype(float)
+        components = components + discrepancy[particle_indices, None]
+        component_variance = np.broadcast_to(
+            discrepancy_variance[particle_indices, None],
+            components.shape,
+        )
+        if additional_independent_variance_m2 is not None:
+            component_variance = (
+                component_variance
+                + (
+                    additional_independent_variance_m2[
+                        hypothesis_indices,
+                        particle_indices,
+                    ]
+                )
+            )
+        dense_batch = {
+            group_id: covariance[hypothesis_indices, particle_indices]
+            for group_id, covariance in group_covariance_m2.items()
+        }
+        factor_batch = {
+            group_id: factor[hypothesis_indices, particle_indices]
+            for group_id, factor in group_covariance_factor_m.items()
+        }
+        batch_scores, diagnostics = grouped_component_log_likelihoods(
+            components,
+            evidence,
+            prefix_frame_count=prefix_frame_count,
+            component_variance_m2=component_variance,
+            component_group_covariance_m2=dense_batch,
+            component_group_covariance_factor_m=factor_batch,
+        )
+        scores[start:stop] = batch_scores.reshape(-1)
+        batch_responsibilities = np.asarray(
+            diagnostics.nominal_responsibilities,
+            dtype=float,
+        ).reshape(stop - start, -1)
+        if responsibilities is None:
+            responsibilities = np.empty(
+                (component_count, batch_responsibilities.shape[1]),
+                dtype=float,
+            )
+            group_ids = diagnostics.group_ids
+            effective_group_weights = diagnostics.effective_group_weights
+            full_covariance_group_ids = diagnostics.full_covariance_group_ids
+            low_rank_covariance_group_ids = diagnostics.low_rank_covariance_group_ids
+        elif (
+            diagnostics.group_ids != group_ids
+            or diagnostics.effective_group_weights != effective_group_weights
+            or diagnostics.full_covariance_group_ids != full_covariance_group_ids
+            or diagnostics.low_rank_covariance_group_ids
+            != low_rank_covariance_group_ids
+        ):
+            raise RuntimeError("grouped diagnostics changed between component batches")
+        responsibilities[start:stop] = batch_responsibilities
+
+    if (
+        responsibilities is None
+        or group_ids is None
+        or effective_group_weights is None
+        or full_covariance_group_ids is None
+        or low_rank_covariance_group_ids is None
+    ):
+        raise RuntimeError("grouped batched abduction produced no component scores")
+    log_posterior = (
+        log_weights_from_probabilities(
+            prior.reshape(-1),
+            name="prior_weights",
+        )
+        + scores
+    )
+    maximum = float(np.max(log_posterior))
+    posterior = np.exp(log_posterior - maximum)
+    posterior /= np.sum(posterior)
+    diagnostics = GroupLikelihoodDiagnostics(
+        group_ids=group_ids,
+        effective_group_weights=effective_group_weights,
+        nominal_responsibilities=responsibilities.reshape(
+            hypothesis_count,
+            particle_count,
+            -1,
+        ),
+        full_covariance_group_ids=full_covariance_group_ids,
+        low_rank_covariance_group_ids=low_rank_covariance_group_ids,
+    )
+    return posterior.reshape(hypothesis_count, particle_count), diagnostics
+
+
 def _update_joint_weights(
     bank: JointRolloutBank,
     belief: TwinBelief,
@@ -161,10 +306,16 @@ def _update_joint_weights(
     base_weights: np.ndarray | None = None,
     grouped_evidence: GroupedObservationEvidence | None = None,
     abduction_uncertainty: FactualAbductionUncertaintyV1 | None = None,
+    grouped_component_batch_size: int | None = None,
 ) -> tuple[np.ndarray, GroupLikelihoodDiagnostics | None]:
     if grouped_evidence is not None and settings.likelihood_semantics != "legacy_v1":
         raise ValueError(
             "normalized_v2 cannot be combined with grouped observation evidence"
+        )
+    batch_size = _validated_grouped_component_batch_size(grouped_component_batch_size)
+    if batch_size is not None and grouped_evidence is None:
+        raise ValueError(
+            "grouped_component_batch_size requires grouped observation evidence"
         )
     discrepancy, discrepancy_variance = _belief_readout(bank, belief)
     if grouped_evidence is None:
@@ -200,10 +351,7 @@ def _update_joint_weights(
                 particle_discrepancy_variance_m2=discrepancy_variance,
             )
         return joint_weights, None
-    components = physical_readout_components(bank, belief)
-    component_variance = np.broadcast_to(
-        discrepancy_variance[None, :, None], components.shape
-    )
+    additional_variance: np.ndarray | None = None
     group_covariance: dict[str, np.ndarray] = {}
     group_covariance_factor: dict[str, np.ndarray] = {}
     if abduction_uncertainty is not None:
@@ -214,9 +362,25 @@ def _update_joint_weights(
                 grouped_evidence,
             )
         )
-        if additional_variance is not None:
-            component_variance = component_variance + additional_variance
     prior = bank.prior_joint_weights if base_weights is None else base_weights
+    if batch_size is not None:
+        return _posterior_weights_from_grouped_evidence_batched(
+            bank,
+            belief,
+            grouped_evidence,
+            prefix_frame_count=prefix_frame_count,
+            prior_weights=prior,
+            additional_independent_variance_m2=additional_variance,
+            group_covariance_m2=group_covariance,
+            group_covariance_factor_m=group_covariance_factor,
+            component_batch_size=batch_size,
+        )
+    components = physical_readout_components(bank, belief)
+    component_variance = np.broadcast_to(
+        discrepancy_variance[None, :, None], components.shape
+    )
+    if additional_variance is not None:
+        component_variance = component_variance + additional_variance
     return posterior_weights_from_grouped_evidence(
         prior,
         components,
@@ -241,6 +405,7 @@ def abduct_factual_intervention(
     abstain_when_unidentifiable: bool = False,
     identifiability_policy: IdentifiabilityPolicy = "full_parameter",
     abduction_uncertainty: FactualAbductionUncertaintyV1 | None = None,
+    grouped_component_batch_size: int | None = None,
 ) -> FactualIntervention:
     """Infer persistent ``phi`` and factual event ``kappa_obs`` from O+ only.
 
@@ -250,6 +415,10 @@ def abduct_factual_intervention(
     ``abstain_when_unidentifiable`` is true, a failed supplied identifiability
     result returns the unchanged joint prior over physical and intervention
     support rather than a falsely concentrated posterior.
+
+    ``grouped_component_batch_size`` is an execution-only memory bound for the
+    grouped-evidence path. It does not enter artifact metadata and must preserve
+    the exact posterior and artifact identity of the dense implementation.
     """
 
     settings = config or FactualAbductionConfig()
@@ -300,6 +469,7 @@ def abduct_factual_intervention(
             settings=settings,
             grouped_evidence=grouped_evidence,
             abduction_uncertainty=abduction_uncertainty,
+            grouped_component_batch_size=grouped_component_batch_size,
         )
     hand_count = len(bank.hypothesis_metadata[0]["contact"]["attachment_shifts"])
     phi_names = ("gain_multiplier", "delay_steps", "rotation_degrees")
@@ -452,8 +622,13 @@ def evaluate_factual_abduction(
     config: FactualAbductionConfig | None = None,
     grouped_evidence: GroupedObservationEvidence | None = None,
     abduction_uncertainty: FactualAbductionUncertaintyV1 | None = None,
+    grouped_component_batch_size: int | None = None,
 ) -> dict[str, Any]:
-    """Compare BPT+z with a same-evidence BPT posterior fixed to nominal z."""
+    """Compare BPT+z with a same-evidence BPT posterior fixed to nominal z.
+
+    ``grouped_component_batch_size`` has the same execution-only semantics as in
+    :func:`abduct_factual_intervention`.
+    """
 
     settings = config or FactualAbductionConfig()
     z_weights = factual_joint_weights(
@@ -476,6 +651,7 @@ def evaluate_factual_abduction(
         base_weights=nominal_base,
         grouped_evidence=grouped_evidence,
         abduction_uncertainty=abduction_uncertainty,
+        grouped_component_batch_size=grouped_component_batch_size,
     )
     components = physical_readout_components(bank, belief)
     hypothesis_marginal = np.sum(z_weights, axis=1)
