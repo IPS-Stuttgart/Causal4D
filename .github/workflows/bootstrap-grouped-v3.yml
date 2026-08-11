@@ -39,7 +39,11 @@ jobs:
           remote_main="$(
             git ls-remote origin refs/heads/main | awk '{print $1}'
           )"
+          remote_target="$(
+            git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}'
+          )"
           test "$remote_main" = "$BASE_SHA"
+          test "$remote_target" = "$EXPECTED_TARGET_SHA"
           git cat-file -e "$BASE_SHA^{commit}"
 
           base64 --decode .agent/grouped-v3-rebased.patch.gz.b64 > \
@@ -110,7 +114,10 @@ jobs:
           git commit -m "Add grouped covariance-normalized likelihood v3" \
             -m "Rebase the opt-in grouped full-covariance normalized score onto registered-query structured factual abduction. Add contributor caps, reliability tempering, explicit likelihood power, source-covariance conditioning diagnostics, and invariant tests while preserving legacy defaults and the registered physical-study artifact identity."
 
+          remote_target_after_build="$(
+            git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}'
+          )"
+          test "$remote_target_after_build" = "$EXPECTED_TARGET_SHA"
           auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           git -c http.extraheader="AUTHORIZATION: basic $auth" push \
-            --force-with-lease="refs/heads/$TARGET_BRANCH:$EXPECTED_TARGET_SHA" \
-            origin "HEAD:refs/heads/$TARGET_BRANCH"
+            --force origin "HEAD:refs/heads/$TARGET_BRANCH"
