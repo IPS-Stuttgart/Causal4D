@@ -85,8 +85,7 @@ def _validated_dense_covariances(
             )
         if float(np.min(np.linalg.eigvalsh(covariance), initial=0.0)) < -1e-10:
             raise ValueError(
-                f"dense covariance for group {group_id!r} must be positive "
-                "semidefinite"
+                f"dense covariance for group {group_id!r} must be positive semidefinite"
             )
         result[group_id] = covariance
     return MappingProxyType(result)
@@ -105,9 +104,7 @@ def _validated_low_rank_factors(
                 "(coordinate, positive_rank)"
             )
         if not np.all(np.isfinite(factor)):
-            raise ValueError(
-                f"low-rank factor for group {group_id!r} must be finite"
-            )
+            raise ValueError(f"low-rank factor for group {group_id!r} must be finite")
         result[group_id] = factor
     return MappingProxyType(result)
 
@@ -189,8 +186,7 @@ class FactualAbductionUncertaintyV1:
             )
             if not np.all(np.isfinite(independent)) or np.any(independent < 0.0):
                 raise ValueError(
-                    "additional_independent_variance_m2 must be finite and "
-                    "nonnegative"
+                    "additional_independent_variance_m2 must be finite and nonnegative"
                 )
         dense = _validated_dense_covariances(self.group_covariance_m2)
         factors = _validated_low_rank_factors(self.group_covariance_factor_m)
@@ -447,9 +443,7 @@ def save_factual_abduction_uncertainty_npz(
             )
         ),
         "dense_group_ids": np.asarray(tuple(uncertainty.group_covariance_m2)),
-        "factor_group_ids": np.asarray(
-            tuple(uncertainty.group_covariance_factor_m)
-        ),
+        "factor_group_ids": np.asarray(tuple(uncertainty.group_covariance_factor_m)),
     }
     if uncertainty.additional_independent_variance_m2 is not None:
         arrays["additional_independent_variance_m2"] = (
@@ -495,12 +489,16 @@ def load_factual_abduction_uncertainty_npz(
         metadata = json.loads(metadata_text)
     except json.JSONDecodeError as error:
         raise ValueError("uncertainty metadata_json must contain valid JSON") from error
-    dense_ids = _string_vector(payload, "dense_group_ids") if np.asarray(
-        payload.get("dense_group_ids", np.asarray([], dtype=str))
-    ).size else ()
-    factor_ids = _string_vector(payload, "factor_group_ids") if np.asarray(
-        payload.get("factor_group_ids", np.asarray([], dtype=str))
-    ).size else ()
+    dense_ids = (
+        _string_vector(payload, "dense_group_ids")
+        if np.asarray(payload.get("dense_group_ids", np.asarray([], dtype=str))).size
+        else ()
+    )
+    factor_ids = (
+        _string_vector(payload, "factor_group_ids")
+        if np.asarray(payload.get("factor_group_ids", np.asarray([], dtype=str))).size
+        else ()
+    )
     dense: dict[str, np.ndarray] = {}
     for index, group_id in enumerate(dense_ids):
         key = f"dense_group_covariance_m2_{index:04d}"

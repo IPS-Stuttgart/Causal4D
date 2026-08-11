@@ -78,9 +78,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--difference-correlation",
         type=float,
         default=0.0,
-        help=(
-            "Adjacent-frame observation correlation used only by normalized_v2."
-        ),
+        help=("Adjacent-frame observation correlation used only by normalized_v2."),
     )
     parser.add_argument(
         "--grouped-observation-likelihood",

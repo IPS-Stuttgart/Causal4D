@@ -225,9 +225,7 @@ def test_registered_query_policy_falls_back_exactly_for_unresolved_query() -> No
 
 def test_registered_query_policy_requires_query_sensitivity() -> None:
     bank, belief, observations, mask, config, evidence = _problem()
-    identifiability = assess_intervention_identifiability(
-        np.asarray([[1.0], [0.0]])
-    )
+    identifiability = assess_intervention_identifiability(np.asarray([[1.0], [0.0]]))
     with pytest.raises(ValueError, match="requires query_sensitivity"):
         abduct_factual_intervention(
             bank,
@@ -292,9 +290,7 @@ def test_abduction_uncertainty_rejects_wrong_bindings() -> None:
         source_only=True,
         disjoint_from_twin_belief_uncertainty=True,
         disjoint_from_grouped_observation_covariance=True,
-        group_covariance_m2={
-            group.group_id: np.eye(group.coordinate_count) * 1e-6
-        },
+        group_covariance_m2={group.group_id: np.eye(group.coordinate_count) * 1e-6},
     )
     with pytest.raises(ValueError, match="rollout_bank_id"):
         abduct_factual_intervention(
@@ -340,9 +336,7 @@ def test_abduction_uncertainty_rejects_duplicate_dense_and_factor_routes() -> No
             source_only=True,
             disjoint_from_twin_belief_uncertainty=True,
             disjoint_from_grouped_observation_covariance=True,
-            group_covariance_m2={
-                group.group_id: np.eye(group.coordinate_count) * 1e-6
-            },
+            group_covariance_m2={group.group_id: np.eye(group.coordinate_count) * 1e-6},
             group_covariance_factor_m={
                 group.group_id: np.zeros((group.coordinate_count, 1))
             },
