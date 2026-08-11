@@ -24,9 +24,7 @@ from typing import Any, Literal, cast
 EVIDENCE_DECISION_SCHEMA = "bayesian_phystwin.evidence_decision"
 EVIDENCE_DECISION_SCHEMA_VERSION = 1
 EVIDENCE_DECISION_SOURCE_REPOSITORY = "IPS-Stuttgart/BayesianPhysTwin"
-EVIDENCE_DECISION_SOURCE_REVISION = (
-    "4ee702f5130cfedbea7bce6be5e72483c92f63da"
-)
+EVIDENCE_DECISION_SOURCE_REVISION = "4ee702f5130cfedbea7bce6be5e72483c92f63da"
 EVIDENCE_DECISION_JSON_SCHEMA_SHA256 = (
     "d5615258c6cf666d0ed9684a87930989adf91817fe99b0387e83a31479dcd465"
 )
@@ -266,10 +264,7 @@ def _require_repository(value: Any, *, name: str) -> str:
     owner, repository = parts
     if _GITHUB_OWNER.fullmatch(owner) is None:
         raise ValueError(f"{name} contains an invalid GitHub owner")
-    if (
-        _GITHUB_REPOSITORY.fullmatch(repository) is None
-        or repository in {".", ".."}
-    ):
+    if _GITHUB_REPOSITORY.fullmatch(repository) is None or repository in {".", ".."}:
         raise ValueError(f"{name} contains an invalid GitHub repository")
     return text
 
@@ -396,9 +391,7 @@ class ValidatedEvidenceDecisionV1:
             "run_manifest_id": self.run_manifest_id,
             "evidence_fingerprint": self.evidence_fingerprint,
             "evidence_summary_sha256": self.evidence_summary_sha256,
-            "repositories": [
-                repository.as_dict() for repository in self.repositories
-            ],
+            "repositories": [repository.as_dict() for repository in self.repositories],
             "limitations": list(self.limitations),
             "metadata": _plain_json(self.metadata),
         }
@@ -496,9 +489,7 @@ def validate_evidence_decision_v1(
         for item in _require_sequence(payload["repositories"], name="repositories")
     )
     primary = [
-        repository
-        for repository in repositories
-        if repository.role == "primary"
+        repository for repository in repositories if repository.role == "primary"
     ]
     if len(primary) != 1:
         raise ValueError("evidence decision requires exactly one primary repository")
@@ -510,19 +501,14 @@ def validate_evidence_decision_v1(
     normalized_repositories = (
         primary[0],
         *sorted(
-            (
-                repository
-                for repository in repositories
-                if repository.role != "primary"
-            ),
+            (repository for repository in repositories if repository.role != "primary"),
             key=lambda repository: (repository.role, repository.repository),
         ),
     )
 
     raw_limitations = _require_sequence(payload["limitations"], name="limitations")
     limitations = tuple(
-        _require_text(limitation, name="limitation")
-        for limitation in raw_limitations
+        _require_text(limitation, name="limitation") for limitation in raw_limitations
     )
     if len(limitations) != len(set(limitations)):
         raise ValueError("limitations must be unique")
@@ -629,8 +615,7 @@ def require_repository_binding_v1(
         else validate_evidence_decision_v1(decision)
     )
     names = tuple(
-        _require_repository(name, name="repository name")
-        for name in repository_names
+        _require_repository(name, name="repository name") for name in repository_names
     )
     if not names or len(names) != len(set(names)):
         raise ValueError("repository_names must be nonempty and unique")
@@ -653,9 +638,13 @@ def require_repository_binding_v1(
             raise ValueError("allowed_roles contains an unsupported repository role")
         if result.role not in roles:
             raise ValueError("evidence decision repository role is not allowed")
-    clean = validated.claim_authorized if require_clean is None else _require_bool(
-        require_clean,
-        name="require_clean",
+    clean = (
+        validated.claim_authorized
+        if require_clean is None
+        else _require_bool(
+            require_clean,
+            name="require_clean",
+        )
     )
     if clean and result.dirty:
         raise ValueError("evidence decision repository binding is dirty")
@@ -683,9 +672,7 @@ def _require_alias_binding_v1(
         if repository.repository in aliases
     ]
     if len(matches) != 1:
-        raise ValueError(
-            f"evidence decision must bind exactly one {label} repository"
-        )
+        raise ValueError(f"evidence decision must bind exactly one {label} repository")
     return require_repository_binding_v1(
         validated,
         repository_names=(matches[0].repository,),
@@ -766,9 +753,7 @@ class CausalClaimAdmissionV1:
             "evidence_level": self.decision.evidence_level,
             "bayesian_phystwin": self.bayesian_phystwin.as_dict(),
             "causal4d": self.causal4d.as_dict(),
-            "prob4d": (
-                None if self.prob4d is None else self.prob4d.as_dict()
-            ),
+            "prob4d": (None if self.prob4d is None else self.prob4d.as_dict()),
         }
 
 
@@ -814,9 +799,7 @@ def admit_causal_claim_v1(
     elif len(matches) == 1:
         prob4d = require_prob4d_evidence_binding_v1(validated)
     elif len(matches) > 1:
-        raise ValueError(
-            "evidence decision must not bind multiple Prob4D repositories"
-        )
+        raise ValueError("evidence decision must not bind multiple Prob4D repositories")
 
     return CausalClaimAdmissionV1(
         decision=validated,
