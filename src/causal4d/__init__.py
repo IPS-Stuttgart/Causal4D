@@ -131,6 +131,7 @@ from causal4d.graph_mode_abduction import (
 )
 from causal4d.grouped_likelihood import (
     GroupLikelihoodDiagnostics,
+    GroupedScoreSemantics,
     grouped_component_log_likelihoods,
     posterior_weights_from_grouped_evidence,
 )
@@ -317,6 +318,7 @@ __all__ = [
     "GraphModeAbductionConfig",
     "GroupLikelihoodDiagnostics",
     "GroupedObservationEvidence",
+    "GroupedScoreSemantics",
     "HierarchicalAbductionResult",
     "INDEPENDENT_SENSOR_SCHEMA_VERSION",
     "INTERVENTIONAL_CONTRAST_SCHEMA_VERSION",
