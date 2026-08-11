@@ -134,7 +134,6 @@ jobs:
           BASE_SHA: 70b5e630c50b1a3702e1b5dc2d0309f530973c7d
           GH_TOKEN: ${{ github.token }}
           PATCH_SHA256: d657c132d8bd0515f2ed5bb33fcf96e8ba1ea33e8db0a112d74537f51f83dfd3
-          REPOSITORY: ${{ github.repository }}
           TARGET_BRANCH: agent/grouped-normalized-v3
         run: |
           set -euo pipefail
@@ -153,18 +152,16 @@ jobs:
           python -m compileall -q src tests
 
           actual="$(git diff --cached --name-only | LC_ALL=C sort)"
-          expected="$(cat <<'EOF'
-docs/grouped_normalized_likelihood_v3.md
-docs/structured_grouped_likelihood.md
-src/causal4d/__init__.py
-src/causal4d/cli/abduct_phystwin_intervention.py
-src/causal4d/grouped_likelihood.py
-src/causal4d/intervention_abduction.py
-src/causal4d/observation_evidence.py
-tests/test_factual_likelihood_semantics.py
-tests/test_grouped_normalized_v3.py
-EOF
-)"
+          expected="$(printf '%s\n' \
+            docs/grouped_normalized_likelihood_v3.md \
+            docs/structured_grouped_likelihood.md \
+            src/causal4d/__init__.py \
+            src/causal4d/cli/abduct_phystwin_intervention.py \
+            src/causal4d/grouped_likelihood.py \
+            src/causal4d/intervention_abduction.py \
+            src/causal4d/observation_evidence.py \
+            tests/test_factual_likelihood_semantics.py \
+            tests/test_grouped_normalized_v3.py | LC_ALL=C sort)"
           test "$actual" = "$expected"
 
           git config user.name github-actions[bot]
