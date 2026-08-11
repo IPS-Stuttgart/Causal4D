@@ -21,6 +21,9 @@ REAL_EFFECT_CONFIDENCE_LEVEL = 0.95
 REAL_EFFECT_BOOTSTRAP_REPLICATES = 20_000
 REAL_EFFECT_BOOTSTRAP_SEED = 20_260_726
 
+_PRIMARY_INTERVAL_METHOD = "target_session_bootstrap_t"
+_ROBUSTNESS_INTERVAL_METHOD = "student_t_mean"
+
 FloatArray: TypeAlias = NDArray[np.float64]
 
 
@@ -100,7 +103,7 @@ def percentile_bootstrap_mean_interval(
     )
     means = np.mean(array[indices], axis=1)
     tail = 0.5 * (1.0 - confidence_level)
-    lower, upper = np.quantile(means, [tail, 1.0 - tail])
+    lower, upper = np.quantile(means, [tail, 1.0 - tail], method="linear")
     return {
         "estimable": True,
         "method": "target_session_percentile_bootstrap",
@@ -111,6 +114,7 @@ def percentile_bootstrap_mean_interval(
         "upper": float(upper),
         "replicates": replicates,
         "seed": seed,
+        "degenerate_sample": float(np.std(array, ddof=1)) == 0.0,
         "finite_sample_coverage_guaranteed": False,
     }
 
@@ -126,7 +130,7 @@ def student_t_mean_interval(
     array = _validated_values(values)
     if len(array) < 2:
         return _not_estimable_interval(
-            method="student_t_mean",
+            method=_ROBUSTNESS_INTERVAL_METHOD,
             sample_count=len(array),
             confidence_level=confidence_level,
             reason="at least two included sessions are required",
@@ -135,12 +139,33 @@ def student_t_mean_interval(
     point = float(np.mean(array))
     sample_sd = float(np.std(array, ddof=1))
     standard_error = sample_sd / math.sqrt(len(array))
+    assumptions = [
+        "independent session effects",
+        "approximately normal sampling distribution of the session mean",
+    ]
+    if sample_sd == 0.0:
+        result = _not_estimable_interval(
+            method=_ROBUSTNESS_INTERVAL_METHOD,
+            sample_count=len(array),
+            confidence_level=confidence_level,
+            reason="zero between-session variance prevents uncertainty estimation",
+        )
+        result.update(
+            degrees_of_freedom=len(array) - 1,
+            point_estimate=point,
+            sample_standard_deviation=sample_sd,
+            standard_error=standard_error,
+            degenerate_sample=True,
+            coverage_assumptions=assumptions,
+        )
+        return result
+
     tail = 0.5 * (1.0 - confidence_level)
     critical_value = float(student_t_distribution.ppf(1.0 - tail, df=len(array) - 1))
     half_width = critical_value * standard_error
     return {
         "estimable": True,
-        "method": "student_t_mean",
+        "method": _ROBUSTNESS_INTERVAL_METHOD,
         "confidence_level": confidence_level,
         "sample_count": len(array),
         "degrees_of_freedom": len(array) - 1,
@@ -150,11 +175,8 @@ def student_t_mean_interval(
         "critical_value": critical_value,
         "lower": point - half_width,
         "upper": point + half_width,
-        "degenerate_sample": sample_sd == 0.0,
-        "coverage_assumptions": [
-            "independent session effects",
-            "approximately normal sampling distribution of the session mean",
-        ],
+        "degenerate_sample": False,
+        "coverage_assumptions": assumptions,
         "finite_sample_coverage_guaranteed": False,
     }
 
@@ -176,7 +198,7 @@ def bootstrap_t_mean_interval(
     array = _validated_values(values)
     if len(array) < 2:
         result = _not_estimable_interval(
-            method="target_session_bootstrap_t",
+            method=_PRIMARY_INTERVAL_METHOD,
             sample_count=len(array),
             confidence_level=confidence_level,
             reason="at least two included sessions are required",
@@ -189,21 +211,23 @@ def bootstrap_t_mean_interval(
     sample_sd = float(np.std(array, ddof=1))
     sample_standard_error = sample_sd / math.sqrt(sample_count)
     if sample_standard_error == 0.0:
-        return {
-            "estimable": True,
-            "method": "target_session_bootstrap_t",
-            "confidence_level": confidence_level,
-            "sample_count": sample_count,
-            "point_estimate": point,
-            "lower": point,
-            "upper": point,
-            "replicates": replicates,
-            "seed": seed,
-            "finite_studentized_replicate_count": replicates,
-            "finite_studentized_replicate_fraction": 1.0,
-            "degenerate_sample": True,
-            "finite_sample_coverage_guaranteed": False,
-        }
+        result = _not_estimable_interval(
+            method=_PRIMARY_INTERVAL_METHOD,
+            sample_count=sample_count,
+            confidence_level=confidence_level,
+            reason="zero between-session variance prevents studentization",
+        )
+        result.update(
+            point_estimate=point,
+            sample_standard_deviation=sample_sd,
+            standard_error=sample_standard_error,
+            replicates=replicates,
+            seed=seed,
+            finite_studentized_replicate_count=0,
+            finite_studentized_replicate_fraction=0.0,
+            degenerate_sample=True,
+        )
+        return result
 
     generator = np.random.default_rng(seed)
     indices = generator.integers(
@@ -231,27 +255,32 @@ def bootstrap_t_mean_interval(
         lower_pivot, upper_pivot = np.quantile(
             studentized,
             [tail, 1.0 - tail],
+            method="linear",
         )
     lower = point - float(upper_pivot) * sample_standard_error
     upper = point - float(lower_pivot) * sample_standard_error
     if not np.isfinite(lower) or not np.isfinite(upper):
         result = _not_estimable_interval(
-            method="target_session_bootstrap_t",
+            method=_PRIMARY_INTERVAL_METHOD,
             sample_count=sample_count,
             confidence_level=confidence_level,
             reason="too many degenerate bootstrap resamples for finite pivots",
         )
         result.update(
+            point_estimate=point,
+            sample_standard_deviation=sample_sd,
+            standard_error=sample_standard_error,
             replicates=replicates,
             seed=seed,
             finite_studentized_replicate_count=int(np.sum(finite)),
             finite_studentized_replicate_fraction=float(np.mean(finite)),
+            degenerate_sample=False,
         )
         return result
 
     return {
         "estimable": True,
-        "method": "target_session_bootstrap_t",
+        "method": _PRIMARY_INTERVAL_METHOD,
         "confidence_level": confidence_level,
         "sample_count": sample_count,
         "point_estimate": point,
@@ -271,12 +300,65 @@ def bootstrap_t_mean_interval(
 
 
 def interval_excludes_nonpositive_effect(interval: Mapping[str, Any]) -> bool:
-    """Return whether one estimable interval has a strictly positive lower bound."""
+    """Return whether one usable interval has a strictly positive lower bound."""
 
     if interval.get("estimable") is not True:
         return False
+    if interval.get("degenerate_sample") is True:
+        return False
     lower = interval.get("lower")
     return type(lower) in {int, float} and np.isfinite(float(lower)) and lower > 0.0
+
+
+def _validated_registered_interval_pair(
+    primary: Mapping[str, Any],
+    robustness: Mapping[str, Any],
+) -> int:
+    if primary.get("method") != _PRIMARY_INTERVAL_METHOD:
+        raise ValueError("primary interval method is not the registered bootstrap-t")
+    if robustness.get("method") != _ROBUSTNESS_INTERVAL_METHOD:
+        raise ValueError("robustness interval method is not the registered Student-t")
+
+    primary_count = primary.get("sample_count")
+    robustness_count = robustness.get("sample_count")
+    if type(primary_count) is not int or primary_count < 0:
+        raise ValueError("primary interval sample_count must be nonnegative")
+    if type(robustness_count) is not int or robustness_count < 0:
+        raise ValueError("robustness interval sample_count must be nonnegative")
+    if primary_count != robustness_count:
+        raise ValueError("registered intervals must use the same session sample")
+
+    for name, interval in (("primary", primary), ("robustness", robustness)):
+        confidence_level = interval.get("confidence_level")
+        if type(confidence_level) not in {int, float} or not np.isclose(
+            float(confidence_level),
+            REAL_EFFECT_CONFIDENCE_LEVEL,
+            rtol=0.0,
+            atol=0.0,
+        ):
+            raise ValueError(
+                f"{name} interval confidence_level differs from the registered value"
+            )
+
+    if primary.get("estimable") is True and robustness.get("estimable") is True:
+        primary_point = primary.get("point_estimate")
+        robustness_point = robustness.get("point_estimate")
+        if type(primary_point) not in {int, float} or not np.isfinite(
+            float(primary_point)
+        ):
+            raise ValueError("primary interval point estimate must be finite")
+        if type(robustness_point) not in {int, float} or not np.isfinite(
+            float(robustness_point)
+        ):
+            raise ValueError("robustness interval point estimate must be finite")
+        if not np.isclose(
+            float(primary_point),
+            float(robustness_point),
+            rtol=0.0,
+            atol=0.0,
+        ):
+            raise ValueError("registered intervals must estimate the same session mean")
+    return primary_count
 
 
 def registered_positive_effect_interval_decision(
@@ -285,18 +367,37 @@ def registered_positive_effect_interval_decision(
 ) -> dict[str, Any]:
     """Apply the predeclared two-interval positive-claim rule.
 
-    Bootstrap-t is primary.  Student-t may veto a positive claim but can never
-    rescue a primary interval that includes zero or is not estimable.
+    Bootstrap-t is primary. Student-t may veto a positive claim but can never
+    rescue a primary interval that includes zero or is not estimable. The gate
+    also fails closed for a zero-variance session panel because neither required
+    method can estimate between-session uncertainty in that case.
     """
 
+    sample_count = _validated_registered_interval_pair(primary, robustness)
     primary_passed = interval_excludes_nonpositive_effect(primary)
     robustness_passed = interval_excludes_nonpositive_effect(robustness)
+    degenerate = (
+        primary.get("degenerate_sample") is True
+        or robustness.get("degenerate_sample") is True
+    )
     return {
         "primary_interval_method": primary.get("method"),
         "required_robustness_interval_method": robustness.get("method"),
+        "sample_count": sample_count,
+        "registered_interval_inputs_match": True,
+        "primary_interval_estimable": primary.get("estimable") is True,
+        "required_robustness_interval_estimable": (
+            robustness.get("estimable") is True
+        ),
+        "degenerate_session_panel": degenerate,
+        "degenerate_session_panel_blocks_positive_claim": True,
         "primary_interval_excludes_nonpositive_effect": primary_passed,
-        "required_robustness_interval_excludes_nonpositive_effect": (robustness_passed),
-        "positive_claim_interval_gate_passed": (primary_passed and robustness_passed),
+        "required_robustness_interval_excludes_nonpositive_effect": (
+            robustness_passed
+        ),
+        "positive_claim_interval_gate_passed": (
+            primary_passed and robustness_passed and not degenerate
+        ),
         "robustness_interval_may_veto_positive_claim": True,
         "robustness_interval_may_rescue_primary_failure": False,
         "negative_or_bounded_result_remains_reportable": True,
