@@ -38,7 +38,11 @@ the migration boundary is recorded in
 `src/causal4d/` owns the typed posterior contracts, controlled benchmark,
 latent-contact inference, intervention abduction, counterfactual operators,
 discrepancy transfer, semantic trust gates, physical validation, and
-prospective mechanism gates.
+prospective mechanism gates. The structural model and identification assumptions
+are explicit in
+[docs/causal_model_and_identification.md](docs/causal_model_and_identification.md).
+Analysis-only coupled action differences are available through
+[`causal4d.interventional_contrast`](docs/interventional_contrast.md).
 
 ### Bayesian-PhysTwin integration
 
@@ -148,6 +152,8 @@ causal4d protocol real validate-protocol \
 
 The full PhysTwin abduction chain is documented in
 [docs/causal4d_abduction_intervention_prediction.md](docs/causal4d_abduction_intervention_prediction.md).
+The formal causal model and the analysis-only interventional-contrast posterior
+are documented separately; neither changes the registered physical estimator.
 
 ## Next Scientific Milestone
 
