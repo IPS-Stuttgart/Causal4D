@@ -165,7 +165,7 @@ def test_packet_bytes_are_deterministic_and_bind_human_instructions() -> None:
     assert first_manifest["packet_id"] == next_action_packet_id(first_manifest)
     assert first_manifest["decision_evidence_sha256"] == decision["evidence_sha256"]
     assert first_manifest["action_identity"]["action_id"] == (
-        "begin_first_confirmatory_session"
+        "stop_independent_verifier_unavailable"
     )
 
     with ZipFile(io.BytesIO(first_bytes), mode="r") as archive:
