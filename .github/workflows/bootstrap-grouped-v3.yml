@@ -47,7 +47,9 @@ jobs:
           test "$remote_target" = "$EXPECTED_TARGET_SHA"
           git cat-file -e "$BASE_SHA^{commit}"
 
-          cp .agent/grouped-v3-a82.patch.gz.b64 \
+          # Base64 wrapping and a final newline are transport details. Verify the
+          # canonical no-whitespace encoding, then verify the decoded gzip bytes.
+          tr -d '[:space:]' < .agent/grouped-v3-a82.patch.gz.b64 > \
             "$RUNNER_TEMP/grouped-v3-a82.patch.gz.b64"
           echo "$PATCH_BASE64_SHA256  $RUNNER_TEMP/grouped-v3-a82.patch.gz.b64" | \
             sha256sum --check --strict
