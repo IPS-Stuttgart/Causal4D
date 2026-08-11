@@ -1,9 +1,8 @@
 name: Publish rebased grouped normalized likelihood v3
 
 on:
-  push:
-    branches:
-      - agent/grouped-v3-bootstrap
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -15,6 +14,9 @@ concurrency:
 
 jobs:
   publish:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.head_ref == 'agent/grouped-v3-bootstrap'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
