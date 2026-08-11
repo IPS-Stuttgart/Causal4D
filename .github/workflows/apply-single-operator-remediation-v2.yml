@@ -62,22 +62,27 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install -e ".[dev]"
-          python -m ruff format \
+          python -m venv .single-operator-remediation-venv
+          py=.single-operator-remediation-venv/bin/python
+          "${py}" -m ensurepip --upgrade
+          "${py}" -m pip install --upgrade pip
+          "${py}" -m pip install -e ".[dev]"
+          "${py}" -m ruff format \
             scripts/ci/correct_self_hosted_operator_registry.py \
             tests/test_operator_registry.py \
             tests/test_preacquisition_next_action.py \
             tests/test_self_hosted_operator_registry_correction.py \
             tests/test_operator_registry_correction_workflow.py
-          python -m ruff check .
-          python -m mypy --python-version 3.12 \
+          "${py}" -m ruff check .
+          "${py}" -m mypy --python-version 3.12 \
             scripts/ci/correct_self_hosted_operator_registry.py
-          python -m pytest -q \
+          "${py}" -m pytest -q \
             tests/test_operator_registry.py \
             tests/test_preacquisition_next_action.py \
             tests/test_self_hosted_operator_registry_correction.py \
             tests/test_operator_registry_correction_workflow.py \
             tests/test_self_hosted_workflow_policy.py
+          rm -rf .single-operator-remediation-venv
           git diff --check
           if grep -R -n -E \
             'Anna Seel|Markus Rummel|Michael Feurer' \
