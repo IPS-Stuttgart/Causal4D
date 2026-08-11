@@ -408,8 +408,7 @@ def _require_registered_seal_action(
         "operator registry seal changes the registered method",
     )
     _require(
-        action.get("command_argv")
-        == _expected_command(repository_root, dataset_root),
+        action.get("command_argv") == _expected_command(repository_root, dataset_root),
         "operator registry seal command differs from the registered command",
     )
     return action
@@ -556,9 +555,7 @@ def execute_operator_registry_seal(
         dataset,
     )
 
-    protocol, _, _, preacquisition_v4 = load_registered_preacquisition_chain(
-        repository
-    )
+    protocol, _, _, preacquisition_v4 = load_registered_preacquisition_chain(repository)
     template_path = dataset / OPERATOR_REGISTRY_TEMPLATE_PATH
     registry_path = dataset / OPERATOR_REGISTRY_PATH
     _require(
@@ -604,17 +601,14 @@ def execute_operator_registry_seal(
         dataset,
     )
     _require(
-        registry_status.get("valid") is True
-        and isinstance(sealed_registry, Mapping),
+        registry_status.get("valid") is True and isinstance(sealed_registry, Mapping),
         "published operator registry failed validation",
     )
     _registry_matches(cast(Mapping[str, Any], sealed_registry), records)
 
     snapshot_after = _snapshot_regular_files(dataset)
     delta = _snapshot_delta(snapshot_before, snapshot_after)
-    expected_modified = (
-        [OPERATOR_REGISTRY_TEMPLATE_PATH] if template_changed else []
-    )
+    expected_modified = [OPERATOR_REGISTRY_TEMPLATE_PATH] if template_changed else []
     _require(
         delta
         == {
