@@ -17,8 +17,6 @@ def _load_runtime_dependencies() -> None:
     global TwinBelief
     global load_contract
     global save_contract
-    global FactualAbductionUncertaintyV1
-    global load_factual_abduction_uncertainty_npz
     global IdentifiabilityConfig
     global InterventionIdentifiabilityResult
     global assess_intervention_identifiability
@@ -30,10 +28,6 @@ def _load_runtime_dependencies() -> None:
 
     from bayesian_phystwin.causal4d_provider_v1 import target_validity
     from causal4d.contracts import TwinBelief, load_contract, save_contract
-    from causal4d.factual_abduction_uncertainty import (
-        FactualAbductionUncertaintyV1,
-        load_factual_abduction_uncertainty_npz,
-    )
     from causal4d.identifiability import (
         IdentifiabilityConfig,
         InterventionIdentifiabilityResult,
@@ -78,7 +72,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--difference-correlation",
         type=float,
         default=0.0,
-        help=("Adjacent-frame observation correlation used only by normalized_v2."),
+        help=(
+            "Adjacent-frame observation correlation used only by normalized_v2."
+        ),
     )
     parser.add_argument(
         "--grouped-observation-likelihood",
@@ -88,26 +84,34 @@ def build_parser() -> argparse.ArgumentParser:
             "frame instead of the legacy dense generalized likelihood."
         ),
     )
+    parser.add_argument(
+        "--grouped-likelihood-semantics",
+        choices=("legacy_v1", "normalized_v3"),
+        default="legacy_v1",
+        help=(
+            "Grouped full-covariance score. normalized_v3 is an opt-in, "
+            "contributor-capped coordinate-normalized development comparator."
+        ),
+    )
+    parser.add_argument(
+        "--grouped-covariance-condition-number-limit",
+        type=float,
+        default=1.0e12,
+        help=(
+            "Fail-closed source-covariance condition-number limit used by "
+            "grouped normalized_v3."
+        ),
+    )
     parser.add_argument("--prior-nominal-probability", type=float, default=0.95)
     parser.add_argument("--outlier-scale-multiplier", type=float, default=100.0)
     parser.add_argument(
         "--identifiability-npz",
         help=(
-            "Optional source-only NPZ with intervention_sensitivity and optional "
-            "nuisance_sensitivity, covariance, covariance_factor, "
-            "parameter_scales, and registered query_sensitivity arrays."
+            "Optional NPZ with intervention_sensitivity and optional "
+            "nuisance_sensitivity/covariance arrays, fitted without target future."
         ),
     )
     parser.add_argument("--abstain-when-unidentifiable", action="store_true")
-    parser.add_argument(
-        "--identifiability-policy",
-        choices=("full_parameter", "registered_query"),
-        default="full_parameter",
-        help=(
-            "Use the historical full-parameter gate or the opt-in decision for a "
-            "source-registered future query. The latter requires query_sensitivity."
-        ),
-    )
     parser.add_argument("--identifiability-rank-tolerance", type=float, default=1e-6)
     parser.add_argument("--minimum-information-eigenvalue", type=float, default=1e-6)
     parser.add_argument("--maximum-condition-number", type=float, default=1e8)
@@ -115,18 +119,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--minimum-residualized-response-fraction", type=float, default=0.10
     )
     parser.add_argument("--maximum-subspace-cosine", type=float, default=0.995)
-    parser.add_argument(
-        "--maximum-query-null-response-fraction",
-        type=float,
-        default=0.10,
-    )
-    parser.add_argument(
-        "--factual-abduction-uncertainty-npz",
-        help=(
-            "Optional content-verified FactualAbductionUncertaintyV1 NPZ. Requires "
-            "grouped observation likelihood and exact bank/belief/evidence bindings."
-        ),
-    )
     return parser
 
 
@@ -153,28 +145,10 @@ def _load_identifiability(
             if "covariance" in payload
             else None
         )
-        covariance_factor = (
-            np.asarray(payload["covariance_factor"], dtype=float)
-            if "covariance_factor" in payload
-            else None
-        )
-        parameter_scales = (
-            np.asarray(payload["parameter_scales"], dtype=float)
-            if "parameter_scales" in payload
-            else None
-        )
-        query_sensitivity = (
-            np.asarray(payload["query_sensitivity"], dtype=float)
-            if "query_sensitivity" in payload
-            else None
-        )
     return assess_intervention_identifiability(
         intervention,
         nuisance,
         covariance=covariance,
-        covariance_factor=covariance_factor,
-        parameter_scales=parameter_scales,
-        query_sensitivity=query_sensitivity,
         config=config,
     )
 
@@ -186,15 +160,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise ValueError("--o-plus-prefix-frames must be positive")
     if args.abstain_when_unidentifiable and args.identifiability_npz is None:
         raise ValueError("--abstain-when-unidentifiable requires --identifiability-npz")
-    if args.identifiability_policy == "registered_query" and (
-        args.identifiability_npz is None
-    ):
-        raise ValueError("registered_query policy requires --identifiability-npz")
-    if args.factual_abduction_uncertainty_npz is not None and (
-        not args.grouped_observation_likelihood
+    if (
+        args.grouped_likelihood_semantics != "legacy_v1"
+        and not args.grouped_observation_likelihood
     ):
         raise ValueError(
-            "--factual-abduction-uncertainty-npz requires "
+            "--grouped-likelihood-semantics normalized_v3 requires "
             "--grouped-observation-likelihood"
         )
     bank, manifest = load_rollout_bank(args.rollout_bank_npz)
@@ -218,6 +189,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         degrees_of_freedom=args.degrees_of_freedom,
         likelihood_semantics=args.likelihood_semantics,
         difference_correlation=args.difference_correlation,
+        grouped_likelihood_semantics=args.grouped_likelihood_semantics,
+        grouped_covariance_condition_number_limit=(
+            args.grouped_covariance_condition_number_limit
+        ),
     )
     grouped_evidence = None
     if args.grouped_observation_likelihood:
@@ -241,16 +216,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.minimum_residualized_response_fraction
             ),
             maximum_subspace_cosine=args.maximum_subspace_cosine,
-            maximum_query_null_response_fraction=(
-                args.maximum_query_null_response_fraction
-            ),
         ),
     )
-    abduction_uncertainty: FactualAbductionUncertaintyV1 | None = None
-    if args.factual_abduction_uncertainty_npz is not None:
-        abduction_uncertainty = load_factual_abduction_uncertainty_npz(
-            args.factual_abduction_uncertainty_npz
-        )
     factual = abduct_factual_intervention(
         bank,
         artifact,
@@ -261,8 +228,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         grouped_evidence=grouped_evidence,
         identifiability=identifiability,
         abstain_when_unidentifiable=args.abstain_when_unidentifiable,
-        identifiability_policy=args.identifiability_policy,
-        abduction_uncertainty=abduction_uncertainty,
     )
     evaluation = evaluate_factual_abduction(
         bank,
@@ -273,7 +238,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         prefix_frame_count=prefix_frame_count,
         config=settings,
         grouped_evidence=grouped_evidence,
-        abduction_uncertainty=abduction_uncertainty,
     )
     evaluation.update(
         {
@@ -287,12 +251,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             ),
             "intervention_identifiability": (
                 None if identifiability is None else identifiability.as_dict()
-            ),
-            "identifiability_policy": args.identifiability_policy,
-            "factual_abduction_uncertainty_id": (
-                None
-                if abduction_uncertainty is None
-                else abduction_uncertainty.artifact_id
             ),
         }
     )
