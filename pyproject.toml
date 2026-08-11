@@ -76,6 +76,8 @@ where = ["src"]
 [tool.setuptools.package-data]
 causal4d = [
     "py.typed",
+    "contract_data/evidence_decision_v1/*.json",
+    "contract_data/evidence_decision_v1/vectors/*.json",
     "contract_data/observation_belief_v1/*.json",
     "contract_data/observation_belief_v1/vectors/*.json",
     "contract_data/provider_v2_factors_v1/*.json",
