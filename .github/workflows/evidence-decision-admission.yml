@@ -6,14 +6,22 @@ on:
     paths:
       - ".github/workflows/evidence-decision-admission.yml"
       - "docs/evidence-decision-admission-v1.md"
+      - "docs/evidence-decision-contract-bundle-v1.md"
+      - "pyproject.toml"
+      - "src/causal4d/contract_data/evidence_decision_v1/**"
       - "src/causal4d/evidence_decision_v1.py"
+      - "tests/test_evidence_decision_contract_bundle.py"
       - "tests/test_evidence_decision_v1.py"
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/evidence-decision-admission.yml"
       - "docs/evidence-decision-admission-v1.md"
+      - "docs/evidence-decision-contract-bundle-v1.md"
+      - "pyproject.toml"
+      - "src/causal4d/contract_data/evidence_decision_v1/**"
       - "src/causal4d/evidence_decision_v1.py"
+      - "tests/test_evidence_decision_contract_bundle.py"
       - "tests/test_evidence_decision_v1.py"
   workflow_dispatch:
 
@@ -77,6 +85,7 @@ jobs:
           from __future__ import annotations
 
           import hashlib
+          import json
           import os
           from importlib.resources import files
           from pathlib import Path
@@ -91,6 +100,7 @@ jobs:
               EVIDENCE_DECISION_JSON_SCHEMA_SHA256,
               admit_causal_claim_v1,
               load_evidence_decision_v1,
+              validate_evidence_decision_v1,
           )
           from prob4d.api.evidence_decision_v1 import (
               EVIDENCE_DECISION_JSON_SCHEMA_SHA256 as PROB4D_SCHEMA_SHA256,
@@ -99,20 +109,48 @@ jobs:
               require_prob4d_evidence_binding_v1,
           )
 
+          expected_schema_sha256 = os.environ["BPT_SCHEMA_SHA256"]
+          bpt_revision = os.environ["BPT_CONTRACT_REVISION"]
+          causal4d_revision = os.environ["CAUSAL4D_CONSUMER_REVISION"]
+          prob4d_revision = os.environ["PROB4D_CONSUMER_REVISION"]
+
           schema = files("bayesian_phystwin").joinpath(
               "contract_data",
               "evidence_decision_v1",
               "evidence-decision-v1.schema.json",
           )
           schema_sha256 = hashlib.sha256(schema.read_bytes()).hexdigest()
-          expected_schema_sha256 = os.environ["BPT_SCHEMA_SHA256"]
           assert schema_sha256 == expected_schema_sha256
           assert EVIDENCE_DECISION_JSON_SCHEMA_SHA256 == expected_schema_sha256
           assert PROB4D_SCHEMA_SHA256 == expected_schema_sha256
 
-          bpt_revision = os.environ["BPT_CONTRACT_REVISION"]
-          causal4d_revision = os.environ["CAUSAL4D_CONSUMER_REVISION"]
-          prob4d_revision = os.environ["PROB4D_CONSUMER_REVISION"]
+          causal4d_bundle = files("causal4d").joinpath(
+              "contract_data",
+              "evidence_decision_v1",
+          )
+          bundle_manifest = json.loads(
+              causal4d_bundle.joinpath("manifest.json").read_text(encoding="utf-8")
+          )
+          causal4d_schema = causal4d_bundle.joinpath(
+              bundle_manifest["json_schema"]["path"]
+          )
+          assert (
+              hashlib.sha256(causal4d_schema.read_bytes()).hexdigest()
+              == expected_schema_sha256
+          )
+          assert bundle_manifest["json_schema"]["sha256"] == expected_schema_sha256
+          assert bundle_manifest["source_revision"] == bpt_revision
+
+          vector_record = bundle_manifest["vectors"]["authorized"]
+          vector = causal4d_bundle
+          for part in vector_record["path"].split("/"):
+              vector = vector.joinpath(part)
+          vector_bytes = vector.read_bytes()
+          assert hashlib.sha256(vector_bytes).hexdigest() == vector_record["sha256"]
+          retained = validate_evidence_decision_v1(json.loads(vector_bytes))
+          assert retained.claim_authorized
+          assert retained.metadata["synthetic"] is True
+
           decision = EvidenceDecisionV1(
               claim_id="contract.causal-admission",
               protocol_id="evidence-decision-causal-admission-v1",
