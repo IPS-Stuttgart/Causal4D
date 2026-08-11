@@ -42,7 +42,9 @@ workflow invocation per required workflow.
 
 The initial ratchet required only explicit NumPy return casts, generated-array
 annotations, one local-variable rename, and a typed wrapper around NumPy's
-`savez_compressed` stub mismatch. These changes do not alter array values,
+`savez_compressed` stub mismatch. The final exact-head diagnostic additionally
+narrowed the NumPy return from `nominal_contact_hypotheses`; it did not change the
+selected indices or their ordering. These changes do not alter array values,
 posterior weights, archive members, causal timing, artifact identity, estimator
 semantics, registered protocols, target access, or evidence counts.
 
