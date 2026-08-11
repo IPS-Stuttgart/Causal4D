@@ -21,6 +21,10 @@ The abduction API and PhysTwin CLI now expose that distinction explicitly:
 - `registered_query` is opt-in and requires `query_sensitivity` in a source-only
   identifiability NPZ.
 
+Selecting `registered_query` without a computed query decision fails before any
+posterior scoring. The policy therefore cannot silently fall back to the broader
+parameter-rank decision or treat a missing query as identifiable.
+
 With `--abstain-when-unidentifiable`, a rejected policy returns the exact original
 joint prior over intervention hypotheses and physical particles. It does not
 renormalize a subset, inject an approximate floor, or create support that was not
