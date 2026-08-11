@@ -214,17 +214,20 @@ def test_bootstrap_t_is_deterministic_and_finite() -> None:
     assert first["lower"] <= first["point_estimate"] <= first["upper"]
 
 
-def test_degenerate_samples_produce_explicit_point_intervals() -> None:
+def test_degenerate_samples_remain_descriptive_but_not_claim_estimable() -> None:
     values = [1.5] * 12
 
     for result in (
         student_t_sensitivity_interval(values),
         bootstrap_t_sensitivity_interval(values),
     ):
-        assert result["estimable"] is True
+        assert result["estimable"] is False
         assert result["degenerate_sample"] is True
-        assert result["lower"] == pytest.approx(1.5)
-        assert result["upper"] == pytest.approx(1.5)
+        assert result["point_estimate"] == pytest.approx(1.5)
+        assert result["lower"] is None
+        assert result["upper"] is None
+        assert result["may_change_primary_decision"] is False
+        assert result["finite_sample_coverage_guaranteed"] is False
 
 
 def test_companion_artifact_verifies_registered_intervals_and_sources(
