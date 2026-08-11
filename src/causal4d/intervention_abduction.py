@@ -214,11 +214,14 @@ def _posterior_weights_from_grouped_evidence_batched(
             components.shape,
         )
         if additional_independent_variance_m2 is not None:
-            component_variance = component_variance + (
-                additional_independent_variance_m2[
-                    hypothesis_indices,
-                    particle_indices,
-                ]
+            component_variance = (
+                component_variance
+                + (
+                    additional_independent_variance_m2[
+                        hypothesis_indices,
+                        particle_indices,
+                    ]
+                )
             )
         dense_batch = {
             group_id: covariance[hypothesis_indices, particle_indices]
@@ -249,9 +252,7 @@ def _posterior_weights_from_grouped_evidence_batched(
             group_ids = diagnostics.group_ids
             effective_group_weights = diagnostics.effective_group_weights
             full_covariance_group_ids = diagnostics.full_covariance_group_ids
-            low_rank_covariance_group_ids = (
-                diagnostics.low_rank_covariance_group_ids
-            )
+            low_rank_covariance_group_ids = diagnostics.low_rank_covariance_group_ids
         elif (
             diagnostics.group_ids != group_ids
             or diagnostics.effective_group_weights != effective_group_weights
@@ -311,9 +312,7 @@ def _update_joint_weights(
         raise ValueError(
             "normalized_v2 cannot be combined with grouped observation evidence"
         )
-    batch_size = _validated_grouped_component_batch_size(
-        grouped_component_batch_size
-    )
+    batch_size = _validated_grouped_component_batch_size(grouped_component_batch_size)
     if batch_size is not None and grouped_evidence is None:
         raise ValueError(
             "grouped_component_batch_size requires grouped observation evidence"
