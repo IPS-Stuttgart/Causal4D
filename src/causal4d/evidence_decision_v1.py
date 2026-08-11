@@ -776,6 +776,12 @@ def admit_causal_claim_v1(
         protocol_id=protocol_id,
         minimum_evidence_level=minimum_evidence_level,
     )
+    require_prob4d = _require_bool(
+        require_prob4d_binding,
+        name="require_prob4d_binding",
+    )
+    if require_prob4d and expected_prob4d_revision is None:
+        raise ValueError("require_prob4d_binding requires expected_prob4d_revision")
     bayesian_phystwin = require_bayesian_phystwin_evidence_binding_v1(
         validated,
         expected_revision=expected_bayesian_phystwin_revision,
@@ -791,7 +797,7 @@ def admit_causal_claim_v1(
         if repository.repository in PROB4D_REPOSITORY_ALIASES
     ]
     prob4d: DecisionRepositoryStateV1 | None = None
-    if expected_prob4d_revision is not None or require_prob4d_binding:
+    if expected_prob4d_revision is not None or require_prob4d:
         prob4d = require_prob4d_evidence_binding_v1(
             validated,
             expected_revision=expected_prob4d_revision,

@@ -182,6 +182,7 @@ def test_prob4d_binding_is_optional_but_can_be_required() -> None:
             protocol_id=PROTOCOL_ID,
             expected_bayesian_phystwin_revision=BPT_REVISION,
             expected_causal4d_revision=CAUSAL4D_REVISION,
+            expected_prob4d_revision=PROB4D_REVISION,
             require_prob4d_binding=True,
         )
 
@@ -333,6 +334,30 @@ def test_limitations_metadata_and_digest_fail_closed() -> None:
 
 def test_admission_and_repository_binding_errors() -> None:
     payload = _authorized()
+    with pytest.raises(
+        ValueError,
+        match=("require_prob4d_binding requires expected_prob4d_revision"),
+    ):
+        admit_causal_claim_v1(
+            payload,
+            claim_id=CLAIM_ID,
+            protocol_id=PROTOCOL_ID,
+            expected_bayesian_phystwin_revision=BPT_REVISION,
+            expected_causal4d_revision=CAUSAL4D_REVISION,
+            require_prob4d_binding=True,
+        )
+    with pytest.raises(
+        ValueError,
+        match="require_prob4d_binding must be boolean",
+    ):
+        admit_causal_claim_v1(
+            payload,
+            claim_id=CLAIM_ID,
+            protocol_id=PROTOCOL_ID,
+            expected_bayesian_phystwin_revision=BPT_REVISION,
+            expected_causal4d_revision=CAUSAL4D_REVISION,
+            require_prob4d_binding=1,  # type: ignore[arg-type]
+        )
 
     with pytest.raises(ValueError, match="claim_id"):
         admit_causal_claim_v1(
