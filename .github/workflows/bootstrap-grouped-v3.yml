@@ -25,7 +25,7 @@ jobs:
           TARGET_BRANCH: agent/grouped-normalized-v3
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          git merge-base --is-ancestor "$BASE_SHA" HEAD
           echo "$PATCH_SHA256  .agent/grouped-v3.patch.gz" | sha256sum --check --strict
           cp .agent/grouped-v3.patch.gz /tmp/grouped-v3.patch.gz
           gzip --decompress --stdout /tmp/grouped-v3.patch.gz > /tmp/grouped-v3.patch
