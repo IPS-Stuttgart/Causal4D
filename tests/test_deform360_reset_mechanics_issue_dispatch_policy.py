@@ -5,10 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = (
-    ROOT
-    / ".github"
-    / "workflows"
-    / "deform360-reset-mechanics-issue-dispatch.yml"
+    ROOT / ".github" / "workflows" / "deform360-reset-mechanics-issue-dispatch.yml"
 )
 
 
@@ -47,8 +44,8 @@ def test_dispatcher_is_hosted_and_dispatches_fixed_reviewed_main() -> None:
     assert "gh workflow run deform360-reset-mechanics.yml" in text
     assert "--ref main" in text
     assert "-f run_source_diagnostic=true" in text
-    assert "test \"${identity[0]}\" = \"workflow_dispatch\"" in text
-    assert "test \"${identity[1]}\" = \"${MAIN_SHA}\"" in text
+    assert 'test "${identity[0]}" = "workflow_dispatch"' in text
+    assert 'test "${identity[1]}" = "${MAIN_SHA}"' in text
 
 
 def test_dispatcher_retains_a_nonphysical_receipt() -> None:
