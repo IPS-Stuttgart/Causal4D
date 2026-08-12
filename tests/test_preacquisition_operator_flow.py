@@ -191,8 +191,7 @@ def test_governance_blocker_markdown_explains_permitted_resolutions() -> None:
         "action_id": "stop_independent_verifier_unavailable",
         "category": "governance_blocker",
         "title": (
-            "Stop: independent verification is unavailable in a single-person "
-            "project"
+            "Stop: independent verification is unavailable in a single-person project"
         ),
         "operator_role": "principal_investigator",
         "physical_acquisition_required": False,
