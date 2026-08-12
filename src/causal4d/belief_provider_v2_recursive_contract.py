@@ -116,12 +116,66 @@ def require_bayesian_phystwin_belief_provider_v2_recursive(
     return manifest
 
 
+# Compatibility names used by the initial recursive-handoff prototype. These
+# delegate to the canonical contract above; no second validator is maintained.
+BAYESIAN_PHYSTWIN_RECURSIVE_BELIEF_PROVIDER_V2_CAPABILITIES = (
+    BAYESIAN_PHYSTWIN_BELIEF_V2_COMPLETE_CAPABILITIES
+)
+BAYESIAN_PHYSTWIN_RECURSIVE_BELIEF_V2_ARTIFACT_SCHEMA_VERSIONS = (
+    BAYESIAN_PHYSTWIN_BELIEF_V2_COMPLETE_ARTIFACT_SCHEMA_VERSIONS
+)
+BAYESIAN_PHYSTWIN_RECURSIVE_STREAM_CLAIM = (
+    BAYESIAN_PHYSTWIN_BELIEF_V2_RECURSIVE_STREAM_CLAIM
+)
+
+
+def load_bayesian_phystwin_recursive_belief_provider_v2_manifest(
+    *,
+    provider_revision: str | None = None,
+) -> PhysicalBeliefProviderManifest:
+    """Load the complete recursive provider through the canonical loader."""
+
+    return load_bayesian_phystwin_belief_provider_v2_manifest(
+        provider_revision=provider_revision
+    )
+
+
+def validate_bayesian_phystwin_recursive_belief_provider_v2(
+    manifest: PhysicalBeliefProviderManifest | None = None,
+    *,
+    provider_revision: str | None = None,
+) -> ProviderCompatibilityResult:
+    """Validate the complete recursive provider through the canonical contract."""
+
+    return validate_bayesian_phystwin_belief_provider_v2_recursive(
+        manifest,
+        provider_revision=provider_revision,
+    )
+
+
+def require_bayesian_phystwin_recursive_belief_provider_v2(
+    *,
+    provider_revision: str | None = None,
+) -> PhysicalBeliefProviderManifest:
+    """Require the complete recursive provider through the canonical contract."""
+
+    return require_bayesian_phystwin_belief_provider_v2_recursive(
+        provider_revision=provider_revision
+    )
+
+
 __all__ = [
     "BAYESIAN_PHYSTWIN_BELIEF_V2_COMPLETE_ARTIFACT_SCHEMA_VERSIONS",
     "BAYESIAN_PHYSTWIN_BELIEF_V2_COMPLETE_CAPABILITIES",
     "BAYESIAN_PHYSTWIN_BELIEF_V2_RECURSIVE_ARTIFACT_SCHEMA_VERSIONS",
     "BAYESIAN_PHYSTWIN_BELIEF_V2_RECURSIVE_CAPABILITIES",
     "BAYESIAN_PHYSTWIN_BELIEF_V2_RECURSIVE_STREAM_CLAIM",
+    "BAYESIAN_PHYSTWIN_RECURSIVE_BELIEF_PROVIDER_V2_CAPABILITIES",
+    "BAYESIAN_PHYSTWIN_RECURSIVE_BELIEF_V2_ARTIFACT_SCHEMA_VERSIONS",
+    "BAYESIAN_PHYSTWIN_RECURSIVE_STREAM_CLAIM",
+    "load_bayesian_phystwin_recursive_belief_provider_v2_manifest",
     "require_bayesian_phystwin_belief_provider_v2_recursive",
+    "require_bayesian_phystwin_recursive_belief_provider_v2",
     "validate_bayesian_phystwin_belief_provider_v2_recursive",
+    "validate_bayesian_phystwin_recursive_belief_provider_v2",
 ]
