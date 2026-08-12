@@ -1,0 +1,247 @@
+name: Release metadata integrity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/release-metadata-integrity.yml"
+      - "CHANGELOG.md"
+      - "CITATION.cff"
+      - "ci/project_status_v2.json"
+      - "pyproject.toml"
+      - "scripts/ci/check_release_metadata.py"
+      - "src/causal4d/__init__.py"
+      - "tests/test_release_metadata_policy.py"
+      - "tests/test_release_metadata_workflow_policy.py"
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths:
+      - ".github/workflows/release-metadata-integrity.yml"
+      - "CHANGELOG.md"
+      - "CITATION.cff"
+      - "ci/project_status_v2.json"
+      - "pyproject.toml"
+      - "scripts/ci/check_release_metadata.py"
+      - "src/causal4d/__init__.py"
+      - "tests/test_release_metadata_policy.py"
+      - "tests/test_release_metadata_workflow_policy.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-metadata-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Metadata, tag, and built-distribution versions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Validate source release metadata and exact tag
+        id: metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p outputs/release-metadata
+          arguments=(
+            --root .
+            --output outputs/release-metadata/source-metadata.json
+          )
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            arguments+=(--tag "${GITHUB_REF_NAME}")
+          fi
+          python scripts/ci/check_release_metadata.py "${arguments[@]}" \
+            | tee outputs/release-metadata/source-metadata.txt
+          package_version="$(
+            python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path("outputs/release-metadata/source-metadata.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          print(report["package_version"])
+          PY
+          )"
+          echo "package_version=${package_version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build and inspect wheel and source distribution
+        shell: bash
+        env:
+          EXPECTED_VERSION: ${{ steps.metadata.outputs.package_version }}
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade \
+            "build>=1.2" \
+            "packaging>=23" \
+            "twine>=5"
+          python -m build --sdist --wheel --outdir dist .
+          python -m twine check dist/*
+          sha256sum dist/* | sort \
+            | tee outputs/release-metadata/distribution-sha256.txt
+          python - <<'PY'
+          import email
+          import json
+          import os
+          import tarfile
+          import zipfile
+          from pathlib import Path
+
+          from packaging.utils import parse_sdist_filename, parse_wheel_filename
+
+          expected = os.environ["EXPECTED_VERSION"]
+          dist = Path("dist")
+          wheels = sorted(dist.glob("*.whl"))
+          sdists = sorted(dist.glob("*.tar.gz"))
+          if len(wheels) != 1 or len(sdists) != 1:
+              raise SystemExit(
+                  f"expected one wheel and one sdist, got {wheels!r}, {sdists!r}"
+              )
+
+          wheel_name, wheel_version, _, _ = parse_wheel_filename(wheels[0].name)
+          sdist_name, sdist_version = parse_sdist_filename(sdists[0].name)
+          if wheel_name != "causal4d" or sdist_name != "causal4d":
+              raise SystemExit("built distribution name is not causal4d")
+
+          with zipfile.ZipFile(wheels[0]) as archive:
+              metadata_members = [
+                  name
+                  for name in archive.namelist()
+                  if name.endswith(".dist-info/METADATA")
+              ]
+              if len(metadata_members) != 1:
+                  raise SystemExit("wheel must contain exactly one METADATA file")
+              wheel_metadata = email.message_from_bytes(
+                  archive.read(metadata_members[0])
+              )
+
+          with tarfile.open(sdists[0], mode="r:gz") as archive:
+              pkg_info_members = [
+                  member
+                  for member in archive.getmembers()
+                  if member.isfile() and member.name.count("/") == 1
+                  and member.name.endswith("/PKG-INFO")
+              ]
+              if len(pkg_info_members) != 1:
+                  raise SystemExit("sdist must contain exactly one root PKG-INFO")
+              extracted = archive.extractfile(pkg_info_members[0])
+              if extracted is None:
+                  raise SystemExit("could not read sdist PKG-INFO")
+              sdist_metadata = email.message_from_bytes(extracted.read())
+
+          observed = {
+              "source": expected,
+              "wheel_filename": str(wheel_version),
+              "wheel_metadata": wheel_metadata["Version"],
+              "sdist_filename": str(sdist_version),
+              "sdist_metadata": sdist_metadata["Version"],
+          }
+          if set(observed.values()) != {expected}:
+              raise SystemExit(
+                  f"distribution version mismatch: {observed!r}, expected {expected!r}"
+              )
+          Path("outputs/release-metadata/distribution-metadata.json").write_text(
+              json.dumps(observed, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(observed, indent=2, sort_keys=True))
+          PY
+
+      - name: Verify installed runtime and distribution metadata agree
+        shell: bash
+        env:
+          EXPECTED_VERSION: ${{ steps.metadata.outputs.package_version }}
+        run: |
+          set -euo pipefail
+          python -m venv outputs/release-metadata/installed-venv
+          venv="outputs/release-metadata/installed-venv"
+          "${venv}/bin/python" -m pip install --upgrade pip
+          wheel="$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
+          test -n "${wheel}"
+          "${venv}/bin/python" -m pip install "${wheel}"
+          "${venv}/bin/python" -m pip check
+          "${venv}/bin/python" -m pip freeze --all \
+            > outputs/release-metadata/installed-freeze.txt
+          "${venv}/bin/python" - <<'PY'
+          import json
+          import os
+          from importlib.metadata import version
+          from pathlib import Path
+
+          import causal4d
+
+          expected = os.environ["EXPECTED_VERSION"]
+          observed = {
+              "expected": expected,
+              "runtime": causal4d.__version__,
+              "distribution": version("causal4d"),
+              "module_origin": str(Path(causal4d.__file__).resolve()),
+          }
+          if observed["runtime"] != expected:
+              raise SystemExit(f"runtime version mismatch: {observed!r}")
+          if observed["distribution"] != expected:
+              raise SystemExit(f"distribution version mismatch: {observed!r}")
+          Path("outputs/release-metadata/installed-metadata.json").write_text(
+              json.dumps(observed, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(observed, indent=2, sort_keys=True))
+          PY
+          rm -rf "${venv}"
+
+      - name: Publish release-integrity summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Release metadata integrity"
+            echo
+            for artifact in \
+              outputs/release-metadata/source-metadata.json \
+              outputs/release-metadata/distribution-metadata.json \
+              outputs/release-metadata/installed-metadata.json \
+              outputs/release-metadata/distribution-sha256.txt
+            do
+              if [[ -f "${artifact}" ]]; then
+                echo "### $(basename "${artifact}")"
+                echo '```text'
+                cat "${artifact}"
+                echo '```'
+              fi
+            done
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload release-integrity evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: causal4d-release-metadata-integrity
+          path: |
+            dist/*
+            outputs/release-metadata/source-metadata.json
+            outputs/release-metadata/source-metadata.txt
+            outputs/release-metadata/distribution-metadata.json
+            outputs/release-metadata/distribution-sha256.txt
+            outputs/release-metadata/installed-metadata.json
+            outputs/release-metadata/installed-freeze.txt
+          if-no-files-found: warn
+          retention-days: 14

@@ -8,10 +8,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: correct-operator-registry-${{ github.sha }}
-  cancel-in-progress: false
-
 jobs:
   correct:
     name: Correct the registered operator roster on workstation2
@@ -28,6 +24,10 @@ jobs:
             '[self-hosted] correct Causal4D operator registry'
         )
       )
+    concurrency:
+      group: correct-operator-registry-${{ github.sha }}
+      cancel-in-progress: false
+      queue: max
     runs-on: [self-hosted, Linux, X64, nvidia-smi]
     timeout-minutes: 45
     outputs:

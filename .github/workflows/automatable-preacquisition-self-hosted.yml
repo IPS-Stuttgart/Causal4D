@@ -8,10 +8,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: automatable-preacquisition-${{ github.sha }}
-  cancel-in-progress: false
-
 jobs:
   execute:
     name: Execute one registered nonphysical action on workstation2
@@ -28,6 +24,10 @@ jobs:
             '[self-hosted] execute Causal4D automatable next action'
         )
       )
+    concurrency:
+      group: automatable-preacquisition-${{ github.sha }}
+      cancel-in-progress: false
+      queue: max
     runs-on: [self-hosted, Linux, X64, nvidia-smi]
     timeout-minutes: 45
     outputs:

@@ -1,0 +1,318 @@
+name: Rolling three-repository compatibility canary
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rolling-three-repository-compatibility
+  cancel-in-progress: true
+
+env:
+  CAUSAL4D_COMPATIBILITY_LANE: rolling-non-claim-bearing
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  current-default-branches:
+    name: Current default branches / non-claim-bearing
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out current Causal4D main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: IPS-Stuttgart/Causal4D
+          ref: main
+          path: causal4d
+          persist-credentials: false
+
+      - name: Check out current BayesianPhysTwin main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: IPS-Stuttgart/BayesianPhysTwin
+          ref: main
+          path: bayesian-phystwin
+          persist-credentials: false
+
+      - name: Check out current Prob4D main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: IPS-Stuttgart/Prob4D
+          ref: main
+          path: prob4d
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            causal4d/pyproject.toml
+            bayesian-phystwin/pyproject.toml
+            prob4d/pyproject.toml
+
+      - name: Record exact current-head revisions
+        id: revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          for repository in prob4d bayesian-phystwin causal4d; do
+            test -z "$(git -C "${repository}" status --porcelain=v1 --untracked-files=all)"
+          done
+          prob4d_sha="$(git -C prob4d rev-parse HEAD)"
+          bpt_sha="$(git -C bayesian-phystwin rev-parse HEAD)"
+          causal4d_sha="$(git -C causal4d rev-parse HEAD)"
+          echo "prob4d=${prob4d_sha}" >> "${GITHUB_OUTPUT}"
+          echo "bpt=${bpt_sha}" >> "${GITHUB_OUTPUT}"
+          echo "causal4d=${causal4d_sha}" >> "${GITHUB_OUTPUT}"
+          export PROB4D_SHA="${prob4d_sha}"
+          export BPT_SHA="${bpt_sha}"
+          export CAUSAL4D_SHA="${causal4d_sha}"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              "schema_version": 1,
+              "artifact_kind": "Causal4DRollingCompatibilityCanary",
+              "lane": os.environ["CAUSAL4D_COMPATIBILITY_LANE"],
+              "claim_bearing": False,
+              "frozen_pins_used": False,
+              "repository_revisions": {
+                  "IPS-Stuttgart/Prob4D": os.environ["PROB4D_SHA"],
+                  "IPS-Stuttgart/BayesianPhysTwin": os.environ["BPT_SHA"],
+                  "IPS-Stuttgart/Causal4D": os.environ["CAUSAL4D_SHA"],
+              },
+              "claim_boundary": (
+                  "This canary detects integration drift on moving default branches. "
+                  "It cannot replace an immutable stack lock or support scientific, "
+                  "physical, calibration, accuracy, or deployment claims."
+              ),
+          }
+          output = Path(os.environ["RUNNER_TEMP"]) / (
+              "rolling-three-repository-revisions.json"
+          )
+          output.write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(payload, indent=2, sort_keys=True))
+          PY
+
+      - name: Build all current-head wheels
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade build pip
+          wheelhouse="${RUNNER_TEMP}/rolling-three-repository-wheelhouse"
+          mkdir -p "${wheelhouse}"
+          python -m build --wheel --outdir "${wheelhouse}" prob4d
+          python -m build --wheel --outdir "${wheelhouse}" bayesian-phystwin
+          python -m build --wheel --outdir "${wheelhouse}" causal4d
+          test "$(find "${wheelhouse}" -maxdepth 1 -name '*.whl' | wc -l)" -eq 3
+          (
+            cd "${wheelhouse}"
+            sha256sum ./*.whl | sort
+          ) | tee "${RUNNER_TEMP}/rolling-three-repository-wheel-sha256.txt"
+
+      - name: Install current-head wheels in isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          venv="${RUNNER_TEMP}/rolling-three-repository-venv"
+          wheelhouse="${RUNNER_TEMP}/rolling-three-repository-wheelhouse"
+          python -m venv "${venv}"
+          "${venv}/bin/python" -m pip install --upgrade pip
+          mapfile -t wheels < <(
+            find "${wheelhouse}" -maxdepth 1 -name '*.whl' -print | sort
+          )
+          "${venv}/bin/python" -m pip install \
+            "${wheels[@]}" \
+            pytest \
+            opencv-python-headless
+          "${venv}/bin/python" -m pip check
+          "${venv}/bin/python" -m pip freeze --all \
+            > "${RUNNER_TEMP}/rolling-three-repository-pip-freeze.txt"
+
+      - name: Verify imports originate only from installed wheels
+        shell: bash
+        env:
+          CAUSAL4D_SOURCE: ${{ github.workspace }}/causal4d
+          BPT_SOURCE: ${{ github.workspace }}/bayesian-phystwin
+          PROB4D_SOURCE: ${{ github.workspace }}/prob4d
+        run: |
+          set -euo pipefail
+          "${RUNNER_TEMP}/rolling-three-repository-venv/bin/python" - <<'PY'
+          import os
+          from pathlib import Path
+
+          import bayesian_phystwin
+          import causal4d
+          import prob4d
+          from causal4d import decision_trace
+
+          roots = tuple(
+              Path(os.environ[name]).resolve()
+              for name in ("CAUSAL4D_SOURCE", "BPT_SOURCE", "PROB4D_SOURCE")
+          )
+          for module in (causal4d, decision_trace, bayesian_phystwin, prob4d):
+              origin = Path(module.__file__).resolve()
+              print(module.__name__, origin)
+              if any(origin.is_relative_to(root) for root in roots):
+                  raise SystemExit(f"source-tree import detected: {origin}")
+          PY
+
+      - name: Create and verify an ephemeral current-head stack lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          venv="${RUNNER_TEMP}/rolling-three-repository-venv"
+          wheelhouse="${RUNNER_TEMP}/rolling-three-repository-wheelhouse"
+          lock="${RUNNER_TEMP}/rolling-three-repository-stack-lock.json"
+          report="${RUNNER_TEMP}/rolling-three-repository-stack-lock-verification.json"
+          mapfile -t wheels < <(
+            find "${wheelhouse}" -maxdepth 1 -name '*.whl' -print | sort
+          )
+
+          create=("${venv}/bin/causal4d" stack create)
+          for wheel in "${wheels[@]}"; do
+            create+=(--wheel "${wheel}")
+          done
+          create+=(
+            --revision "prob4d=${{ steps.revisions.outputs.prob4d }}"
+            --revision "bayesian-phystwin=${{ steps.revisions.outputs.bpt }}"
+            --revision "causal4d=${{ steps.revisions.outputs.causal4d }}"
+            --output "${lock}"
+            --json
+          )
+          "${create[@]}" > "${RUNNER_TEMP}/rolling-stack-lock-create.json"
+          cmp "${lock}" "${RUNNER_TEMP}/rolling-stack-lock-create.json"
+
+          verify=("${venv}/bin/causal4d" stack verify --lock "${lock}")
+          for wheel in "${wheels[@]}"; do
+            verify+=(--wheel "${wheel}")
+          done
+          verify+=(--json)
+          "${verify[@]}" | tee "${report}"
+          "${venv}/bin/python" -m json.tool "${lock}" >/dev/null
+          "${venv}/bin/python" -m json.tool "${report}" >/dev/null
+
+      - name: Run current-head compatibility and provider-v2 paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_dir="${RUNNER_TEMP}/rolling-three-repository-run"
+          mkdir -p "${run_dir}"
+          cp causal4d/ci/three_repository_*.py "${run_dir}/"
+          cd "${run_dir}"
+          env -u PYTHONPATH \
+            "${RUNNER_TEMP}/rolling-three-repository-venv/bin/python" \
+            three_repository_golden_path.py \
+              --prob4d-fixture \
+                "${GITHUB_WORKSPACE}/prob4d/tests/fixtures/prob4d_joint_observation_v1.json" \
+              --prob4d-revision "${{ steps.revisions.outputs.prob4d }}" \
+              --bpt-revision "${{ steps.revisions.outputs.bpt }}" \
+              --causal4d-revision "${{ steps.revisions.outputs.causal4d }}" \
+              --checkout-root "${GITHUB_WORKSPACE}/prob4d" \
+              --checkout-root "${GITHUB_WORKSPACE}/bayesian-phystwin" \
+              --checkout-root "${GITHUB_WORKSPACE}/causal4d" \
+              --output "${RUNNER_TEMP}/rolling-three-repository-summary.json" \
+            | tee "${RUNNER_TEMP}/rolling-three-repository-golden-path.log"
+          test -s "${RUNNER_TEMP}/rolling-three-repository-summary.json"
+
+          env -u PYTHONPATH \
+            "${RUNNER_TEMP}/rolling-three-repository-venv/bin/python" \
+            three_repository_provider_v2_attestation.py \
+              --prob4d-fixture \
+                "${GITHUB_WORKSPACE}/prob4d/tests/fixtures/prob4d_joint_observation_v1.json" \
+              --prob4d-revision "${{ steps.revisions.outputs.prob4d }}" \
+              --output-dir \
+                "${RUNNER_TEMP}/rolling-three-repository-provider-v2-work" \
+              --output \
+                "${RUNNER_TEMP}/rolling-three-repository-provider-v2-summary.json" \
+            | tee "${RUNNER_TEMP}/rolling-three-repository-provider-v2.log"
+          test -s "${RUNNER_TEMP}/rolling-three-repository-provider-v2-summary.json"
+
+      - name: Run focused current-head contract tests
+        shell: bash
+        env:
+          CAUSAL4D_REQUIRE_BPT_PROVIDER: "1"
+        run: |
+          set -euo pipefail
+          cd "${RUNNER_TEMP}/rolling-three-repository-run"
+          env -u PYTHONPATH \
+            "${RUNNER_TEMP}/rolling-three-repository-venv/bin/python" -m pytest -q \
+              --import-mode=importlib \
+              --junitxml="${RUNNER_TEMP}/rolling-three-repository-tests.xml" \
+              "${GITHUB_WORKSPACE}/prob4d/tests/test_claim_bearing_observation.py" \
+              "${GITHUB_WORKSPACE}/prob4d/tests/test_joint_observation_contract_fixture.py" \
+              "${GITHUB_WORKSPACE}/bayesian-phystwin/tests/test_causal4d_provider_v1.py" \
+              "${GITHUB_WORKSPACE}/bayesian-phystwin/tests/test_causal4d_provider_v2.py" \
+              "${GITHUB_WORKSPACE}/bayesian-phystwin/tests/test_causal4d_artifacts_v2.py" \
+              "${GITHUB_WORKSPACE}/bayesian-phystwin/tests/test_observation_belief_gauge_adapter.py" \
+              "${GITHUB_WORKSPACE}/bayesian-phystwin/tests/test_prob4d_causal_lineage.py" \
+              "${GITHUB_WORKSPACE}/bayesian-phystwin/tests/test_run_manifest_v2.py" \
+              "${GITHUB_WORKSPACE}/causal4d/tests/test_bpt_provider_import_boundary.py" \
+              "${GITHUB_WORKSPACE}/causal4d/tests/test_bpt_provider_integration.py" \
+              "${GITHUB_WORKSPACE}/causal4d/tests/test_causal4d_provider_contract.py" \
+              "${GITHUB_WORKSPACE}/causal4d/tests/test_causal4d_phystwin_backend.py" \
+              "${GITHUB_WORKSPACE}/causal4d/tests/test_causal4d_bpt_belief.py" \
+              "${GITHUB_WORKSPACE}/causal4d/tests/test_decision_trace.py" \
+              "${GITHUB_WORKSPACE}/causal4d/tests/test_observation_lineage.py" \
+              "${GITHUB_WORKSPACE}/causal4d/tests/test_prob4d_joint_contract_fixture.py" \
+              "${GITHUB_WORKSPACE}/causal4d/tests/test_prob4d_stream_contract_version.py" \
+              "${GITHUB_WORKSPACE}/causal4d/tests/test_stack_lock.py"
+
+      - name: Publish the non-claim-bearing boundary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Rolling three-repository compatibility canary"
+            echo
+            echo "This lane follows the moving \`main\` branches."
+            echo "It is **non-claim-bearing** and does not update frozen pins."
+            echo
+            for artifact in \
+              "${RUNNER_TEMP}/rolling-three-repository-revisions.json" \
+              "${RUNNER_TEMP}/rolling-three-repository-stack-lock.json" \
+              "${RUNNER_TEMP}/rolling-three-repository-stack-lock-verification.json" \
+              "${RUNNER_TEMP}/rolling-three-repository-summary.json" \
+              "${RUNNER_TEMP}/rolling-three-repository-provider-v2-summary.json" \
+              "${RUNNER_TEMP}/rolling-three-repository-wheel-sha256.txt"
+            do
+              if [[ -f "${artifact}" ]]; then
+                echo "### $(basename "${artifact}")"
+                echo '```text'
+                cat "${artifact}"
+                echo '```'
+              fi
+            done
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload rolling compatibility diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: three-repository-rolling-canary
+          path: |
+            ${{ runner.temp }}/rolling-three-repository-wheelhouse/*.whl
+            ${{ runner.temp }}/rolling-three-repository-wheel-sha256.txt
+            ${{ runner.temp }}/rolling-three-repository-pip-freeze.txt
+            ${{ runner.temp }}/rolling-three-repository-revisions.json
+            ${{ runner.temp }}/rolling-three-repository-stack-lock.json
+            ${{ runner.temp }}/rolling-three-repository-stack-lock-verification.json
+            ${{ runner.temp }}/rolling-three-repository-summary.json
+            ${{ runner.temp }}/rolling-three-repository-golden-path.log
+            ${{ runner.temp }}/rolling-three-repository-provider-v2-summary.json
+            ${{ runner.temp }}/rolling-three-repository-provider-v2.log
+            ${{ runner.temp }}/rolling-three-repository-tests.xml
+          if-no-files-found: warn
+          retention-days: 14

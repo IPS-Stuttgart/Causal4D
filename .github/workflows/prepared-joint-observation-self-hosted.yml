@@ -7,10 +7,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: prepared-joint-observation-${{ github.sha }}
-  cancel-in-progress: false
-
 jobs:
   validate:
     name: Validate prepared joint observations on workstation2
@@ -22,6 +18,10 @@ jobs:
       github.event.issue.user.id == 6773539 &&
       github.event.issue.title ==
         '[self-hosted] validate prepared joint observation'
+    concurrency:
+      group: prepared-joint-observation-${{ github.sha }}
+      cancel-in-progress: false
+      queue: max
     runs-on: [self-hosted, Linux, X64, nvidia-smi]
     timeout-minutes: 90
     steps:

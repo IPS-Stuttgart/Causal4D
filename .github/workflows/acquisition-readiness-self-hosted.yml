@@ -8,10 +8,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: acquisition-readiness-${{ github.sha }}
-  cancel-in-progress: false
-
 jobs:
   inspect:
     name: Inspect registered acquisition readiness on workstation2
@@ -28,6 +24,10 @@ jobs:
             '[self-hosted] inspect Causal4D acquisition readiness'
         )
       )
+    concurrency:
+      group: acquisition-readiness-${{ github.sha }}
+      cancel-in-progress: false
+      queue: max
     runs-on: [self-hosted, Linux, X64, nvidia-smi]
     timeout-minutes: 45
     outputs:
