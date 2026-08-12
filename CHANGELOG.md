@@ -4,6 +4,12 @@
 
 ### Added
 
+- Add a non-claim-bearing `causal4d paper reproduce` route that atomically
+  publishes and independently reopens reviewer-facing bundles. It binds the
+  exact protocol, method freeze, registered analysis, deterministic report
+  shell, source-verified effect reports, optional gate interpretation, and a
+  semantic conformance record without changing the frozen method or physical
+  evidence count.
 - Make the historical package-root API lazy while preserving exact owning-module
   object identity, wildcard exports, and module introspection. Package an explicit
   `__init__.pyi` surface, promote physical-posterior query projection through API

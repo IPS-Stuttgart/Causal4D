@@ -48,6 +48,7 @@ causal4d protocol freeze validate method_freeze.json protocol.json checkout/
 causal4d protocol readiness status checkout/ dataset/ --verify-file-hashes
 causal4d protocol acquisition doctor protocol.json checkout/ dataset/
 causal4d evidence observation-lineage validate observation.npz twin_belief.npz
+causal4d paper reproduce --verify paper-reproduction-v1/
 causal4d calibration execution-block --help
 ```
 
