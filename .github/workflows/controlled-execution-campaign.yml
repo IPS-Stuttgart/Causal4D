@@ -9,10 +9,6 @@ permissions:
   contents: read
   issues: write
 
-concurrency:
-  group: controlled-execution-campaign-${{ github.sha }}
-  cancel-in-progress: false
-
 jobs:
   dispatch:
     name: Dispatch target-free executions from reviewed main
@@ -24,6 +20,10 @@ jobs:
       github.event.issue.user.id == 6773539 &&
       github.event.issue.title ==
         '[self-hosted] run Causal4D controlled execution campaign'
+    concurrency:
+      group: controlled-execution-campaign-${{ github.sha }}
+      cancel-in-progress: false
+      queue: max
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
