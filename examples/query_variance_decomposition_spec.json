@@ -1,0 +1,40 @@
+{
+  "artifact_kind": "Causal4DQueryVarianceDecompositionInputV1",
+  "conditional_covariance_arrays": {
+    "readout_discrepancy": "readout_covariance"
+  },
+  "factor_values": {
+    "contact": [
+      "left",
+      "right",
+      "left",
+      "right"
+    ],
+    "physical_particle": [
+      "p0",
+      "p0",
+      "p1",
+      "p1"
+    ]
+  },
+  "metadata": {
+    "registered_before_target_access": true
+  },
+  "query_id": "late-endpoint-position",
+  "query_labels": [
+    "x",
+    "y",
+    "z"
+  ],
+  "query_scales": [
+    0.01,
+    0.01,
+    0.01
+  ],
+  "query_units": [
+    "m",
+    "m",
+    "m"
+  ],
+  "schema_version": 1
+}

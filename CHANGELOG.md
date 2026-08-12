@@ -10,6 +10,12 @@
   shell, source-verified effect reports, optional gate interpretation, and a
   semantic conformance record without changing the frozen method or physical
   evidence count.
+- Add a content-addressed registered-query variance decomposition with exact
+  Shapley attribution over caller-declared finite-support factors, retained
+  unresolved component covariance, additive conditional covariance sources,
+  strict portable validation, and a grouped diagnostic CLI. The diagnostic does
+  not change a posterior, identify a physical cause, establish calibration, or
+  authorize confirmatory method selection.
 - Make the historical package-root API lazy while preserving exact owning-module
   object identity, wildcard exports, and module introspection. Package an explicit
   `__init__.pyi` surface, promote physical-posterior query projection through API
