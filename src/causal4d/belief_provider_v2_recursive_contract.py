@@ -87,9 +87,7 @@ def validate_bayesian_phystwin_belief_provider_v2_recursive(
     _validate_recursive_metadata(candidate)
     return validate_provider_compatibility(
         candidate,
-        required_capabilities=(
-            BAYESIAN_PHYSTWIN_BELIEF_V2_COMPLETE_CAPABILITIES
-        ),
+        required_capabilities=(BAYESIAN_PHYSTWIN_BELIEF_V2_COMPLETE_CAPABILITIES),
         supported_schema_versions=(
             BAYESIAN_PHYSTWIN_BELIEF_PROVIDER_V2_SCHEMA_VERSIONS
         ),
