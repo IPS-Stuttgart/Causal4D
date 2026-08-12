@@ -777,12 +777,6 @@ COMMANDS = (
         lifecycle="stable",
     ),
     CommandSpec(
-        route=("diagnostic", "uncertainty", "decompose-query"),
-        target="causal4d.cli.query_variance_decomposition:main",
-        summary="Attribute a fixed query covariance to declared sources.",
-        lifecycle="diagnostic",
-    ),
-    CommandSpec(
         route=("evidence", "interpret-real-result"),
         target="causal4d.cli.real_result_interpretation:main",
         summary="Apply the preregistered real-result interpretation tree.",

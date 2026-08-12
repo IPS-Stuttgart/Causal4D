@@ -82,7 +82,6 @@ def _incomplete_gate_summary(
     }
 
 
-
 def _complete_gate_summary(
     *,
     freeze_sha: str,
@@ -133,9 +132,7 @@ def _endpoint_payload(
                 "source_execution_id": source_id,
                 "target_execution_id": target_id,
                 "session_id": target["session_id"],
-                "acquisition_execution_index": (
-                    target["acquisition_execution_index"]
-                ),
+                "acquisition_execution_index": (target["acquisition_execution_index"]),
                 "action_id": target["command_profile_id"],
                 "contact_region_id": target["contact_region_id"],
                 "realization_condition_id": target["realization_condition_id"],
@@ -200,9 +197,7 @@ def test_target_free_bundle_is_portable_and_exactly_reproducible(
     )
     assert second_result == result
     first_files = {path.name: path.read_bytes() for path in bundle.iterdir()}
-    second_files = {
-        path.name: path.read_bytes() for path in second_bundle.iterdir()
-    }
+    second_files = {path.name: path.read_bytes() for path in second_bundle.iterdir()}
     assert second_files == first_files
 
     index = json.loads((bundle / "paper-reproduction.json").read_text())
@@ -410,10 +405,13 @@ def test_complete_bundle_covers_all_registered_endpoints(tmp_path: Path) -> None
     assert result["status"] == "complete-result"
     assert result["effect_report_count"] == 3
     assert result["complete_evidence_registry"] is True
-    assert verify_paper_reproduction_bundle(
-        bundle,
-        require_complete=True,
-    ) == result
+    assert (
+        verify_paper_reproduction_bundle(
+            bundle,
+            require_complete=True,
+        )
+        == result
+    )
 
 
 def test_target_informed_gate_is_retained_as_failed_conformance(
@@ -444,7 +442,4 @@ def test_target_informed_gate_is_retained_as_failed_conformance(
     assert interpretation["rule_id"] == "confirmatory_boundary_violated"
     conformance = json.loads((bundle / "semantic-conformance.json").read_text())
     assert conformance["status"] == "failed"
-    assert (
-        conformance["checks"]["gate_summary_target_informed_selection"]
-        is True
-    )
+    assert conformance["checks"]["gate_summary_target_informed_selection"] is True

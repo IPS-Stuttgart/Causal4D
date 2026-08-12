@@ -46,9 +46,7 @@ from causal4d.result_bundle_verification import verify_embedded_result_bundle
 PAPER_REPRODUCTION_SCHEMA_VERSION: Final = 1
 PAPER_REPRODUCTION_ARTIFACT_KIND: Final = "Causal4DPaperReproductionBundleV1"
 PAPER_REPRODUCTION_BENCHMARK: Final = "causal4d-paper-reproduction-v1"
-SEMANTIC_CONFORMANCE_ARTIFACT_KIND: Final = (
-    "Causal4DPaperSemanticConformanceV1"
-)
+SEMANTIC_CONFORMANCE_ARTIFACT_KIND: Final = "Causal4DPaperSemanticConformanceV1"
 
 _INDEX_FILE = "paper-reproduction.json"
 _PROTOCOL_FILE = "source-protocol.json"
@@ -825,8 +823,7 @@ def verify_paper_reproduction_bundle(
         and registered_ids["protocol_design_sha256"]
         == analysis["protocol_design_sha256"]
         and registered_ids["analysis_id"] == analysis["analysis_id"]
-        and registered_ids["method_freeze_sha256"]
-        == analysis["method_freeze_sha256"],
+        and registered_ids["method_freeze_sha256"] == analysis["method_freeze_sha256"],
         "paper reproduction registered identities changed",
     )
 
@@ -1004,9 +1001,7 @@ def verify_paper_reproduction_bundle(
         name="semantic conformance report",
     )
     _require(
-        cast(Mapping[str, Any], index["registered_ids"])[
-            "semantic_conformance_id"
-        ]
+        cast(Mapping[str, Any], index["registered_ids"])["semantic_conformance_id"]
         == conformance["conformance_id"],
         "semantic conformance identity changed",
     )

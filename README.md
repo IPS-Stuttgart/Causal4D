@@ -176,28 +176,6 @@ decisions, records exact hashes and byte counts, and can be independently
 reopened with `causal4d paper reproduce --verify <bundle-dir>`. See
 [the paper reproduction guide](docs/paper_reproduction.md).
 
-## Query-space uncertainty attribution
-
-Attribute one fixed finite-posterior query covariance to declared physical
-particle, actuation, contact, slip, or other support labels while retaining any
-unexplained component variation explicitly:
-
-```bash
-causal4d diagnostic uncertainty decompose-query build \
-  posterior-query-input.npz \
-  examples/query_variance_decomposition_spec.json \
-  query-variance-decomposition.json
-
-causal4d diagnostic uncertainty decompose-query validate \
-  query-variance-decomposition.json
-```
-
-The output uses exact Shapley attribution over the declared finite factor set,
-adds caller-declared conditional covariance sources, and verifies numerical
-additivity and content identity. It is diagnostic-only and cannot select or
-change the frozen physical method. See
-[the variance-decomposition guide](docs/query_variance_decomposition.md).
-
 ## Next Scientific Milestone
 
 The controlled result has passed. The next first-paper milestone is the locked
