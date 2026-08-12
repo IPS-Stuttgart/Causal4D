@@ -1,0 +1,123 @@
+name: Recursive belief-handoff installed-wheel integration
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/recursive-belief-handoff-integration.yml"
+      - "docs/recursive_bayesian_phystwin_handoff.md"
+      - "src/causal4d/belief_provider_v2_recursive_contract.py"
+      - "src/causal4d/recursive_bpt_handoff_contract.py"
+      - "src/causal4d/recursive_bpt_belief_handoff.py"
+      - "tests/test_belief_provider_v2_recursive_contract.py"
+      - "tests/test_recursive_bpt_belief_handoff.py"
+      - "tests/test_recursive_bpt_belief_handoff_workflow_policy.py"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/recursive-belief-handoff-integration.yml"
+      - "docs/recursive_bayesian_phystwin_handoff.md"
+      - "src/causal4d/belief_provider_v2_recursive_contract.py"
+      - "src/causal4d/recursive_bpt_handoff_contract.py"
+      - "src/causal4d/recursive_bpt_belief_handoff.py"
+      - "tests/test_belief_provider_v2_recursive_contract.py"
+      - "tests/test_recursive_bpt_belief_handoff.py"
+      - "tests/test_recursive_bpt_belief_handoff_workflow_policy.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: recursive-belief-handoff-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installed-wheel-contract:
+    name: BPT recursive stream -> Causal4D belief handoff
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact Causal4D revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: causal4d
+          persist-credentials: false
+
+      - name: Verify tested Causal4D revision
+        working-directory: causal4d
+        env:
+          EXPECTED_CAUSAL4D_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$EXPECTED_CAUSAL4D_SHA"
+          echo "Tested Causal4D revision: $actual_sha"
+
+      - name: Check out exact BayesianPhysTwin recursive-provider revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: IPS-Stuttgart/BayesianPhysTwin
+          ref: d2b38ce72a0ecb07cce7e252a0af6fb32c9411dc
+          path: bayesian-phystwin
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            causal4d/pyproject.toml
+            bayesian-phystwin/pyproject.toml
+
+      - name: Build both wheels
+        run: |
+          python -m pip install --upgrade build pip
+          wheelhouse="$RUNNER_TEMP/recursive-belief-handoff-wheelhouse"
+          mkdir -p "$wheelhouse"
+          python -m build --wheel --outdir "$wheelhouse" bayesian-phystwin
+          python -m build --wheel --outdir "$wheelhouse" causal4d
+          test "$(find "$wheelhouse" -maxdepth 1 -name '*.whl' | wc -l)" -eq 2
+
+      - name: Install wheels in an isolated environment
+        run: |
+          venv="$RUNNER_TEMP/recursive-belief-handoff-venv"
+          wheelhouse="$RUNNER_TEMP/recursive-belief-handoff-wheelhouse"
+          python -m venv "$venv"
+          "$venv/bin/python" -m pip install --upgrade pip
+          mapfile -t wheels < <(find "$wheelhouse" -maxdepth 1 -name '*.whl' -print | sort)
+          "$venv/bin/python" -m pip install "${wheels[@]}" pytest
+          "$venv/bin/python" -m pip check
+
+      - name: Exercise the installed recursive handoff contract
+        run: |
+          cd "$RUNNER_TEMP"
+          env -u PYTHONPATH \
+            "$RUNNER_TEMP/recursive-belief-handoff-venv/bin/python" -m pytest -q \
+              --import-mode=importlib \
+              "$GITHUB_WORKSPACE/causal4d/tests/test_belief_provider_v2_contract.py" \
+              "$GITHUB_WORKSPACE/causal4d/tests/test_belief_provider_v2_recursive_contract.py" \
+              "$GITHUB_WORKSPACE/causal4d/tests/test_recursive_bpt_belief_handoff.py" \
+              "$GITHUB_WORKSPACE/causal4d/tests/test_recursive_bpt_belief_handoff_workflow_policy.py" \
+              "$GITHUB_WORKSPACE/causal4d/tests/test_evidence_ownership.py" \
+              "$GITHUB_WORKSPACE/causal4d/tests/test_bpt_provider_import_boundary.py"
+
+      - name: Check Causal4D source quality
+        if: always()
+        run: |
+          python -m pip install "ruff>=0.15.22,<0.17"
+          python -m ruff check \
+            causal4d/src/causal4d/belief_provider_v2_recursive_contract.py \
+            causal4d/src/causal4d/recursive_bpt_handoff_contract.py \
+            causal4d/src/causal4d/recursive_bpt_belief_handoff.py \
+            causal4d/tests/test_belief_provider_v2_recursive_contract.py \
+            causal4d/tests/test_recursive_bpt_belief_handoff.py \
+            causal4d/tests/test_recursive_bpt_belief_handoff_workflow_policy.py
+          python -m ruff format --check --diff \
+            causal4d/src/causal4d/belief_provider_v2_recursive_contract.py \
+            causal4d/src/causal4d/recursive_bpt_handoff_contract.py \
+            causal4d/src/causal4d/recursive_bpt_belief_handoff.py \
+            causal4d/tests/test_belief_provider_v2_recursive_contract.py \
+            causal4d/tests/test_recursive_bpt_belief_handoff.py \
+            causal4d/tests/test_recursive_bpt_belief_handoff_workflow_policy.py
