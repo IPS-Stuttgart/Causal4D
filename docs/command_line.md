@@ -56,6 +56,21 @@ causal4d calibration execution-block --help
 `protocol acquisition` provides the method-neutral pre-session doctor, health
 snapshot evaluator, and append-only session journal.
 
+## Diagnostic workflows
+
+Diagnostics remain outside the default stable help view and cannot alter a
+registered method merely because their artifacts validate:
+
+```bash
+causal4d diagnostic uncertainty decompose-query build --help
+causal4d diagnostic uncertainty decompose-query validate --help
+```
+
+The query-variance decomposition attributes a fixed finite-posterior query to
+caller-declared support factors and additive conditional covariance sources. It
+retains unresolved component covariance and does not establish causal recovery
+or empirical calibration.
+
 ## Authoritative registry
 
 The registry records, for every supported route:
