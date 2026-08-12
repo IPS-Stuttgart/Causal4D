@@ -4,9 +4,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = (
-    ROOT / ".github" / "workflows" / "three-repository-rolling-canary.yml"
-)
+WORKFLOW = ROOT / ".github" / "workflows" / "three-repository-rolling-canary.yml"
 
 
 def _text() -> str:

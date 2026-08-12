@@ -152,9 +152,7 @@ def _project_status_required_version(root: Path) -> str:
 
 def _changelog_state(root: Path, version: str) -> tuple[bool, bool, bool]:
     changelog = _required_file(root, "CHANGELOG.md").read_text(encoding="utf-8")
-    heading_present = bool(
-        re.search(rf"(?m)^##\s+{re.escape(version)}\s*$", changelog)
-    )
+    heading_present = bool(re.search(rf"(?m)^##\s+{re.escape(version)}\s*$", changelog))
     unreleased_match = re.search(
         r"(?ms)^##\s+Unreleased\s*$\n(?P<body>.*?)(?=^##\s+|\Z)",
         changelog,
