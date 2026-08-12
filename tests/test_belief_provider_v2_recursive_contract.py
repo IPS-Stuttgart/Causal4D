@@ -21,9 +21,7 @@ from causal4d.provider_contract import PhysicalBeliefProviderManifest
 
 def _manifest(
     *,
-    capabilities: tuple[str, ...] = (
-        BAYESIAN_PHYSTWIN_BELIEF_V2_COMPLETE_CAPABILITIES
-    ),
+    capabilities: tuple[str, ...] = (BAYESIAN_PHYSTWIN_BELIEF_V2_COMPLETE_CAPABILITIES),
     schemas: dict[str, int] | None = None,
     metadata: dict[str, object] | None = None,
 ) -> PhysicalBeliefProviderManifest:
@@ -82,9 +80,7 @@ def test_horizon_subset_remains_compatible_without_recursive_surface() -> None:
     assert validate_bayesian_phystwin_belief_provider_v2(manifest).compatible
     recursive = validate_bayesian_phystwin_belief_provider_v2_recursive(manifest)
     assert not recursive.compatible
-    assert recursive.missing_capabilities == (
-        "claim_bearing_prob4d_recursive_stream",
-    )
+    assert recursive.missing_capabilities == ("claim_bearing_prob4d_recursive_stream",)
 
 
 def test_recursive_provider_contract_rejects_artifact_schema_drift() -> None:
