@@ -3,9 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-WORKFLOW = (
-    Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ci.yml"
-)
+WORKFLOW = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ci.yml"
 BASE_EXPRESSION = "${{ github.event.pull_request.base.sha || github.event.before }}"
 
 
