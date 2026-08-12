@@ -157,6 +157,47 @@ causal4d protocol real validate-protocol \
 The full PhysTwin abduction chain is documented in
 [docs/causal4d_abduction_intervention_prediction.md](docs/causal4d_abduction_intervention_prediction.md).
 
+## Reviewer-facing paper reproduction
+
+Create an immutable target-free bundle from the exact registered protocol,
+method freeze, and analysis manifest:
+
+```bash
+causal4d paper reproduce \
+  --protocol configs/causal4d/sloth_multi_action_v1.json \
+  --analysis-manifest /data/causal4d-sloth-multi-action-v1/registered-analysis.json \
+  --method-freeze /data/causal4d-sloth-multi-action-v1/method_freeze.json \
+  --output-dir /data/causal4d-sloth-multi-action-v1/paper-reproduction-plan
+```
+
+The bundle copies no raw sensor data and changes no method. It regenerates the
+registered report shell, source-verifies supplied effect tables and gate
+decisions, records exact hashes and byte counts, and can be independently
+reopened with `causal4d paper reproduce --verify <bundle-dir>`. See
+[the paper reproduction guide](docs/paper_reproduction.md).
+
+## Query-space uncertainty attribution
+
+Attribute one fixed finite-posterior query covariance to declared physical
+particle, actuation, contact, slip, or other support labels while retaining any
+unexplained component variation explicitly:
+
+```bash
+causal4d diagnostic uncertainty decompose-query build \
+  posterior-query-input.npz \
+  examples/query_variance_decomposition_spec.json \
+  query-variance-decomposition.json
+
+causal4d diagnostic uncertainty decompose-query validate \
+  query-variance-decomposition.json
+```
+
+The output uses exact Shapley attribution over the declared finite factor set,
+adds caller-declared conditional covariance sources, and verifies numerical
+additivity and content identity. It is diagnostic-only and cannot select or
+change the frozen physical method. See
+[the variance-decomposition guide](docs/query_variance_decomposition.md).
+
 ## Next Scientific Milestone
 
 The controlled result has passed. The next first-paper milestone is the locked
