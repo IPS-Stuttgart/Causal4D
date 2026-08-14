@@ -24,9 +24,7 @@ PUBLIC_API_REQUIREMENTS: Mapping[str, tuple[str, str, int]] = {
 }
 
 REQUIRED_MODULE_SYMBOLS: Mapping[str, tuple[str, ...]] = {
-    "bayesian_phystwin.causal4d_belief_provider_v2": (
-        "ClaimBearingProb4DStreamRunV1",
-    ),
+    "bayesian_phystwin.causal4d_belief_provider_v2": ("ClaimBearingProb4DStreamRunV1",),
 }
 
 
@@ -177,7 +175,9 @@ def verify_installed_stack(lock: Mapping[str, Any]) -> dict[str, Any]:
             missing_symbols = (
                 list(required_symbols)
                 if module is None
-                else [symbol for symbol in required_symbols if not hasattr(module, symbol)]
+                else [
+                    symbol for symbol in required_symbols if not hasattr(module, symbol)
+                ]
             )
             importable = module is not None
             valid = importable and not missing_symbols
@@ -203,7 +203,9 @@ def verify_installed_stack(lock: Mapping[str, Any]) -> dict[str, Any]:
                         module=module_name,
                         expected=list(required_symbols),
                         observed=[
-                            symbol for symbol in required_symbols if hasattr(module, symbol)
+                            symbol
+                            for symbol in required_symbols
+                            if hasattr(module, symbol)
                         ],
                     )
                 )
