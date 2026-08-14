@@ -53,9 +53,7 @@ class GroupedLikelihoodSummaryDiagnostics:
             "responsibility_storage": self.responsibility_storage,
         }
         if self.full_covariance_group_ids:
-            result["full_covariance_group_ids"] = list(
-                self.full_covariance_group_ids
-            )
+            result["full_covariance_group_ids"] = list(self.full_covariance_group_ids)
         if self.low_rank_covariance_group_ids:
             result["low_rank_covariance_group_ids"] = list(
                 self.low_rank_covariance_group_ids
@@ -137,8 +135,7 @@ def _batch_mapping(
         if factors:
             if raw.ndim < 2 or raw.shape[-2] != coordinate_count or raw.shape[-1] < 1:
                 raise ValueError(
-                    "covariance factors must end in "
-                    "(group_coordinate, positive_rank)"
+                    "covariance factors must end in (group_coordinate, positive_rank)"
                 )
             tail = (coordinate_count, raw.shape[-1])
         else:
@@ -290,8 +287,7 @@ def posterior_weights_from_grouped_evidence_batched(
     if first is None or responsibility_sum is None or responsibility_minimum is None:
         raise RuntimeError("grouped batched update produced no component scores")
     log_posterior = (
-        log_weights_from_probabilities(prior.reshape(-1), name="prior_weights")
-        + scores
+        log_weights_from_probabilities(prior.reshape(-1), name="prior_weights") + scores
     )
     maximum = float(np.max(log_posterior))
     posterior = np.exp(log_posterior - maximum)
@@ -313,9 +309,7 @@ def posterior_weights_from_grouped_evidence_batched(
         contributor_power_caps=first.contributor_power_caps,
         group_coordinate_counts=first.group_coordinate_counts,
         normalization_coordinate_mass=first.normalization_coordinate_mass,
-        source_covariance_condition_numbers=(
-            first.source_covariance_condition_numbers
-        ),
+        source_covariance_condition_numbers=(first.source_covariance_condition_numbers),
         normalization_coordinate_fractions=first.normalization_coordinate_fractions,
     )
     return posterior.reshape(leading_shape), summary
