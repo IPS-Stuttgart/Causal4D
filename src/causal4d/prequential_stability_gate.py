@@ -239,9 +239,7 @@ class PrequentialStabilityGateConfigV1:
             "artifact_kind": _CONFIG_KIND,
             "minimum_prefix_frame_count": self.minimum_prefix_frame_count,
             "required_consecutive_passes": self.required_consecutive_passes,
-            "maximum_previous_total_variation": (
-                self.maximum_previous_total_variation
-            ),
+            "maximum_previous_total_variation": (self.maximum_previous_total_variation),
             "maximum_previous_kl": self.maximum_previous_kl,
             "minimum_effective_sample_size": self.minimum_effective_sample_size,
             "maximum_query_mean_shift_standardized_l2": (
@@ -333,9 +331,7 @@ class PrequentialStabilityDecisionV1:
             unique=False,
         )
         if len(factual_ids) != len(prefixes):
-            raise ValueError(
-                "factual_intervention_ids must identify every prefix"
-            )
+            raise ValueError("factual_intervention_ids must identify every prefix")
         raw_criteria = np.asarray(self.criterion_pass)
         if raw_criteria.dtype.kind != "b":
             raise ValueError("criterion_pass must contain Booleans")
@@ -390,9 +386,7 @@ class PrequentialStabilityDecisionV1:
                     "accepted decision must select the first passing prefix"
                 )
             if selected_stop != int(evidence_stops[index]):
-                raise ValueError(
-                    "selected_evidence_frame_stop does not match the path"
-                )
+                raise ValueError("selected_evidence_frame_stop does not match the path")
             selected_factual_id = _require_sha256(
                 selected_factual_id,
                 name="selected_factual_intervention_id",
@@ -419,9 +413,7 @@ class PrequentialStabilityDecisionV1:
                 name="fallback_reason",
             )
             if np.any(consecutive >= required_passes):
-                raise ValueError(
-                    "fallback decision cannot contain a passing prefix"
-                )
+                raise ValueError("fallback decision cannot contain a passing prefix")
         object.__setattr__(self, "status", status)
         object.__setattr__(self, "required_consecutive_passes", required_passes)
         object.__setattr__(self, "prefix_frame_counts", prefixes)
@@ -466,9 +458,7 @@ class PrequentialStabilityDecisionV1:
             "selected_step_index": self.selected_step_index,
             "selected_prefix_frame_count": self.selected_prefix_frame_count,
             "selected_evidence_frame_stop": self.selected_evidence_frame_stop,
-            "selected_factual_intervention_id": (
-                self.selected_factual_intervention_id
-            ),
+            "selected_factual_intervention_id": (self.selected_factual_intervention_id),
             "fallback_reason": self.fallback_reason,
             "metadata": plain_json(self.metadata),
             "claim_boundary": _CLAIM_BOUNDARY,
@@ -487,9 +477,7 @@ class PrequentialStabilityDecisionV1:
                 "evidence_frame_stops": array_sha256(self.evidence_frame_stops),
                 "criterion_pass": array_sha256(self.criterion_pass),
                 "step_pass": array_sha256(self.step_pass),
-                "consecutive_pass_counts": array_sha256(
-                    self.consecutive_pass_counts
-                ),
+                "consecutive_pass_counts": array_sha256(self.consecutive_pass_counts),
             },
         }
 
@@ -575,9 +563,7 @@ def evaluate_prequential_stability(
             path.factual_intervention_ids[selected] if accepted else None
         ),
         fallback_reason=(
-            None
-            if accepted
-            else "no_prefix_satisfied_source_frozen_stability_gate"
+            None if accepted else "no_prefix_satisfied_source_frozen_stability_gate"
         ),
         metadata={
             "operator": "prequential-stability-gate-v1",
@@ -712,9 +698,7 @@ def load_prequential_stability_gate_config(
     config = PrequentialStabilityGateConfigV1(
         minimum_prefix_frame_count=fields["minimum_prefix_frame_count"],
         required_consecutive_passes=fields["required_consecutive_passes"],
-        maximum_previous_total_variation=fields[
-            "maximum_previous_total_variation"
-        ],
+        maximum_previous_total_variation=fields["maximum_previous_total_variation"],
         maximum_previous_kl=fields["maximum_previous_kl"],
         minimum_effective_sample_size=fields["minimum_effective_sample_size"],
         maximum_query_mean_shift_standardized_l2=fields[
@@ -795,9 +779,7 @@ def load_prequential_stability_decision(
         selected_step_index=fields["selected_step_index"],
         selected_prefix_frame_count=fields["selected_prefix_frame_count"],
         selected_evidence_frame_stop=fields["selected_evidence_frame_stop"],
-        selected_factual_intervention_id=fields[
-            "selected_factual_intervention_id"
-        ],
+        selected_factual_intervention_id=fields["selected_factual_intervention_id"],
         fallback_reason=fields["fallback_reason"],
         metadata=_require_mapping(fields["metadata"], name="metadata"),
     )

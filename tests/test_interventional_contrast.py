@@ -593,9 +593,9 @@ def test_registered_cross_branch_extension_preserves_legacy_metadata() -> None:
             branch_b_label="b",
             conditional_variance_policy=policy,
         )
-        assert contrast.metadata[
-            "cross_branch_discrepancy_covariance_available"
-        ] is False
+        assert (
+            contrast.metadata["cross_branch_discrepancy_covariance_available"] is False
+        )
         assert "cross_branch_query_covariance_available" not in contrast.metadata
         assert "registered_cross_branch_query_covariance" not in contrast.metadata
 

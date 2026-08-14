@@ -24,9 +24,7 @@ def _independent_product_posterior(
     conditional_variance: float = 0.0,
 ) -> InterventionalContrastPosteriorV1:
     variance_policy = (
-        "component_means_only"
-        if conditional_variance == 0.0
-        else "independent_readout"
+        "component_means_only" if conditional_variance == 0.0 else "independent_readout"
     )
     return InterventionalContrastPosteriorV1(
         source_branch_a_posterior_id=_digest("branch-a"),

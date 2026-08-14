@@ -174,9 +174,7 @@ class RegisteredCrossBranchQueryCovarianceV1:
             or covariance.shape[1] != covariance.shape[2]
             or covariance.shape[1] < 1
         ):
-            raise ValueError(
-                "cross_covariance must have shape (pair, query, query)"
-            )
+            raise ValueError("cross_covariance must have shape (pair, query, query)")
         if not np.all(np.isfinite(covariance)):
             raise ValueError("cross_covariance must be finite")
         source_ids = _validated_source_ids(self.source_artifact_ids)
@@ -270,9 +268,7 @@ def save_registered_cross_branch_query_covariance(
     """Atomically publish a strict non-pickled covariance artifact."""
 
     if not isinstance(artifact, RegisteredCrossBranchQueryCovarianceV1):
-        raise TypeError(
-            "artifact must be RegisteredCrossBranchQueryCovarianceV1"
-        )
+        raise TypeError("artifact must be RegisteredCrossBranchQueryCovarianceV1")
     descriptor = {**artifact._scalar_payload(), "artifact_id": artifact.artifact_id}
 
     def write_archive(handle: BinaryIO) -> None:

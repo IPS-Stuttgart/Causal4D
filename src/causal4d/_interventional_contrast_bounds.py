@@ -64,9 +64,7 @@ _BOUNDS_ARRAY_FIELDS = frozenset(
         "source_probability_positive",
     }
 )
-_BOUNDS_ARRAY_DTYPES = {
-    name: np.dtype(np.float64) for name in _BOUNDS_ARRAY_FIELDS
-}
+_BOUNDS_ARRAY_DTYPES = {name: np.dtype(np.float64) for name in _BOUNDS_ARRAY_FIELDS}
 _BOUNDS_CLAIM_BOUNDARY = {
     "analysis_only": True,
     "changes_estimator": False,
@@ -371,16 +369,10 @@ class InterventionalContrastBoundsV1:
             "mean": self.mean.tolist(),
             "variance_lower": self.variance_lower.tolist(),
             "variance_upper": self.variance_upper.tolist(),
-            "probability_positive_lower": (
-                self.probability_positive_lower.tolist()
-            ),
-            "probability_positive_upper": (
-                self.probability_positive_upper.tolist()
-            ),
+            "probability_positive_lower": (self.probability_positive_lower.tolist()),
+            "probability_positive_upper": (self.probability_positive_upper.tolist()),
             "source_variance": self.source_variance.tolist(),
-            "source_probability_positive": (
-                self.source_probability_positive.tolist()
-            ),
+            "source_probability_positive": (self.source_probability_positive.tolist()),
         }
 
 
@@ -400,9 +392,7 @@ def _validated_thresholds(
         elif thresholds.shape == (output_count,):
             thresholds = thresholds[None]
         else:
-            raise ValueError(
-                "one-dimensional cdf_thresholds must match query outputs"
-            )
+            raise ValueError("one-dimensional cdf_thresholds must match query outputs")
     if (
         thresholds.ndim != 2
         or thresholds.shape[0] == 0
@@ -425,9 +415,7 @@ def _transport_constraints(
     row_indices = np.unique(pairs[:, 0])
     column_indices = np.unique(pairs[:, 1])
     row_lookup = {int(value): index for index, value in enumerate(row_indices)}
-    column_lookup = {
-        int(value): index for index, value in enumerate(column_indices)
-    }
+    column_lookup = {int(value): index for index, value in enumerate(column_indices)}
     variable_count = len(pairs)
     variable_indices = np.arange(variable_count, dtype=np.int64)
     constraint_rows = np.concatenate(
@@ -504,8 +492,7 @@ def _component_cdf(
     probabilities = np.empty_like(means, dtype=float)
     positive_variance = variances > 0.0
     probabilities[positive_variance] = ndtr(
-        (threshold - means[positive_variance])
-        / np.sqrt(variances[positive_variance])
+        (threshold - means[positive_variance]) / np.sqrt(variances[positive_variance])
     )
     probabilities[~positive_variance] = means[~positive_variance] <= threshold
     return probabilities
@@ -571,11 +558,9 @@ def build_interventional_contrast_bounds(
         cdf_thresholds,
         output_count=output_count,
     )
-    constraints, right_hand_side, marginal_error, source_mass = (
-        _transport_constraints(
-            posterior,
-            marginal_tolerance=tolerance,
-        )
+    constraints, right_hand_side, marginal_error, source_mass = _transport_constraints(
+        posterior,
+        marginal_tolerance=tolerance,
     )
     if not np.isclose(source_mass, 1.0, atol=tolerance, rtol=tolerance):
         raise ValueError("source contrast pair weights must sum to one")

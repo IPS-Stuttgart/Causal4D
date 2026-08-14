@@ -507,8 +507,7 @@ def build_interventional_contrast(
     if variance_policy == "registered_cross_branch":
         if cross_branch_query_covariance is None:
             raise ValueError(
-                "registered_cross_branch requires "
-                "cross_branch_query_covariance"
+                "registered_cross_branch requires cross_branch_query_covariance"
             )
     elif cross_branch_query_covariance is not None:
         raise ValueError(
