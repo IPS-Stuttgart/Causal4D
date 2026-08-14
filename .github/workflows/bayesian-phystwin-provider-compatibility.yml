@@ -24,6 +24,7 @@ on:
       - "src/causal4d/cli/root.py"
       - "src/causal4d/cli/stack.py"
       - "src/causal4d/immutable_json.py"
+      - "src/causal4d/installed_stack.py"
       - "src/causal4d/molmo_visual_inputs_v2.py"
       - "src/causal4d/observation_lineage.py"
       - "src/causal4d/phystwin_backend.py"
@@ -44,6 +45,7 @@ on:
       - "tests/test_decision_trace.py"
       - "tests/test_causal4d_phystwin_backend.py"
       - "tests/test_causal4d_rollout_bank.py"
+      - "tests/test_installed_stack.py"
       - "tests/test_rollout_bank_io.py"
       - "tests/test_phystwin_resumable.py"
       - "tests/test_prob4d_stream_contract_version.py"
@@ -74,6 +76,7 @@ on:
       - "src/causal4d/cli/root.py"
       - "src/causal4d/cli/stack.py"
       - "src/causal4d/immutable_json.py"
+      - "src/causal4d/installed_stack.py"
       - "src/causal4d/molmo_visual_inputs_v2.py"
       - "src/causal4d/observation_lineage.py"
       - "src/causal4d/phystwin_backend.py"
@@ -94,6 +97,7 @@ on:
       - "tests/test_decision_trace.py"
       - "tests/test_causal4d_phystwin_backend.py"
       - "tests/test_causal4d_rollout_bank.py"
+      - "tests/test_installed_stack.py"
       - "tests/test_rollout_bank_io.py"
       - "tests/test_phystwin_resumable.py"
       - "tests/test_prob4d_stream_contract_version.py"
@@ -128,7 +132,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: IPS-Stuttgart/BayesianPhysTwin
-          ref: 68eaf4f4daaf7066f56f3ef8a4add65a5ae70059
+          ref: 3c2c703f731a46019cf07b540474f25827dd5106
           path: bayesian-phystwin
           persist-credentials: false
 
@@ -255,7 +259,7 @@ jobs:
           for wheel in "${wheels[@]}"; do
             verify+=(--wheel "$wheel")
           done
-          verify+=(--json)
+          verify+=(--installed --json)
           "${verify[@]}" | tee "$report"
           "$venv/bin/python" -m json.tool "$lock" >/dev/null
           "$venv/bin/python" -m json.tool "$report" >/dev/null
@@ -266,9 +270,16 @@ jobs:
 
           report = json.loads(Path(os.environ["STACK_REPORT"]).read_text())
           if report.get("valid") is not True:
-              raise SystemExit("stack-lock verification did not pass")
-          if report.get("wheel_set", {}).get("verified") is not True:
+              raise SystemExit("stack runtime verification did not pass")
+          lock_report = report.get("lock_verification", {})
+          if lock_report.get("wheel_set", {}).get("verified") is not True:
               raise SystemExit("stack-lock wheel identities were not verified")
+          installed_report = report.get("installed_environment", {})
+          if installed_report.get("valid") is not True:
+              raise SystemExit("installed stack interfaces were not verified")
+          boundary = report.get("evidence_boundary", {})
+          if boundary.get("claim_bearing_ready") is not False:
+              raise SystemExit("compatibility diagnostics must not claim readiness")
           PY
 
       - name: Run the isolated three-repository compatibility path
@@ -336,6 +347,7 @@ jobs:
               "$GITHUB_WORKSPACE/causal4d/tests/test_causal4d_bpt_belief.py" \
               "$GITHUB_WORKSPACE/causal4d/tests/test_causal4d_molmo_visual_inputs_v2.py" \
               "$GITHUB_WORKSPACE/causal4d/tests/test_decision_trace.py" \
+              "$GITHUB_WORKSPACE/causal4d/tests/test_installed_stack.py" \
               "$GITHUB_WORKSPACE/causal4d/tests/test_phystwin_resumable.py" \
               "$GITHUB_WORKSPACE/causal4d/tests/test_replay_provider_contract.py" \
               "$GITHUB_WORKSPACE/causal4d/tests/test_rollout_cache.py" \
