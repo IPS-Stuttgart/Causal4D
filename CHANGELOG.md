@@ -4,6 +4,12 @@
 
 ### Added
 
+- Add an analysis-only, content-addressed sensitivity artifact for assumed
+  cross-branch conditional readout correlation in interventional contrasts.
+  It preserves the source coupling and means, reproduces the existing
+  independent-readout posterior exactly at zero correlation, and reports
+  marginal variance and sign-probability envelopes without identifying a
+  cross-world covariance or changing the frozen estimator.
 - Add a non-claim-bearing `causal4d paper reproduce` route that atomically
   publishes and independently reopens reviewer-facing bundles. It binds the
   exact protocol, method freeze, registered analysis, deterministic report
