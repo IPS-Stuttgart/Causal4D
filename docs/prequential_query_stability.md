@@ -108,3 +108,12 @@ contact truth, deployment safety, or state of the art. It should be interpreted
 alongside held-out execution-level proper scores, coverage, interval width,
 finite-support adequacy, exact fallback accounting, and the registered physical
 experiment.
+
+## Prospective source-frozen gate
+
+A separately versioned future protocol may apply the source-frozen thresholds in
+[`prequential_stability_gate.md`](prequential_stability_gate.md). That gate uses
+only preceding-prefix movement, requires a preregistered number of consecutive
+passes, selects the first passing causal prefix, and returns an exact caller-owned
+fallback when no prefix is admitted. The diagnostic in this document remains
+unchanged and does not itself select a prefix.

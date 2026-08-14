@@ -126,6 +126,7 @@ class InterventionalContrastPosteriorV1:
         if variance_policy not in {
             "component_means_only",
             "independent_readout",
+            "registered_cross_branch",
         }:
             raise ValueError("unsupported conditional variance policy")
 

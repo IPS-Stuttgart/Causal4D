@@ -483,3 +483,222 @@ def test_contrast_archive_round_trip_and_tamper_rejection(tmp_path: Path) -> Non
     )
     with pytest.raises(ValueError, match="must use dtype"):
         load_interventional_contrast(malformed_dtype)
+
+
+def _registered_cross_covariance(
+    branch_a: PhysicalPosterior,
+    branch_b: PhysicalPosterior,
+    *,
+    cross_covariance: float = 0.01,
+):
+    from causal4d.interventional_contrast import (
+        RegisteredCrossBranchQueryCovarianceV1,
+    )
+
+    query = _final_x_query()
+    return RegisteredCrossBranchQueryCovarianceV1(
+        source_branch_a_posterior_id=branch_a.artifact_id,
+        source_branch_b_posterior_id=branch_b.artifact_id,
+        source_branch_a_query_id=branch_a.source_query_id,
+        source_branch_b_query_id=branch_b.source_query_id,
+        query_id=query.query_id,
+        branch_a_component_count=len(branch_a.weights),
+        branch_b_component_count=len(branch_b.weights),
+        coupling_policy="shared_component",
+        shared_kappa_names=(),
+        pair_indices=np.asarray([[0, 0], [1, 1]], dtype=np.int64),
+        cross_covariance=np.full((2, 1, 1), cross_covariance, dtype=float),
+        source_artifact_ids=("3" * 64,),
+        source_only=True,
+        registered_before_target_access=True,
+        metadata={"fit_units": ["source-session-a", "source-session-b"]},
+    )
+
+
+def test_registered_cross_branch_covariance_changes_only_conditional_variance() -> None:
+    branch_a = _posterior(
+        "action-a",
+        (2.0, 4.0),
+        action_scale=1.0,
+        weights=(0.75, 0.25),
+        variance_m2=0.04,
+    )
+    branch_b = _posterior(
+        "action-b",
+        (1.0, 1.0),
+        action_scale=-1.0,
+        weights=(0.75, 0.25),
+        variance_m2=0.01,
+    )
+    artifact = _registered_cross_covariance(branch_a, branch_b)
+
+    registered = build_interventional_contrast(
+        branch_a,
+        branch_b,
+        _final_x_query(),
+        branch_a_label="a",
+        branch_b_label="b",
+        conditional_variance_policy="registered_cross_branch",
+        cross_branch_query_covariance=artifact,
+    )
+    independent = build_interventional_contrast(
+        branch_a,
+        branch_b,
+        _final_x_query(),
+        branch_a_label="a",
+        branch_b_label="b",
+        conditional_variance_policy="independent_readout",
+    )
+
+    np.testing.assert_array_equal(
+        registered.contrast_values,
+        independent.contrast_values,
+    )
+    np.testing.assert_array_equal(registered.weights, independent.weights)
+    np.testing.assert_allclose(registered.mean, independent.mean)
+    np.testing.assert_allclose(registered.conditional_covariance[:, 0, 0], 0.03)
+    np.testing.assert_allclose(independent.conditional_covariance[:, 0, 0], 0.05)
+    np.testing.assert_allclose(registered.covariance, [[0.78]])
+    assert registered.metadata["cross_branch_discrepancy_covariance_available"] is True
+    covariance_metadata = registered.metadata[
+        "registered_cross_branch_query_covariance"
+    ]
+    assert covariance_metadata["artifact_id"] == artifact.artifact_id
+    assert covariance_metadata["minimum_block_covariance_eigenvalue"] > 0.0
+    assert covariance_metadata["minimum_contrast_covariance_eigenvalue"] > 0.0
+
+
+def test_registered_cross_branch_extension_preserves_legacy_metadata() -> None:
+    branch_a = _posterior(
+        "action-a",
+        (2.0, 4.0),
+        action_scale=1.0,
+        weights=(0.75, 0.25),
+        variance_m2=0.04,
+    )
+    branch_b = _posterior(
+        "action-b",
+        (1.0, 1.0),
+        action_scale=-1.0,
+        weights=(0.75, 0.25),
+        variance_m2=0.01,
+    )
+
+    for policy in ("component_means_only", "independent_readout"):
+        contrast = build_interventional_contrast(
+            branch_a,
+            branch_b,
+            _final_x_query(),
+            branch_a_label="a",
+            branch_b_label="b",
+            conditional_variance_policy=policy,
+        )
+        assert contrast.metadata[
+            "cross_branch_discrepancy_covariance_available"
+        ] is False
+        assert "cross_branch_query_covariance_available" not in contrast.metadata
+        assert "registered_cross_branch_query_covariance" not in contrast.metadata
+
+
+def test_registered_cross_branch_covariance_round_trip_and_no_overwrite(
+    tmp_path: Path,
+) -> None:
+    from causal4d.interventional_contrast import (
+        load_registered_cross_branch_query_covariance,
+        save_registered_cross_branch_query_covariance,
+    )
+
+    branch_a = _posterior(
+        "action-a",
+        (2.0, 4.0),
+        action_scale=1.0,
+        weights=(0.75, 0.25),
+        variance_m2=0.04,
+    )
+    branch_b = _posterior(
+        "action-b",
+        (1.0, 1.0),
+        action_scale=-1.0,
+        weights=(0.75, 0.25),
+        variance_m2=0.01,
+    )
+    artifact = _registered_cross_covariance(branch_a, branch_b)
+    path = tmp_path / "cross-branch-covariance.npz"
+
+    save_registered_cross_branch_query_covariance(path, artifact)
+    restored = load_registered_cross_branch_query_covariance(path)
+    assert restored.artifact_id == artifact.artifact_id
+    np.testing.assert_array_equal(restored.pair_indices, artifact.pair_indices)
+    np.testing.assert_array_equal(
+        restored.cross_covariance,
+        artifact.cross_covariance,
+    )
+    with pytest.raises(FileExistsError):
+        save_registered_cross_branch_query_covariance(path, artifact)
+
+
+def test_registered_cross_branch_covariance_fails_closed_on_binding_and_psd() -> None:
+    from dataclasses import replace
+
+    branch_a = _posterior(
+        "action-a",
+        (2.0, 4.0),
+        action_scale=1.0,
+        weights=(0.75, 0.25),
+        variance_m2=0.04,
+    )
+    branch_b = _posterior(
+        "action-b",
+        (1.0, 1.0),
+        action_scale=-1.0,
+        weights=(0.75, 0.25),
+        variance_m2=0.01,
+    )
+    artifact = _registered_cross_covariance(branch_a, branch_b)
+
+    with pytest.raises(ValueError, match="pair_indices do not match"):
+        build_interventional_contrast(
+            branch_a,
+            branch_b,
+            _final_x_query(),
+            branch_a_label="a",
+            branch_b_label="b",
+            conditional_variance_policy="registered_cross_branch",
+            cross_branch_query_covariance=replace(
+                artifact,
+                pair_indices=artifact.pair_indices[::-1],
+            ),
+        )
+    with pytest.raises(ValueError, match="block covariance"):
+        build_interventional_contrast(
+            branch_a,
+            branch_b,
+            _final_x_query(),
+            branch_a_label="a",
+            branch_b_label="b",
+            conditional_variance_policy="registered_cross_branch",
+            cross_branch_query_covariance=_registered_cross_covariance(
+                branch_a,
+                branch_b,
+                cross_covariance=0.03,
+            ),
+        )
+    with pytest.raises(ValueError, match="requires the registered_cross_branch"):
+        build_interventional_contrast(
+            branch_a,
+            branch_b,
+            _final_x_query(),
+            branch_a_label="a",
+            branch_b_label="b",
+            conditional_variance_policy="independent_readout",
+            cross_branch_query_covariance=artifact,
+        )
+    with pytest.raises(ValueError, match="requires cross_branch_query_covariance"):
+        build_interventional_contrast(
+            branch_a,
+            branch_b,
+            _final_x_query(),
+            branch_a_label="a",
+            branch_b_label="b",
+            conditional_variance_policy="registered_cross_branch",
+        )

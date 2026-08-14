@@ -86,10 +86,13 @@ A `maximum_pair_count` guard is checked before product support is materialized.
 - `component_means_only`: retain only finite-support component-mean contrasts.
 - `independent_readout`: propagate each branch's declared diagonal readout
   variance through the query and add the two query covariances.
+- `registered_cross_branch`: require a source-only, pre-target artifact for
+  `Cov(Q_a, Q_b | pair)`, validate every complete joint block covariance, and
+  subtract both oriented cross terms from the contrast covariance.
 
-No current source artifact identifies cross-branch conditional discrepancy
-covariance. The independent policy records zero cross-branch covariance rather
-than inventing cancellation.
+The independent policy records zero cross-branch covariance rather than
+inventing cancellation. The registered policy is documented in
+[`cross_branch_query_covariance.md`](cross_branch_query_covariance.md).
 
 ### Cross-branch correlation sensitivity
 

@@ -23,6 +23,7 @@ ContrastCouplingPolicy = Literal[
 ContrastConditionalVariancePolicy = Literal[
     "component_means_only",
     "independent_readout",
+    "registered_cross_branch",
 ]
 
 _ARTIFACT_KIND = "Causal4DInterventionalContrastPosteriorV1"

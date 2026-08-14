@@ -173,15 +173,19 @@ Form the product of the two branch marginals. This is a population-level
 uncoupled diagnostic. It is not an individual-level cross-world effect and must
 not be described as paired real counterfactual ground truth.
 
-`PhysicalPosterior` does not encode cross-branch conditional discrepancy
-covariance. The contrast API consequently supports only:
+`PhysicalPosterior` does not itself encode cross-branch conditional discrepancy
+covariance. The contrast API supports:
 
 - `component_means_only`, which reports the finite mixture of component-mean
-  contrasts; or
+  contrasts;
 - `independent_readout`, which adds the two declared branch query covariances and
-  explicitly assumes zero cross-branch conditional covariance.
+  explicitly assumes zero cross-branch conditional covariance; or
+- `registered_cross_branch`, which consumes a source-only, pre-target artifact
+  bound to the exact branches, query, coupling, and ordered pair support.
 
-The API never infers unrecorded discrepancy cancellation.
+The registered path validates every complete joint block covariance before
+subtracting the oriented cross terms. The API never infers unrecorded
+discrepancy cancellation.
 
 ## Identification assumptions
 

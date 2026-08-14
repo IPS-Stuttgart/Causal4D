@@ -4,6 +4,16 @@
 
 ### Added
 
+- Add registered source-only cross-branch query covariance for interventional
+  contrasts. The builder binds exact branch, query, coupling, and pair identities,
+  verifies every complete joint block covariance, and propagates
+  `C_a + C_b - C_ab - C_ab.T` without changing branch means or source marginals.
+- Add a content-addressed source-frozen prequential stability gate over
+  immediately preceding causal prefixes, including consecutive-pass admission,
+  strict JSON decisions, and exact caller-supplied fallback. The gate is for a
+  separately registered future protocol and does not modify the frozen real
+  estimator.
+
 - Add an analysis-only, content-addressed sensitivity artifact for assumed
   cross-branch conditional readout correlation in interventional contrasts.
   It preserves the source coupling and means, reproduces the existing

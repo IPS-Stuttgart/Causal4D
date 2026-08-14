@@ -201,6 +201,7 @@ class InterventionalContrastBoundsV1:
         if variance_policy not in {
             "component_means_only",
             "independent_readout",
+            "registered_cross_branch",
         }:
             raise ValueError("unsupported conditional variance policy")
         query_name = _require_nonempty_string(self.query_name, name="query_name")
