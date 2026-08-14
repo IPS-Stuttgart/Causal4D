@@ -8,6 +8,7 @@ from typing import Any, Literal, cast
 import numpy as np
 
 from causal4d.contracts import FactualIntervention, TwinBelief, array_sha256
+from causal4d.dense_likelihood import update_dense_joint_weights_batched
 from causal4d.factual_abduction_uncertainty import FactualAbductionUncertaintyV1
 from causal4d.grouped_likelihood import (
     GroupLikelihoodDiagnostics,
@@ -392,6 +393,7 @@ def _update_joint_weights(
     base_weights: np.ndarray | None = None,
     grouped_evidence: GroupedObservationEvidence | None = None,
     abduction_uncertainty: FactualAbductionUncertaintyV1 | None = None,
+    dense_component_batch_size: int | None = None,
     grouped_component_batch_size: int | None = None,
 ) -> tuple[np.ndarray, GroupLikelihoodDiagnostics | None]:
     if grouped_evidence is not None and settings.likelihood_semantics != "legacy_v1":
@@ -403,6 +405,11 @@ def _update_joint_weights(
         and settings.grouped_likelihood_semantics != "legacy_v1"
     ):
         raise ValueError("normalized_v3 requires grouped observation evidence")
+    if dense_component_batch_size is not None and grouped_evidence is not None:
+        raise ValueError(
+            "dense_component_batch_size cannot be combined with grouped "
+            "observation evidence"
+        )
     batch_size = _validated_grouped_component_batch_size(grouped_component_batch_size)
     if batch_size is not None and grouped_evidence is None:
         raise ValueError(
@@ -410,7 +417,24 @@ def _update_joint_weights(
         )
     discrepancy, discrepancy_variance = _belief_readout(bank, belief)
     if grouped_evidence is None:
-        if settings.likelihood_semantics == "legacy_v1":
+        if dense_component_batch_size is not None:
+            joint_weights = update_dense_joint_weights_batched(
+                bank,
+                observations_from_endpoint_m,
+                prefix_frame_count=prefix_frame_count,
+                component_batch_size=dense_component_batch_size,
+                likelihood_semantics=settings.likelihood_semantics,
+                observation_scale_m=settings.observation_scale_m,
+                likelihood_power=settings.likelihood_power,
+                dynamic_likelihood_weight=settings.dynamic_likelihood_weight,
+                degrees_of_freedom=settings.degrees_of_freedom,
+                difference_correlation=settings.difference_correlation,
+                mask=observation_mask,
+                base_weights=base_weights,
+                particle_discrepancy_m=discrepancy,
+                particle_discrepancy_variance_m2=discrepancy_variance,
+            )
+        elif settings.likelihood_semantics == "legacy_v1":
             joint_weights = bank.update_from_observations_legacy_v1(
                 observations_from_endpoint_m,
                 prefix_frame_count=prefix_frame_count,
@@ -511,6 +535,7 @@ def abduct_factual_intervention(
     abstain_when_unidentifiable: bool = False,
     identifiability_policy: IdentifiabilityPolicy = "full_parameter",
     abduction_uncertainty: FactualAbductionUncertaintyV1 | None = None,
+    dense_component_batch_size: int | None = None,
     grouped_component_batch_size: int | None = None,
 ) -> FactualIntervention:
     """Infer persistent ``phi`` and factual event ``kappa_obs`` from O+ only.
@@ -522,9 +547,10 @@ def abduct_factual_intervention(
     result returns the unchanged joint prior over physical and intervention
     support rather than a falsely concentrated posterior.
 
-    ``grouped_component_batch_size`` is an execution-only memory bound for the
-    grouped-evidence path. It does not enter artifact metadata and must preserve
-    the exact posterior and artifact identity of the dense implementation.
+    ``dense_component_batch_size`` and ``grouped_component_batch_size`` are
+    mutually exclusive execution-only memory bounds for the corresponding
+    evidence paths. They do not enter artifact metadata and must preserve the
+    exact posterior and artifact identity of the unbatched implementations.
     """
 
     settings = config or FactualAbductionConfig()
@@ -575,6 +601,7 @@ def abduct_factual_intervention(
             settings=settings,
             grouped_evidence=grouped_evidence,
             abduction_uncertainty=abduction_uncertainty,
+            dense_component_batch_size=dense_component_batch_size,
             grouped_component_batch_size=grouped_component_batch_size,
         )
     hand_count = len(bank.hypothesis_metadata[0]["contact"]["attachment_shifts"])
@@ -731,12 +758,13 @@ def evaluate_factual_abduction(
     config: FactualAbductionConfig | None = None,
     grouped_evidence: GroupedObservationEvidence | None = None,
     abduction_uncertainty: FactualAbductionUncertaintyV1 | None = None,
+    dense_component_batch_size: int | None = None,
     grouped_component_batch_size: int | None = None,
 ) -> dict[str, Any]:
     """Compare BPT+z with a same-evidence BPT posterior fixed to nominal z.
 
-    ``grouped_component_batch_size`` has the same execution-only semantics as in
-    :func:`abduct_factual_intervention`.
+    The component batch-size arguments have the same execution-only semantics as
+    in :func:`abduct_factual_intervention`.
     """
 
     settings = config or FactualAbductionConfig()
@@ -760,6 +788,7 @@ def evaluate_factual_abduction(
         base_weights=nominal_base,
         grouped_evidence=grouped_evidence,
         abduction_uncertainty=abduction_uncertainty,
+        dense_component_batch_size=dense_component_batch_size,
         grouped_component_batch_size=grouped_component_batch_size,
     )
     components = physical_readout_components(bank, belief)
