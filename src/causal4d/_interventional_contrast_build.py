@@ -9,6 +9,9 @@ from typing import Any, cast
 import numpy as np
 
 from causal4d.contracts import PhysicalPosterior
+from causal4d.cross_branch_query_covariance import (
+    RegisteredCrossBranchQueryCovarianceV1,
+)
 from causal4d.immutable_json import plain_json
 from causal4d._interventional_contrast_common import (
     ContrastConditionalVariancePolicy,
@@ -261,6 +264,104 @@ def _marginal_error(
     return float(np.max(np.abs(reconstructed - source_weights), initial=0.0))
 
 
+def _minimum_psd_eigenvalue(
+    matrix: np.ndarray,
+    *,
+    name: str,
+) -> float:
+    symmetric = 0.5 * (matrix + matrix.T)
+    eigenvalues = np.linalg.eigvalsh(symmetric)
+    scale = max(
+        1.0,
+        float(np.max(np.abs(eigenvalues), initial=0.0)),
+        float(np.linalg.norm(symmetric, ord=2)),
+    )
+    minimum = float(np.min(eigenvalues))
+    if minimum < -1.0e-10 * scale:
+        raise ValueError(f"{name} must be positive semidefinite")
+    return minimum
+
+
+def _registered_cross_branch_covariance(
+    artifact: RegisteredCrossBranchQueryCovarianceV1,
+    *,
+    branch_a: PhysicalPosterior,
+    branch_b: PhysicalPosterior,
+    query: InterventionalContrastQueryV1,
+    pairs: np.ndarray,
+    coupling_policy: ContrastCouplingPolicy,
+    shared_kappa_names: tuple[str, ...],
+    covariance_a: np.ndarray,
+    covariance_b: np.ndarray,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    if not isinstance(artifact, RegisteredCrossBranchQueryCovarianceV1):
+        raise TypeError(
+            "cross_branch_query_covariance must be "
+            "RegisteredCrossBranchQueryCovarianceV1"
+        )
+    exact_bindings = {
+        "source_branch_a_posterior_id": branch_a.artifact_id,
+        "source_branch_b_posterior_id": branch_b.artifact_id,
+        "source_branch_a_query_id": branch_a.source_query_id,
+        "source_branch_b_query_id": branch_b.source_query_id,
+        "query_id": query.query_id,
+        "branch_a_component_count": len(branch_a.weights),
+        "branch_b_component_count": len(branch_b.weights),
+        "coupling_policy": coupling_policy,
+        "shared_kappa_names": shared_kappa_names,
+    }
+    for name, expected in exact_bindings.items():
+        if getattr(artifact, name) != expected:
+            raise ValueError(
+                f"registered cross-branch covariance {name} does not match "
+                "the contrast problem"
+            )
+    if not np.array_equal(artifact.pair_indices, pairs):
+        raise ValueError(
+            "registered cross-branch covariance pair_indices do not match "
+            "the exact contrast pair order"
+        )
+    if artifact.query_dimension != query.output_count:
+        raise ValueError(
+            "registered cross-branch covariance query dimension does not match"
+        )
+
+    result = np.empty_like(covariance_a[pairs[:, 0]])
+    minimum_block = float("inf")
+    minimum_contrast = float("inf")
+    for index, (component_a, component_b) in enumerate(pairs):
+        marginal_a = covariance_a[int(component_a)]
+        marginal_b = covariance_b[int(component_b)]
+        cross = artifact.cross_covariance[index]
+        block = np.block(
+            [
+                [marginal_a, cross],
+                [cross.T, marginal_b],
+            ]
+        )
+        block_minimum = _minimum_psd_eigenvalue(
+            block,
+            name=f"registered cross-branch block covariance[{index}]",
+        )
+        contrast = marginal_a + marginal_b - cross - cross.T
+        contrast = 0.5 * (contrast + contrast.T)
+        contrast_minimum = _minimum_psd_eigenvalue(
+            contrast,
+            name=f"registered contrast covariance[{index}]",
+        )
+        result[index] = contrast
+        minimum_block = min(minimum_block, block_minimum)
+        minimum_contrast = min(minimum_contrast, contrast_minimum)
+    return result, {
+        "artifact_id": artifact.artifact_id,
+        "source_artifact_ids": list(artifact.source_artifact_ids),
+        "source_only": artifact.source_only,
+        "registered_before_target_access": artifact.registered_before_target_access,
+        "minimum_block_covariance_eigenvalue": minimum_block,
+        "minimum_contrast_covariance_eigenvalue": minimum_contrast,
+    }
+
+
 def build_interventional_contrast(
     branch_a: PhysicalPosterior,
     branch_b: PhysicalPosterior,
@@ -273,6 +374,9 @@ def build_interventional_contrast(
     conditional_variance_policy: ContrastConditionalVariancePolicy = (
         "component_means_only"
     ),
+    cross_branch_query_covariance: (
+        RegisteredCrossBranchQueryCovarianceV1 | None
+    ) = None,
     maximum_pair_count: int = 1_000_000,
     marginal_tolerance: float = 1e-12,
     metadata: Mapping[str, Any] | None = None,
@@ -286,10 +390,13 @@ def build_interventional_contrast(
     ``independent_product`` forms an uncoupled product diagnostic and must not be
     interpreted as an individual-level cross-world effect.
 
-    PhysicalPosterior does not encode cross-branch conditional discrepancy
-    covariance. Consequently, conditional uncertainty is either omitted from the
-    finite component means or combined under an explicit independent-readout
-    policy; unrecorded cancellation is never inferred.
+    ``component_means_only`` omits conditional uncertainty.
+    ``independent_readout`` adds the two branch query covariances under an
+    explicit zero-cross-covariance assumption. ``registered_cross_branch``
+    requires an exact source-only covariance artifact, verifies the complete
+    joint block covariance for every coupled pair, and then applies
+    ``Cov(Q_a-Q_b)=C_a+C_b-C_ab-C_ab.T``. Unrecorded cancellation is never
+    inferred.
     """
 
     if not isinstance(query, InterventionalContrastQueryV1):
@@ -394,8 +501,19 @@ def build_interventional_contrast(
     if variance_policy not in {
         "component_means_only",
         "independent_readout",
+        "registered_cross_branch",
     }:
         raise ValueError("unsupported conditional variance policy")
+    if variance_policy == "registered_cross_branch":
+        if cross_branch_query_covariance is None:
+            raise ValueError(
+                "registered_cross_branch requires cross_branch_query_covariance"
+            )
+    elif cross_branch_query_covariance is not None:
+        raise ValueError(
+            "cross_branch_query_covariance requires the "
+            "registered_cross_branch variance policy"
+        )
     validated_variance_policy = cast(
         ContrastConditionalVariancePolicy,
         variance_policy,
@@ -411,10 +529,26 @@ def build_interventional_contrast(
         variance_policy=validated_variance_policy,
     )
     contrast_values = values_a[pairs[:, 0]] - values_b[pairs[:, 1]]
+    cross_covariance_metadata: dict[str, Any] | None = None
     if covariance_a is None or covariance_b is None:
         conditional_covariance = np.zeros(
             (len(pairs), query.output_count, query.output_count),
             dtype=float,
+        )
+    elif validated_variance_policy == "registered_cross_branch":
+        assert cross_branch_query_covariance is not None
+        conditional_covariance, cross_covariance_metadata = (
+            _registered_cross_branch_covariance(
+                cross_branch_query_covariance,
+                branch_a=branch_a,
+                branch_b=branch_b,
+                query=query,
+                pairs=pairs,
+                coupling_policy=validated_coupling,
+                shared_kappa_names=shared_names,
+                covariance_a=covariance_a,
+                covariance_b=covariance_b,
+            )
         )
     else:
         conditional_covariance = covariance_a[pairs[:, 0]] + covariance_b[pairs[:, 1]]
@@ -433,6 +567,14 @@ def build_interventional_contrast(
         "cross_branch_discrepancy_covariance_available": False,
         "user": plain_json(user_metadata),
     }
+    if cross_covariance_metadata is not None:
+        result_metadata.update(
+            {
+                "cross_branch_discrepancy_covariance_available": True,
+                "cross_branch_query_covariance_available": True,
+                "registered_cross_branch_query_covariance": cross_covariance_metadata,
+            }
+        )
     return InterventionalContrastPosteriorV1(
         source_branch_a_posterior_id=branch_a.artifact_id,
         source_branch_b_posterior_id=branch_b.artifact_id,

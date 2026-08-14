@@ -112,6 +112,7 @@ bounded symlink-free snapshot, and content addressed.
 The correlation grid is an assumption or source-frozen sensitivity range. The
 artifact does not estimate correlation from branch marginals, establish
 calibration, provide individual-level real counterfactual ground truth, or
-select a favorable correlation after target access. A source-estimated
-cross-branch covariance requires a separately registered artifact and independent
-source or controlled paired evidence.
+select a favorable correlation after target access. A source-estimated covariance
+can instead use `RegisteredCrossBranchQueryCovarianceV1`, documented in
+[`cross_branch_query_covariance.md`](cross_branch_query_covariance.md), but still
+requires independent source or controlled paired evidence.

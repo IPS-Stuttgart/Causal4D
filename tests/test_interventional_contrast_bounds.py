@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import hashlib
 from pathlib import Path
 
@@ -23,9 +24,7 @@ def _independent_product_posterior(
     conditional_variance: float = 0.0,
 ) -> InterventionalContrastPosteriorV1:
     variance_policy = (
-        "component_means_only"
-        if conditional_variance == 0.0
-        else "independent_readout"
+        "component_means_only" if conditional_variance == 0.0 else "independent_readout"
     )
     return InterventionalContrastPosteriorV1(
         source_branch_a_posterior_id=_digest("branch-a"),
@@ -131,6 +130,18 @@ def test_conditional_variance_is_included_in_transport_objectives() -> None:
     )
     assert 0.0 < uncertain.probability_positive_lower[0]
     assert uncertain.probability_positive_upper[0] < 1.0
+
+
+def test_bounds_preserve_registered_cross_branch_variance_policy() -> None:
+    posterior = replace(
+        _independent_product_posterior(conditional_variance=1.0),
+        conditional_variance_policy="registered_cross_branch",
+    )
+
+    result = build_interventional_contrast_bounds(posterior)
+
+    assert result.conditional_variance_policy == "registered_cross_branch"
+    np.testing.assert_allclose(result.source_variance, posterior.covariance.diagonal())
 
 
 def test_bound_artifact_round_trip_is_content_addressed(tmp_path: Path) -> None:
