@@ -56,6 +56,9 @@ def _runtime_modules(*, causal4d_api_version: object = 1):
     modules["bayesian_phystwin.causal4d_provider_v2"] = SimpleNamespace(
         CAUSAL4D_PROVIDER_API_VERSION=2
     )
+    modules["bayesian_phystwin.causal4d_belief_provider_v2"] = SimpleNamespace(
+        ClaimBearingProb4DStreamRunV1=type("ClaimBearingProb4DStreamRunV1", (), {})
+    )
     modules["causal4d.api.v1"] = SimpleNamespace(
         PUBLIC_API_VERSION=causal4d_api_version
     )
@@ -100,6 +103,7 @@ def test_installed_stack_accepts_exact_versions_modules_and_apis(
     assert report["evidence_boundary"] == {
         "exact_locked_versions_checked": True,
         "required_modules_imported": True,
+        "required_module_symbols_checked": True,
         "public_api_versions_checked": True,
         "installed_files_bound_to_locked_wheel_bytes": False,
         "source_revisions_independently_verified": False,
@@ -151,6 +155,31 @@ def test_installed_stack_reports_import_and_public_api_failures(
     )
     assert api["observed_version"] == "1"
     assert api["valid"] is False
+
+
+def test_installed_stack_reports_missing_required_provider_symbol(
+    tmp_path, monkeypatch
+) -> None:
+    lock = _lock(tmp_path)
+    versions = {entry["name"]: entry["version"] for entry in lock["distributions"]}
+    modules = _runtime_modules()
+    modules["bayesian_phystwin.causal4d_belief_provider_v2"] = SimpleNamespace()
+    _patch_runtime(monkeypatch, versions, modules)
+
+    report = installed_stack.verify_installed_stack(lock)
+    codes = [issue["code"] for issue in report["issues"]]
+    entry = next(
+        item
+        for item in report["required_modules"]
+        if item["module"] == "bayesian_phystwin.causal4d_belief_provider_v2"
+    )
+
+    assert report["valid"] is False
+    assert "required_module_symbol_missing" in codes
+    assert entry["status"] == "symbol_missing"
+    assert entry["importable"] is True
+    assert entry["missing_symbols"] == ["ClaimBearingProb4DStreamRunV1"]
+    assert entry["valid"] is False
 
 
 def test_installed_stack_reuses_import_result_for_required_public_module(
