@@ -41,8 +41,7 @@ def _lock(tmp_path):
         "causal4d": "0.5.0",
     }
     wheels = [
-        _write_wheel(tmp_path, name, version)
-        for name, version in versions.items()
+        _write_wheel(tmp_path, name, version) for name, version in versions.items()
     ]
     return stack_lock.build_stack_lock(wheels, source_revisions=REVISIONS)
 
@@ -88,9 +87,7 @@ def test_installed_stack_accepts_exact_versions_modules_and_apis(
     tmp_path, monkeypatch
 ) -> None:
     lock = _lock(tmp_path)
-    versions = {
-        entry["name"]: entry["version"] for entry in lock["distributions"]
-    }
+    versions = {entry["name"]: entry["version"] for entry in lock["distributions"]}
     _patch_runtime(monkeypatch, versions, _runtime_modules())
 
     report = installed_stack.verify_installed_stack(lock)
@@ -138,9 +135,7 @@ def test_installed_stack_reports_import_and_public_api_failures(
     tmp_path, monkeypatch
 ) -> None:
     lock = _lock(tmp_path)
-    versions = {
-        entry["name"]: entry["version"] for entry in lock["distributions"]
-    }
+    versions = {entry["name"]: entry["version"] for entry in lock["distributions"]}
     modules = _runtime_modules(causal4d_api_version="1")
     modules["prob4d.provider_v2_loading"] = ImportError("optional ABI mismatch")
     _patch_runtime(monkeypatch, versions, modules)
@@ -162,9 +157,7 @@ def test_installed_stack_reuses_import_result_for_required_public_module(
     tmp_path, monkeypatch
 ) -> None:
     lock = _lock(tmp_path)
-    versions = {
-        entry["name"]: entry["version"] for entry in lock["distributions"]
-    }
+    versions = {entry["name"]: entry["version"] for entry in lock["distributions"]}
     modules = _runtime_modules()
     calls: list[str] = []
 
@@ -188,9 +181,7 @@ def test_runtime_verification_keeps_compatibility_separate_from_claim_readiness(
     tmp_path, monkeypatch
 ) -> None:
     lock = _lock(tmp_path)
-    versions = {
-        entry["name"]: entry["version"] for entry in lock["distributions"]
-    }
+    versions = {entry["name"]: entry["version"] for entry in lock["distributions"]}
     _patch_runtime(monkeypatch, versions, _runtime_modules())
     lock_report = stack_lock.verify_stack_lock(lock, require_wheels=False)
     installed_report = installed_stack.verify_installed_stack(lock)
