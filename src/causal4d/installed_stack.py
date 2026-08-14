@@ -23,6 +23,12 @@ PUBLIC_API_REQUIREMENTS: Mapping[str, tuple[str, str, int]] = {
     "causal4d": ("causal4d.api.v1", "PUBLIC_API_VERSION", 1),
 }
 
+REQUIRED_MODULE_SYMBOLS: Mapping[str, tuple[str, ...]] = {
+    "bayesian_phystwin.causal4d_belief_provider_v2": (
+        "ClaimBearingProb4DStreamRunV1",
+    ),
+}
+
 
 def _error_text(error: Exception) -> str:
     detail = str(error).strip()
@@ -167,8 +173,15 @@ def verify_installed_stack(lock: Mapping[str, Any]) -> dict[str, Any]:
         for module_name in locked[name]["required_modules"]:
             module = load_module(module_name)
             error = import_errors.get(module_name)
-            valid = module is not None
-            if not valid:
+            required_symbols = REQUIRED_MODULE_SYMBOLS.get(module_name, ())
+            missing_symbols = (
+                list(required_symbols)
+                if module is None
+                else [symbol for symbol in required_symbols if not hasattr(module, symbol)]
+            )
+            importable = module is not None
+            valid = importable and not missing_symbols
+            if not importable:
                 issues.append(
                     _issue(
                         "required_module_import_failed",
@@ -177,11 +190,33 @@ def verify_installed_stack(lock: Mapping[str, Any]) -> dict[str, Any]:
                         module=module_name,
                     )
                 )
+                status = "import_failed"
+            elif missing_symbols:
+                issues.append(
+                    _issue(
+                        "required_module_symbol_missing",
+                        (
+                            f"required module {module_name} is missing symbols: "
+                            f"{missing_symbols}"
+                        ),
+                        component=name,
+                        module=module_name,
+                        expected=list(required_symbols),
+                        observed=[
+                            symbol for symbol in required_symbols if hasattr(module, symbol)
+                        ],
+                    )
+                )
+                status = "symbol_missing"
+            else:
+                status = "ok"
             entry: dict[str, object] = {
                 "component": name,
                 "module": module_name,
-                "status": "ok" if valid else "import_failed",
-                "importable": valid,
+                "status": status,
+                "importable": importable,
+                "required_symbols": list(required_symbols),
+                "missing_symbols": missing_symbols,
                 "valid": valid,
             }
             if error is not None:
@@ -273,6 +308,7 @@ def verify_installed_stack(lock: Mapping[str, Any]) -> dict[str, Any]:
         "evidence_boundary": {
             "exact_locked_versions_checked": True,
             "required_modules_imported": True,
+            "required_module_symbols_checked": True,
             "public_api_versions_checked": True,
             "installed_files_bound_to_locked_wheel_bytes": False,
             "source_revisions_independently_verified": False,
@@ -349,6 +385,7 @@ __all__ = [
     "INSTALLED_STACK_SCHEMA_NAME",
     "INSTALLED_STACK_SCHEMA_VERSION",
     "PUBLIC_API_REQUIREMENTS",
+    "REQUIRED_MODULE_SYMBOLS",
     "STACK_RUNTIME_VERIFICATION_SCHEMA_NAME",
     "STACK_RUNTIME_VERIFICATION_SCHEMA_VERSION",
     "build_stack_runtime_verification",
