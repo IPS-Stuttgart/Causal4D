@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Final
 
+from causal4d.benchmark import CounterfactualBenchmarkConfig, build_protocol
 from causal4d.contracts import (
     CounterfactualQuery,
     FactualIntervention,
@@ -79,6 +80,7 @@ __all__ = [
     "PUBLIC_API_VERSION",
     "ContrastConditionalVariancePolicy",
     "ContrastCouplingPolicy",
+    "CounterfactualBenchmarkConfig",
     "CounterfactualQuery",
     "CovarianceRepresentation",
     "FactualIntervention",
@@ -99,6 +101,7 @@ __all__ = [
     "apply_counterfactual_operator",
     "project_physical_posterior",
     "block_diagonalize_covariance",
+    "build_protocol",
     "build_interventional_contrast",
     "joint_component_log_likelihoods",
     "load_bayesian_phystwin_provider_manifest",

@@ -127,6 +127,32 @@ and [the complete 0.5 migration table](docs/command_migration_0_5.md).
 
 ## Quick Start
 
+Build and inspect the controlled protocol through the supported Python API:
+
+```python
+from causal4d.api.v1 import CounterfactualBenchmarkConfig, build_protocol
+
+config = CounterfactualBenchmarkConfig(
+    frame_count=18,
+    training_repeats=1,
+    parameter_grid_count=3,
+)
+protocol = build_protocol(config)
+
+for object_protocol in protocol:
+    print(
+        object_protocol.graph_object.name,
+        object_protocol.validation_action.action_id,
+        object_protocol.test_action.action_id,
+    )
+```
+
+The runnable version is
+[`examples/python_api_quickstart.py`](examples/python_api_quickstart.py). New
+downstream code should prefer `causal4d.api.v1`; research and registered-protocol
+internals remain available from their owning modules without entering the v1
+compatibility promise.
+
 Run the controlled counterfactual benchmark:
 
 ```bash

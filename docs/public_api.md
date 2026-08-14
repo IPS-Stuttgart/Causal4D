@@ -45,6 +45,7 @@ latent-contact-v2, semantic-freshness, or decision-trace machinery.
 
 The surface is deliberately conservative:
 
+- controlled benchmark protocol construction;
 - causal query and posterior contracts;
 - rollout-bank and prefix-likelihood interfaces;
 - the counterfactual operator and explicit physical-posterior query projection;
@@ -105,6 +106,28 @@ to scientific metadata, and the batched path is required to reproduce the dense
 posterior weights, diagnostics, and artifact identity exactly. The dense path
 remains the default. This research entry point is documented here for resource
 control but is not thereby added to the v1 compatibility surface.
+
+When the complete component-by-group responsibility matrix is unnecessary, the
+standalone streaming update keeps only per-group responsibility means and minima:
+
+```python
+from causal4d.grouped_likelihood_streaming import (
+    posterior_weights_from_grouped_evidence_batched,
+)
+
+posterior, summary = posterior_weights_from_grouped_evidence_batched(
+    prior_weights,
+    predicted_components_m,
+    evidence,
+    prefix_frame_count=prefix_frame_count,
+    component_batch_size=64,
+)
+```
+
+The function traverses components in their existing row-major support order and
+reproduces the ordinary grouped posterior exactly. Its memory is bounded by one
+component batch plus the posterior-score vector and per-group accumulators. This
+research utility remains in its owning module rather than entering API v1.
 
 ## Compatibility policy
 
