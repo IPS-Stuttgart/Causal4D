@@ -82,8 +82,7 @@ def _validate_joint_blocks(
         scale = max(1.0, float(np.max(np.abs(joint), initial=0.0)))
         if float(np.min(np.linalg.eigvalsh(joint), initial=0.0)) < -1.0e-10 * scale:
             raise ValueError(
-                f"joint branch covariance for pair {index} is not positive "
-                "semidefinite"
+                f"joint branch covariance for pair {index} is not positive semidefinite"
             )
         if joint.shape != (2 * output_count, 2 * output_count):
             raise RuntimeError("internal joint covariance shape changed")
@@ -130,9 +129,8 @@ class InterventionalCrossCovarianceV1:
         units = tuple(self.query_units)
         if not labels or len(labels) != len(units):
             raise ValueError("query labels and units must be nonempty and aligned")
-        if (
-            len(set(labels)) != len(labels)
-            or any(not value for value in labels + units)
+        if len(set(labels)) != len(labels) or any(
+            not value for value in labels + units
         ):
             raise ValueError("query labels must be unique and labels/units nonempty")
         pairs = readonly_integer_array(self.pair_indices, name="pair_indices")
