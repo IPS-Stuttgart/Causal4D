@@ -43,8 +43,7 @@ def save_interventional_contrast_readout_correlation_sensitivity(
         InterventionalContrastReadoutCorrelationSensitivityV1,
     ):
         raise TypeError(
-            "sensitivity must be "
-            "InterventionalContrastReadoutCorrelationSensitivityV1"
+            "sensitivity must be InterventionalContrastReadoutCorrelationSensitivityV1"
         )
     descriptor = {
         **sensitivity._scalar_payload(),

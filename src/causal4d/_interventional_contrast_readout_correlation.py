@@ -272,9 +272,7 @@ class InterventionalContrastReadoutCorrelationSensitivityV1:
                 "total_variance must equal between plus conditional variance"
             )
         if np.any(np.diff(conditional, axis=0) > 1e-10):
-            raise ValueError(
-                "conditional_variance must not increase with correlation"
-            )
+            raise ValueError("conditional_variance must not increase with correlation")
         zero_index = int(zero_indices[0])
         if not np.allclose(
             total[zero_index],
@@ -372,9 +370,7 @@ class InterventionalContrastReadoutCorrelationSensitivityV1:
             "total_variance": self.total_variance,
             "probability_positive": self.probability_positive,
             "independent_total_variance": self.independent_total_variance,
-            "independent_probability_positive": (
-                self.independent_probability_positive
-            ),
+            "independent_probability_positive": (self.independent_probability_positive),
         }
 
     @property
@@ -401,15 +397,11 @@ class InterventionalContrastReadoutCorrelationSensitivityV1:
             "artifact_id": self.artifact_id,
             "correlation_grid": self.correlation_grid.tolist(),
             "mean": self.mean.tolist(),
-            "between_component_variance": (
-                self.between_component_variance.tolist()
-            ),
+            "between_component_variance": (self.between_component_variance.tolist()),
             "conditional_variance": self.conditional_variance.tolist(),
             "total_variance": self.total_variance.tolist(),
             "probability_positive": self.probability_positive.tolist(),
-            "independent_total_variance": (
-                self.independent_total_variance.tolist()
-            ),
+            "independent_total_variance": (self.independent_total_variance.tolist()),
             "independent_probability_positive": (
                 self.independent_probability_positive.tolist()
             ),

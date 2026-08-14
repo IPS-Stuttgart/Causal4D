@@ -236,9 +236,7 @@ def build_interventional_contrast_readout_correlation_sensitivity(
             "pairwise marginal conditional readout-error correlation"
         ),
         "correlation_applied_per_query_output": True,
-        "source_conditional_variance_policy": (
-            contrast.conditional_variance_policy
-        ),
+        "source_conditional_variance_policy": (contrast.conditional_variance_policy),
         "source_pair_count": len(pairs),
         "user": plain_json(user_metadata),
     }

@@ -208,12 +208,10 @@ def test_probability_curve_uses_declared_conditional_variance() -> None:
     )
 
     assert (
-        sensitivity.probability_positive[0, 0]
-        < sensitivity.probability_positive[1, 0]
+        sensitivity.probability_positive[0, 0] < sensitivity.probability_positive[1, 0]
     )
     assert (
-        sensitivity.probability_positive[1, 0]
-        < sensitivity.probability_positive[2, 0]
+        sensitivity.probability_positive[1, 0] < sensitivity.probability_positive[2, 0]
     )
     np.testing.assert_allclose(sensitivity.probability_positive[2, 0], 1.0)
 
@@ -233,9 +231,7 @@ def test_builder_rejects_wrong_source_and_missing_independent_variance() -> None
             contrast,
         )
 
-    branch_a, branch_b, means_only = _source_contrast(
-        policy="component_means_only"
-    )
+    branch_a, branch_b, means_only = _source_contrast(policy="component_means_only")
     with pytest.raises(ValueError, match="requires an independent_readout"):
         build_interventional_contrast_readout_correlation_sensitivity(
             branch_a,
