@@ -91,6 +91,16 @@ No current source artifact identifies cross-branch conditional discrepancy
 covariance. The independent policy records zero cross-branch covariance rather
 than inventing cancellation.
 
+### Cross-branch correlation sensitivity
+
+An `independent_readout` contrast can be passed to
+`build_interventional_contrast_readout_correlation_sensitivity` together with
+its two unchanged source branches. The additive artifact evaluates each query
+marginal over a declared correlation grid and requires its zero-correlation row
+to reproduce the source contrast exactly. It does not estimate correlation or
+construct one joint cross-output covariance. See
+[`interventional_contrast_readout_correlation.md`](interventional_contrast_readout_correlation.md).
+
 ## Posterior summaries
 
 ```python
