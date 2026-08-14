@@ -74,6 +74,13 @@ pseudoinverse is introduced.
 Legacy artifact metadata remains unchanged. The additional fields are emitted
 only when normalized v3 is selected.
 
+For large finite supports,
+`posterior_weights_from_grouped_evidence_batched` evaluates the same score in
+deterministic component batches and streams only the per-group responsibility
+mean and minimum. It therefore avoids materializing the complete
+`component_count x group_count` responsibility matrix. The ordinary grouped
+likelihood and factual-abduction APIs remain unchanged.
+
 ## API
 
 ```python
@@ -82,6 +89,26 @@ posterior, diagnostics = posterior_weights_from_grouped_evidence(
     predicted_components_m,
     evidence,
     prefix_frame_count=prefix_frame_count,
+    component_group_covariance_factor_m=structured_covariance,
+    score_semantics="normalized_coordinate_mean_v3",
+    likelihood_power=12.0,
+    max_source_covariance_condition_number=1.0e10,
+)
+```
+
+The bounded-memory summary path is:
+
+```python
+from causal4d.grouped_likelihood_streaming import (
+    posterior_weights_from_grouped_evidence_batched,
+)
+
+posterior, summary = posterior_weights_from_grouped_evidence_batched(
+    prior_weights,
+    predicted_components_m,
+    evidence,
+    prefix_frame_count=prefix_frame_count,
+    component_batch_size=64,
     component_group_covariance_factor_m=structured_covariance,
     score_semantics="normalized_coordinate_mean_v3",
     likelihood_power=12.0,
