@@ -184,6 +184,38 @@ def test_markdown_orders_staging_verification_and_publication() -> None:
     assert result["evidence_sha256"] in markdown
 
 
+def test_governance_blocker_markdown_explains_permitted_resolutions() -> None:
+    decision = _source_decision()
+    decision["action"] = {
+        **decision["action"],
+        "action_id": "stop_independent_verifier_unavailable",
+        "category": "governance_blocker",
+        "title": (
+            "Stop: independent verification is unavailable in a single-person project"
+        ),
+        "operator_role": "principal_investigator",
+        "physical_acquisition_required": False,
+        "command_argv": None,
+        "command_text": None,
+        "after_completion_argv": None,
+        "after_completion_text": None,
+        "blocking_items": [
+            "single_operator_project_cannot_satisfy_independent_verification"
+        ],
+        "registered_execution": None,
+    }
+
+    result = operator_flow.enrich_preacquisition_next_action(decision)
+    markdown = operator_flow.render_preacquisition_operator_next_action_markdown(result)
+
+    assert "### Permitted governance resolutions" in markdown
+    assert "real, distinct person" in markdown
+    assert "separately versioned protocol amendment" in markdown
+    assert "Do not create aliases" in markdown
+    assert "docs/independent_verifier_onboarding.md" in markdown
+    assert "Target outcomes permitted: `false`" in markdown
+
+
 def test_operator_flow_hash_is_mount_independent() -> None:
     first = operator_flow.enrich_preacquisition_next_action(_source_decision())
     second = deepcopy(first)

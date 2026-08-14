@@ -286,6 +286,37 @@ def render_preacquisition_operator_next_action_markdown(
     if isinstance(blockers, list) and blockers:
         lines += ["", "### Blocking items", ""]
         lines += [f"- `{item}`" for item in blockers]
+    if action.get("action_id") == "stop_independent_verifier_unavailable":
+        lines += [
+            "",
+            "### Permitted governance resolutions",
+            "",
+            (
+                "The current independently attested protocol cannot proceed with "
+                "a one-person registry."
+            ),
+            "",
+            (
+                "1. Register a real, distinct person as independent verifier, "
+                "seal the corrected registry, and recompute the next action."
+            ),
+            (
+                "2. Before any target access or physical acquisition, approve a "
+                "separately versioned protocol amendment that removes the "
+                "independent-attestation claim while preserving the method, split, "
+                "threshold, and reporting locks."
+            ),
+            "",
+            (
+                "Do not create aliases, duplicate identities, or multiple operator "
+                "IDs for one person. They do not satisfy person-level independence."
+            ),
+            "",
+            (
+                "See `docs/independent_verifier_onboarding.md` for the verifier's "
+                "bounded role and checklist."
+            ),
+        ]
     execution = action.get("registered_execution")
     if isinstance(execution, Mapping):
         lines += [
