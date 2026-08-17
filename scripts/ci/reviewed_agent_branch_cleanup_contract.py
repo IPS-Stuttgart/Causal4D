@@ -240,8 +240,7 @@ def _positive_ints(value: Any, name: str) -> tuple[int, ...]:
     if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
         raise CleanupError(f"{name} must be a sequence")
     result = tuple(
-        _positive_int(item, f"{name}[{index}]")
-        for index, item in enumerate(value)
+        _positive_int(item, f"{name}[{index}]") for index, item in enumerate(value)
     )
     if tuple(sorted(set(result))) != result:
         raise CleanupError(f"{name} must be sorted and unique")
@@ -252,18 +251,14 @@ def _sha(value: Any, length: int, name: str) -> str:
     text = _string(value, name)
     pattern = _SHA1 if length == 40 else _SHA256
     if pattern.fullmatch(text) is None:
-        raise CleanupError(
-            f"{name} must be lowercase hexadecimal with length {length}"
-        )
+        raise CleanupError(f"{name} must be lowercase hexadecimal with length {length}")
     return text
 
 
 def _repository(value: Any) -> str:
     repository = _string(value, "repository")
     parts = repository.split("/")
-    if len(parts) != 2 or any(
-        not part or part in {".", ".."} for part in parts
-    ):
+    if len(parts) != 2 or any(not part or part in {".", ".."} for part in parts):
         raise CleanupError("repository must use owner/name syntax")
     return repository
 
@@ -421,8 +416,7 @@ def _validate_report(manifest: CleanupManifest, report: Mapping[str, Any]) -> No
         and report["default_branch"] == manifest.default_branch
         and report["prefix"] == "agent/"
         and report["minimum_age_days"] == manifest.minimum_age_days
-        and report["generated_at_utc"]
-        == manifest.source_report_generated_at_utc
+        and report["generated_at_utc"] == manifest.source_report_generated_at_utc
     )
     if not expected:
         raise CleanupError("source report metadata does not match the manifest")
@@ -515,4 +509,3 @@ def load_cleanup(
     _validate_report(manifest, _json(report_raw, "source report"))
     allowlist = _load_allowlist(root_path)
     return LoadedCleanup(manifest, manifest_sha, report_sha), allowlist
-
