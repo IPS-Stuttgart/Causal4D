@@ -4,12 +4,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = (
-    ROOT
-    / ".github"
-    / "workflows"
-    / "deform360-filament-support-issue-dispatch.yml"
-)
+WORKFLOW = ROOT / ".github" / "workflows" / "deform360-filament-support-issue-dispatch.yml"
 
 
 def _workflow_text() -> str:
