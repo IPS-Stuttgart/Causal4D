@@ -109,15 +109,12 @@ def test_source_diagnostic_has_a_durable_status_artifact() -> None:
 
 def test_registry_binds_the_self_hosted_job_and_fixed_entrypoint() -> None:
     payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
-    entries = {(entry["workflow"], entry["job_id"]): entry for entry in payload["jobs"]}
+    entries = {(entry["workflow"], entry["job"]): entry for entry in payload["jobs"]}
     entry = entries[("deform360-filament-support.yml", "source-diagnostic")]
 
-    assert entry["runs_on"] == ["self-hosted", "Linux", "X64", "nvidia-smi"]
-    assert (
-        entry["entrypoint"]
-        == "scripts/remote/run_deform360_filament_support_workflow.sh"
-    )
-    assert entry["authorized"] is True
-    assert entry["secret_names"] == []
-    assert entry["data_paths"] == ["$HOME/Datasets/Deform360/replication"]
-    assert entry["claim_boundary"] == "source_only_graph_support_diagnostic"
+    assert entry["runner_labels"] == ["self-hosted", "Linux", "X64", "nvidia-smi"]
+    assert entry["authorization_model"] == "main-only"
+    assert entry["purpose"] == "Locked Deform360 source filament-support diagnostic"
+    assert entry["dataset_access"] == "approved-source-only-deform360"
+    assert entry["secrets_allowed"] is False
+    assert "scripts/remote/run_deform360_filament_support_workflow.sh" in _text()
