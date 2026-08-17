@@ -164,9 +164,7 @@ def _build_inputs() -> tuple[
         endpoint_frame=context.o_minus.frame_stop - 1,
         particle_ids=("theta-low", "theta-high"),
         theta_names=("stiffness_scale",),
-        endpoint_position_m=np.asarray(
-            factual_bank.trajectories[0, :, 0], dtype=float
-        ),
+        endpoint_position_m=np.asarray(factual_bank.trajectories[0, :, 0], dtype=float),
         endpoint_velocity_mps=np.zeros((2, 2, 3), dtype=float),
         theta=factual_bank.parameter_particles,
         discrepancy_mean_m=np.zeros((2, 2, 3), dtype=float),
