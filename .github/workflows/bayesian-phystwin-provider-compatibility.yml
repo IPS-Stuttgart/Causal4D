@@ -140,7 +140,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: IPS-Stuttgart/Prob4D
-          ref: 47e0568781d96f09b8df4bb650097b129e23c178
+          ref: 20830d39502aea84ccadf5d7611423517fa9531c
           path: prob4d
           persist-credentials: false
 
