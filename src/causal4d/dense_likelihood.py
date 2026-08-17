@@ -298,8 +298,17 @@ def update_dense_joint_weights_batched(
     for start in range(0, component_count, batch_size):
         stop = min(start + batch_size, component_count)
         flat_indices = np.arange(start, stop, dtype=np.int64)
-        hypothesis_indices = flat_indices // particle_count
-        particle_indices = flat_indices % particle_count
+        evaluation_indices = flat_indices
+        if likelihood_semantics == "legacy_v1" and stop - start == 1:
+            # NumPy 1.24 selects a different reduction kernel for an
+            # advanced-indexed singleton than for the registered dense
+            # (H, P, T, N, C) layout. Duplicate the same support index so the
+            # execution layout has two component rows, then retain only the
+            # first score below. This reads no additional distinct component
+            # and keeps the memory overhead constant.
+            evaluation_indices = np.repeat(flat_indices, 2)
+        hypothesis_indices = evaluation_indices // particle_count
+        particle_indices = evaluation_indices % particle_count
         predicted = bank.trajectories[hypothesis_indices, particle_indices]
 
         if likelihood_semantics == "legacy_v1":
@@ -320,58 +329,22 @@ def update_dense_joint_weights_batched(
             )
 
         if likelihood_semantics == "legacy_v1":
-            if stop - start == 1:
-                # Preserve the registered legacy reduction layout even for a
-                # singleton execution batch. NumPy 1.24 may choose a different
-                # summation kernel for (1, T, N, C) than for the original
-                # (H, P, T, N, C) layout, changing the last bit of the posterior.
-                # The extra singleton particle axis uses no additional component
-                # support and keeps component_batch_size=1 genuinely bounded.
-                legacy_predicted = predicted_prefix[:, None]
-                legacy_scale = (
-                    position_scale[:, None]
-                    if isinstance(position_scale, np.ndarray)
-                    else position_scale
-                )
-                score = _legacy_student_t_mean_log_score(
-                    legacy_predicted - observed_prefix[None, None],
-                    valid_prefix,
-                    scale_m=legacy_scale,
-                    degrees_of_freedom=degrees_of_freedom,
-                    reduction_axes=(2, 3, 4),
-                ).reshape(-1)
-                if dynamic_likelihood_weight and prefix_frame_count >= 4:
-                    score += (
-                        dynamic_likelihood_weight
-                        * _legacy_student_t_mean_log_score(
-                            np.diff(legacy_predicted, axis=2)
-                            - np.diff(observed_prefix, axis=0)[None, None],
-                            valid_prefix[1:] & valid_prefix[:-1],
-                            scale_m=observation_scale_m,
-                            degrees_of_freedom=degrees_of_freedom,
-                            reduction_axes=(2, 3, 4),
-                        ).reshape(-1)
-                    )
-            else:
-                score = _legacy_student_t_mean_log_score(
-                    predicted_prefix - observed_prefix[None],
-                    valid_prefix,
-                    scale_m=position_scale,
+            score = _legacy_student_t_mean_log_score(
+                predicted_prefix - observed_prefix[None],
+                valid_prefix,
+                scale_m=position_scale,
+                degrees_of_freedom=degrees_of_freedom,
+                reduction_axes=(1, 2, 3),
+            )
+            if dynamic_likelihood_weight and prefix_frame_count >= 4:
+                score += dynamic_likelihood_weight * _legacy_student_t_mean_log_score(
+                    np.diff(predicted_prefix, axis=1)
+                    - np.diff(observed_prefix, axis=0)[None],
+                    valid_prefix[1:] & valid_prefix[:-1],
+                    scale_m=observation_scale_m,
                     degrees_of_freedom=degrees_of_freedom,
                     reduction_axes=(1, 2, 3),
                 )
-                if dynamic_likelihood_weight and prefix_frame_count >= 4:
-                    score += (
-                        dynamic_likelihood_weight
-                        * _legacy_student_t_mean_log_score(
-                            np.diff(predicted_prefix, axis=1)
-                            - np.diff(observed_prefix, axis=0)[None],
-                            valid_prefix[1:] & valid_prefix[:-1],
-                            scale_m=observation_scale_m,
-                            degrees_of_freedom=degrees_of_freedom,
-                            reduction_axes=(1, 2, 3),
-                        )
-                    )
         else:
             if normalized_config is None:
                 raise RuntimeError("normalized dense configuration was not initialized")
@@ -397,7 +370,7 @@ def update_dense_joint_weights_batched(
                         reduction_axes=(1, 2, 3),
                     )
                 )
-        component_scores[start:stop] = score
+        component_scores[start:stop] = score[: stop - start]
 
     score_matrix = component_scores.reshape(hypothesis_count, particle_count)
     scaled_score = likelihood_power * score_matrix

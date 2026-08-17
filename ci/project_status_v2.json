@@ -59,12 +59,12 @@
     },
     "prob4d": {
       "role": "optional_probabilistic_observation_feeder",
-      "supported_versions": ">=0.3,<0.4"
+      "supported_versions": ">=0.4,<0.6"
     }
   },
   "primary_next_milestone": "same_object_multi_action_real_protocol",
   "schema_version": 2,
-  "snapshot_date": "2026-08-07",
+  "snapshot_date": "2026-08-17",
   "status_id": "causal4d-project-status-v2",
   "supersedes_status_id": "causal4d-project-status-v1"
 }

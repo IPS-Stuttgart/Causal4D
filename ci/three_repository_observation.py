@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
@@ -196,7 +197,7 @@ def _write_semantic_variant(
         save_observation_belief_export,
     )
 
-    metadata = json.loads(json.dumps(artifact.metadata, sort_keys=True))
+    metadata = json.loads(json.dumps(deepcopy(artifact.metadata), sort_keys=True))
     mutate(metadata)
     variant = replace(artifact, metadata=metadata)
     save_observation_belief_export(target, variant)
