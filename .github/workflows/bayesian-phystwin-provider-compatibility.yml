@@ -6,6 +6,8 @@ on:
     paths:
       - ".github/workflows/bayesian-phystwin-provider-compatibility.yml"
       - "ci/three_repository_*.py"
+      - "ci/project_status_v1.json"
+      - "ci/project_status_v2.json"
       - "requirements/ci/bayesian-phystwin-three-repository.sha"
       - "requirements/ci/prob4d-three-repository.sha"
       - "docs/ci.md"
@@ -58,6 +60,8 @@ on:
     paths:
       - ".github/workflows/bayesian-phystwin-provider-compatibility.yml"
       - "ci/three_repository_*.py"
+      - "ci/project_status_v1.json"
+      - "ci/project_status_v2.json"
       - "requirements/ci/bayesian-phystwin-three-repository.sha"
       - "requirements/ci/prob4d-three-repository.sha"
       - "docs/ci.md"
@@ -301,7 +305,7 @@ jobs:
               --checkout-root "$GITHUB_WORKSPACE/bayesian-phystwin" \
               --checkout-root "$GITHUB_WORKSPACE/causal4d" \
               --output "$RUNNER_TEMP/three-repository-summary.json" \
-            | tee "$RUNNER_TEMP/three-repository-golden-path.log"
+              2>&1 | tee "$RUNNER_TEMP/three-repository-golden-path.log"
           test -s "$RUNNER_TEMP/three-repository-summary.json"
           "$RUNNER_TEMP/three-repository-venv/bin/python" -m json.tool \
             "$RUNNER_TEMP/three-repository-summary.json" >/dev/null
@@ -318,7 +322,7 @@ jobs:
               --prob4d-revision "${{ steps.revisions.outputs.prob4d }}" \
               --output-dir "$RUNNER_TEMP/three-repository-provider-v2-work" \
               --output "$RUNNER_TEMP/three-repository-provider-v2-summary.json" \
-            | tee "$RUNNER_TEMP/three-repository-provider-v2.log"
+              2>&1 | tee "$RUNNER_TEMP/three-repository-provider-v2.log"
           test -s "$RUNNER_TEMP/three-repository-provider-v2-summary.json"
           "$RUNNER_TEMP/three-repository-venv/bin/python" -m json.tool \
             "$RUNNER_TEMP/three-repository-provider-v2-summary.json" >/dev/null
