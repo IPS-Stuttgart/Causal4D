@@ -10,10 +10,7 @@ name: Exact pull-request head validation
   schedule:
     - cron: "17 * * * *"
 
-permissions:
-  contents: read
-  pull-requests: write
-  issues: write
+permissions: {}
 
 concurrency:
   group: exact-head-validation-${{ github.event_name }}-${{ inputs.pr_number || 'queue' }}
@@ -27,11 +24,15 @@ jobs:
   select:
     name: Select one immutable pull-request head
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       has_target: ${{ steps.select.outputs.has_target }}
       pr_number: ${{ steps.select.outputs.pr_number }}
       head_sha: ${{ steps.select.outputs.head_sha }}
       base_sha: ${{ steps.select.outputs.base_sha }}
+      merge_base_sha: ${{ steps.select.outputs.merge_base_sha }}
       base_ref: ${{ steps.select.outputs.base_ref }}
     steps:
       - name: Resolve a same-repository pull request
@@ -87,6 +88,7 @@ jobs:
                   handle.write("pr_number=0\n")
                   handle.write("head_sha=\n")
                   handle.write("base_sha=\n")
+                  handle.write("merge_base_sha=\n")
                   handle.write("base_ref=\n")
               raise SystemExit(0)
 
@@ -100,11 +102,19 @@ jobs:
           if pull["base"]["ref"] != "main":
               raise SystemExit("exact-head validation accepts main-targeted PRs only")
 
+          comparison = api(
+              f"compare/{pull['base']['sha']}...{pull['head']['sha']}"
+          )
+          merge_base = comparison.get("merge_base_commit")
+          if not isinstance(merge_base, dict) or not merge_base.get("sha"):
+              raise SystemExit("GitHub comparison did not return a merge base")
+
           values = {
               "has_target": "true",
               "pr_number": str(pull["number"]),
               "head_sha": pull["head"]["sha"],
               "base_sha": pull["base"]["sha"],
+              "merge_base_sha": str(merge_base["sha"]),
               "base_ref": pull["base"]["ref"],
           }
           with output.open("a", encoding="utf-8") as handle:
@@ -117,6 +127,9 @@ jobs:
     needs: select
     if: needs.select.outputs.has_target == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -127,15 +140,31 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.select.outputs.head_sha }}
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
+      - name: Fetch exact comparison commits
+        env:
+          EXPECTED_BASE_SHA: ${{ needs.select.outputs.base_sha }}
+          EXPECTED_MERGE_BASE_SHA: ${{ needs.select.outputs.merge_base_sha }}
+        shell: bash
+        run: |
+          ca_file=/etc/ssl/certs/ca-certificates.crt
+          test -r "$ca_file"
+          for sha in "$EXPECTED_BASE_SHA" "$EXPECTED_MERGE_BASE_SHA"; do
+            if ! git cat-file -e "${sha}^{commit}" 2>/dev/null; then
+              git -c http.sslCAInfo="$ca_file" fetch \
+                --no-tags --depth=1 origin "$sha"
+            fi
+          done
       - name: Verify immutable checkout identity
         env:
           EXPECTED_HEAD_SHA: ${{ needs.select.outputs.head_sha }}
           EXPECTED_BASE_SHA: ${{ needs.select.outputs.base_sha }}
+          EXPECTED_MERGE_BASE_SHA: ${{ needs.select.outputs.merge_base_sha }}
         run: |
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
           git cat-file -e "$EXPECTED_BASE_SHA^{commit}"
+          git cat-file -e "$EXPECTED_MERGE_BASE_SHA^{commit}"
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -167,6 +196,8 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ needs.select.outputs.pr_number }}
           EXPECTED_HEAD_SHA: ${{ needs.select.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ needs.select.outputs.base_sha }}
+          EXPECTED_BASE_REF: ${{ needs.select.outputs.base_ref }}
         run: |
           python - <<'PY'
           import json
@@ -186,6 +217,11 @@ jobs:
               pull = json.load(response)
           if pull["head"]["sha"] != os.environ["EXPECTED_HEAD_SHA"]:
               raise SystemExit("pull-request head changed during exact-head validation")
+          if (
+              pull["base"]["sha"] != os.environ["EXPECTED_BASE_SHA"]
+              or pull["base"]["ref"] != os.environ["EXPECTED_BASE_REF"]
+          ):
+              raise SystemExit("pull-request base changed during exact-head validation")
           PY
       - name: Upload core test report
         if: always()
@@ -199,28 +235,49 @@ jobs:
     needs: select
     if: needs.select.outputs.has_target == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     timeout-minutes: 45
     steps:
       - name: Check out the selected exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.select.outputs.head_sha }}
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
+      - name: Fetch exact comparison commits
+        env:
+          EXPECTED_BASE_SHA: ${{ needs.select.outputs.base_sha }}
+          EXPECTED_MERGE_BASE_SHA: ${{ needs.select.outputs.merge_base_sha }}
+        shell: bash
+        run: |
+          ca_file=/etc/ssl/certs/ca-certificates.crt
+          test -r "$ca_file"
+          for sha in "$EXPECTED_BASE_SHA" "$EXPECTED_MERGE_BASE_SHA"; do
+            if ! git cat-file -e "${sha}^{commit}" 2>/dev/null; then
+              git -c http.sslCAInfo="$ca_file" fetch \
+                --no-tags --depth=1 origin "$sha"
+            fi
+          done
       - name: Verify immutable checkout identity
         env:
           EXPECTED_HEAD_SHA: ${{ needs.select.outputs.head_sha }}
           EXPECTED_BASE_SHA: ${{ needs.select.outputs.base_sha }}
+          EXPECTED_MERGE_BASE_SHA: ${{ needs.select.outputs.merge_base_sha }}
         run: |
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
           git cat-file -e "$EXPECTED_BASE_SHA^{commit}"
+          git cat-file -e "$EXPECTED_MERGE_BASE_SHA^{commit}"
       - name: Verify current-base merge compatibility
         env:
           EXPECTED_HEAD_SHA: ${{ needs.select.outputs.head_sha }}
           EXPECTED_BASE_SHA: ${{ needs.select.outputs.base_sha }}
+          EXPECTED_MERGE_BASE_SHA: ${{ needs.select.outputs.merge_base_sha }}
         run: |
-          git merge-tree --write-tree "$EXPECTED_BASE_SHA" "$EXPECTED_HEAD_SHA" \
-            > merge-tree-sha.txt
+          git merge-tree --write-tree \
+            --merge-base "$EXPECTED_MERGE_BASE_SHA" \
+            "$EXPECTED_BASE_SHA" "$EXPECTED_HEAD_SHA" > merge-tree-sha.txt
       - name: Set up Python 3.12
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -290,6 +347,8 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ needs.select.outputs.pr_number }}
           EXPECTED_HEAD_SHA: ${{ needs.select.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ needs.select.outputs.base_sha }}
+          EXPECTED_BASE_REF: ${{ needs.select.outputs.base_ref }}
         run: |
           python - <<'PY'
           import json
@@ -309,6 +368,11 @@ jobs:
               pull = json.load(response)
           if pull["head"]["sha"] != os.environ["EXPECTED_HEAD_SHA"]:
               raise SystemExit("pull-request head changed during exact-head validation")
+          if (
+              pull["base"]["sha"] != os.environ["EXPECTED_BASE_SHA"]
+              or pull["base"]["ref"] != os.environ["EXPECTED_BASE_REF"]
+          ):
+              raise SystemExit("pull-request base changed during exact-head validation")
           PY
       - name: Upload distributions and exact identities
         if: always()
@@ -325,6 +389,10 @@ jobs:
     needs: [select, core, quality-package-provider]
     if: always() && needs.select.outputs.has_target == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     steps:
       - name: Recheck head and publish one-shot result
         env:
@@ -333,6 +401,8 @@ jobs:
           PR_NUMBER: ${{ needs.select.outputs.pr_number }}
           EXPECTED_HEAD_SHA: ${{ needs.select.outputs.head_sha }}
           EXPECTED_BASE_SHA: ${{ needs.select.outputs.base_sha }}
+          EXPECTED_BASE_REF: ${{ needs.select.outputs.base_ref }}
+          EXPECTED_MERGE_BASE_SHA: ${{ needs.select.outputs.merge_base_sha }}
           CORE_RESULT: ${{ needs.core.result }}
           QUALITY_RESULT: ${{ needs.quality-package-provider.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -368,10 +438,15 @@ jobs:
 
           pull = request("GET", f"pulls/{pr_number}")
           head_current = pull["head"]["sha"] == expected_head
+          base_current = (
+              pull["base"]["sha"] == os.environ["EXPECTED_BASE_SHA"]
+              and pull["base"]["ref"] == os.environ["EXPECTED_BASE_REF"]
+          )
           passed = (
               os.environ["CORE_RESULT"] == "success"
               and os.environ["QUALITY_RESULT"] == "success"
               and head_current
+              and base_current
           )
           result = "passed" if passed else "failed"
           record = {
@@ -380,8 +455,11 @@ jobs:
               "repository": repository,
               "pull_request_number": int(pr_number),
               "head_sha": expected_head,
+              "base_ref": os.environ["EXPECTED_BASE_REF"],
               "base_sha": os.environ["EXPECTED_BASE_SHA"],
+              "merge_base_sha": os.environ["EXPECTED_MERGE_BASE_SHA"],
               "head_still_current": head_current,
+              "base_still_current": base_current,
               "core_result": os.environ["CORE_RESULT"],
               "quality_package_provider_result": os.environ["QUALITY_RESULT"],
               "result": result,
@@ -405,7 +483,8 @@ jobs:
               f"Exact-head validation **{result}** for `{expected_head}`. "
               f"Core matrix: `{os.environ['CORE_RESULT']}`; quality/package/"
               f"provider: `{os.environ['QUALITY_RESULT']}`; "
-              f"head still current: `{str(head_current).lower()}`. "
+              f"head still current: `{str(head_current).lower()}`; "
+              f"base still current: `{str(base_current).lower()}`. "
               f"Run: {os.environ['RUN_URL']}"
           )
           request("POST", f"issues/{pr_number}/comments", {"body": comment})
