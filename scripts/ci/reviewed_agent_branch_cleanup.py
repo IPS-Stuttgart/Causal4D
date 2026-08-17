@@ -159,8 +159,7 @@ def _live_candidates(
         if (
             inspection.sha != entry.expected_sha
             or decision.reason != entry.eligibility_reason
-            or inspection.exact_tip_merged_pull_requests
-            != entry.merged_pull_requests
+            or inspection.exact_tip_merged_pull_requests != entry.merged_pull_requests
         ):
             raise CleanupError(f"live branch lineage changed: {entry.name}")
         selected.append(decision)
@@ -182,8 +181,7 @@ def _immediate_recheck(
     if repository.get("default_branch") != manifest.default_branch:
         raise CleanupError("default branch changed immediately before deletion")
     branch = api.get_json(
-        f"/repos/{manifest.repository}/branches/"
-        f"{quote(inspection.name, safe='')}"
+        f"/repos/{manifest.repository}/branches/{quote(inspection.name, safe='')}"
     )
     if not isinstance(branch, Mapping) or branch.get("name") != inspection.name:
         raise CleanupError(f"branch no longer resolves exactly: {inspection.name}")
@@ -251,9 +249,7 @@ def execute_cleanup(
             api.delete_branch_ref(loaded.manifest.repository, inspection.name)
             phase = "confirm_absence"
             if api.branch_exists(loaded.manifest.repository, inspection.name):
-                raise CleanupError(
-                    f"deleted branch still resolves: {inspection.name}"
-                )
+                raise CleanupError(f"deleted branch still resolves: {inspection.name}")
         except (CleanupError, GitHubApiError, OSError) as error:
             receipt["deleted_count"] = len(deleted)
             receipt["mutation_performed"] = (
@@ -331,9 +327,7 @@ def main(argv: list[str] | None = None) -> int:
             }
         else:
             if arguments.approval_phrase != _APPROVAL:
-                raise CleanupError(
-                    f"--approval-phrase must be exactly {_APPROVAL!r}"
-                )
+                raise CleanupError(f"--approval-phrase must be exactly {_APPROVAL!r}")
             token = os.environ.get(arguments.token_env, "")
             if not token:
                 raise CleanupError(
