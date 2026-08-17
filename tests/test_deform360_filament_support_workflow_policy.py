@@ -19,7 +19,7 @@ def test_workflow_keeps_normal_validation_on_hosted_runner() -> None:
     assert "pull_request:" in text
     assert "push:" in text
     assert "workflow_dispatch:" in text
-    assert 'branches: [main]' in text
+    assert "branches: [main]" in text
     assert "contents: read" in text
     assert "run_source_diagnostic:" in text
     assert "run_source_diagnostic: true" not in text
@@ -87,11 +87,9 @@ def test_self_hosted_job_fetches_only_the_exact_locked_ancestry() -> None:
 def test_self_hosted_job_uses_explicit_reproduction_python() -> None:
     text = _text()
 
-    assert (
-        "scripts/remote/select_deform360_prefix_kinematics_python.py" in text
-    )
+    assert "scripts/remote/select_deform360_prefix_kinematics_python.py" in text
     assert "FILAMENT_SUPPORT_PYTHON=${selected}" in text
-    assert '"$FILAMENT_SUPPORT_PYTHON" - <<\'PY\'' in text
+    assert "\"$FILAMENT_SUPPORT_PYTHON\" - <<'PY'" in text
     assert "python-selection.json" in text
 
 
@@ -111,10 +109,7 @@ def test_source_diagnostic_has_a_durable_status_artifact() -> None:
 
 def test_registry_binds_the_self_hosted_job_and_fixed_entrypoint() -> None:
     payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
-    entries = {
-        (entry["workflow"], entry["job_id"]): entry
-        for entry in payload["jobs"]
-    }
+    entries = {(entry["workflow"], entry["job_id"]): entry for entry in payload["jobs"]}
     entry = entries[("deform360-filament-support.yml", "source-diagnostic")]
 
     assert entry["runs_on"] == ["self-hosted", "Linux", "X64", "nvidia-smi"]
