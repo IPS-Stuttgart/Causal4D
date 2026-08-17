@@ -22,7 +22,7 @@ def test_exact_head_validation_has_manual_and_scheduled_queue() -> None:
     text = _workflow_text()
     assert "workflow_dispatch:" in text
     assert "schedule:" in text
-    assert '<!-- exact-head-validation: queued -->' in text
+    assert "<!-- exact-head-validation: queued -->" in text
     assert "same-repository PRs only" in text
     assert 'pull["base"]["ref"] != "main"' in text
     assert 'WORKFLOW_REF"] != "refs/heads/main"' in text
@@ -38,9 +38,7 @@ def test_exact_head_checkout_is_shallow_immutable_and_uncredentialed() -> None:
     assert text.count('git -c http.sslCAInfo="$ca_file" fetch') == 2
     assert text.count('--no-tags --depth=1 origin "$sha"') == 2
     assert text.count('git cat-file -e "$EXPECTED_BASE_SHA^{commit}"') >= 2
-    assert (
-        text.count('git cat-file -e "$EXPECTED_MERGE_BASE_SHA^{commit}"') >= 2
-    )
+    assert text.count('git cat-file -e "$EXPECTED_MERGE_BASE_SHA^{commit}"') >= 2
     assert '--merge-base "$EXPECTED_MERGE_BASE_SHA"' in text
     assert text.count("persist-credentials: false") >= 3
     assert text.count("git rev-parse HEAD") >= 2
