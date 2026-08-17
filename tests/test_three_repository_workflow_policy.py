@@ -8,6 +8,7 @@ WORKFLOW = (
     ROOT / ".github" / "workflows" / "bayesian-phystwin-provider-compatibility.yml"
 )
 PROVIDER_V2_ATTESTATION = ROOT / "ci" / "three_repository_provider_v2_attestation.py"
+OBSERVATION_GOLDEN_PATH = ROOT / "ci" / "three_repository_observation.py"
 BPT_PIN = ROOT / "requirements" / "ci" / "bayesian-phystwin-three-repository.sha"
 PROB4D_PIN = ROOT / "requirements" / "ci" / "prob4d-three-repository.sha"
 
@@ -93,6 +94,29 @@ def test_provider_v2_attestation_serializes_frozen_json_at_output_boundary() -> 
     assert 'args.output.write_text(rendered + "\\n", encoding="utf-8")' in text
     assert "print(rendered)" in text
     assert "json.dumps(summary" not in text
+
+
+def test_golden_path_copies_immutable_prob4d_metadata_before_mutation() -> None:
+    text = OBSERVATION_GOLDEN_PATH.read_text(encoding="utf-8")
+
+    assert "from copy import deepcopy" in text
+    assert "deepcopy(artifact.metadata)" in text
+    assert "json.dumps(artifact.metadata" not in text
+
+
+def test_failure_diagnostics_capture_python_tracebacks() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    assert text.count('2>&1 | tee "$RUNNER_TEMP/three-repository-') >= 2
+    assert "three-repository-golden-path.log" in text
+    assert "three-repository-provider-v2.log" in text
+
+
+def test_project_status_changes_trigger_installed_wheel_path() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    assert text.count('"ci/project_status_v1.json"') == 2
+    assert text.count('"ci/project_status_v2.json"') == 2
 
 
 def test_built_wheels_receive_persistent_content_identities() -> None:
