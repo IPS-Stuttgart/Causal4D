@@ -4,16 +4,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 from reviewed_agent_branch_cleanup_test_support import (
     BRANCH,
     MODULE,
     SHA,
-    CleanupError,
     CleanupExecutionError,
     _write_review_files,
-    load_cleanup,
     main,
 )
 
