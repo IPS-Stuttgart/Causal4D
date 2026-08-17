@@ -89,7 +89,7 @@ def test_manifest_and_allowlist_reject_symlinks(tmp_path: Path) -> None:
     manifest_path, manifest_sha = _write_review_files(root)
     allowlist = root / ".github" / "stale-agent-branch-allowlist.json"
     allowlist_target = allowlist.with_name("allowlist-target.json")
-    allowllist.replace(allowlist_target)
+    allowlist.replace(allowlist_target)
     allowlist.symlink_to(allowlist_target.name)
     with pytest.raises(CleanupError, match="must not traverse a symlink"):
         load_cleanup(root, manifest_path, manifest_sha)
