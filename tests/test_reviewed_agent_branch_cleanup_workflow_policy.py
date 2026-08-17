@@ -81,8 +81,7 @@ def test_every_action_is_pinned_and_both_receipts_are_retained() -> None:
 
     assert action_lines
     assert all(
-        re.search(r"uses: [^@\s]+@[0-9a-f]{40}(?:\s|$)", line)
-        for line in action_lines
+        re.search(r"uses: [^@\s]+@[0-9a-f]{40}(?:\s|$)", line) for line in action_lines
     )
     assert text.count("if: always()") == 3
     assert text.count("retention-days: 90") == 2
