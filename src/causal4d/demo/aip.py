@@ -11,7 +11,6 @@ import numpy as np
 
 from causal4d.artifacts.v1 import (
     CounterfactualQuery,
-    PhysicalPosterior,
     TwinBelief,
     build_causal_context,
     load_contract,
