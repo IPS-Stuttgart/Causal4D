@@ -337,16 +337,13 @@ def update_dense_joint_weights_batched(
                 reduction_axes=(1, 2, 3),
             )
             if dynamic_likelihood_weight and prefix_frame_count >= 4:
-                score += (
-                    dynamic_likelihood_weight
-                    * _legacy_student_t_mean_log_score(
-                        np.diff(predicted_prefix, axis=1)
-                        - np.diff(observed_prefix, axis=0)[None],
-                        valid_prefix[1:] & valid_prefix[:-1],
-                        scale_m=observation_scale_m,
-                        degrees_of_freedom=degrees_of_freedom,
-                        reduction_axes=(1, 2, 3),
-                    )
+                score += dynamic_likelihood_weight * _legacy_student_t_mean_log_score(
+                    np.diff(predicted_prefix, axis=1)
+                    - np.diff(observed_prefix, axis=0)[None],
+                    valid_prefix[1:] & valid_prefix[:-1],
+                    scale_m=observation_scale_m,
+                    degrees_of_freedom=degrees_of_freedom,
+                    reduction_axes=(1, 2, 3),
                 )
         else:
             if normalized_config is None:
