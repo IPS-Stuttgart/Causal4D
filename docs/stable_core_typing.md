@@ -2,11 +2,12 @@
 
 ## Scope
 
-Causal4D applies an additive strict MyPy ratchet to the small reusable core that
+Causal4D applies an additive strict MyPy ratchet to the reusable surface that
 owns versioned artifacts, factual intervention abduction, grouped likelihoods,
-and the counterfactual operator. Historical diagnostics, acquisition tooling,
-and fast-moving research modules remain on the repository's incremental typing
-policy until they are promoted in separate reviewed tranches.
+counterfactual operators, atomic publication, provider admission, replay
+validation, and result-bundle verification. Historical diagnostics,
+acquisition tooling, and fast-moving research modules remain on the repository's
+incremental typing policy until they are promoted in separate reviewed tranches.
 
 The single source of truth is:
 
@@ -27,16 +28,30 @@ against exactly:
 
 ```text
 src/causal4d/api/v1.py
+src/causal4d/artifacts/v1.py
+src/causal4d/inference/v1.py
 src/causal4d/contracts.py
 src/causal4d/counterfactual.py
 src/causal4d/grouped_likelihood.py
 src/causal4d/intervention_abduction.py
 src/causal4d/observation_evidence.py
+src/causal4d/atomic_io.py
+src/causal4d/result_bundle_verification.py
+src/causal4d/result_bundle_publication.py
+src/causal4d/provider_contract.py
+src/causal4d/replay_provider_contract.py
 ```
 
 Both ordinary CI and the required merge gate invoke that same runner. The policy
 test locks the exact options, target inventory, command construction, and one
 workflow invocation per required workflow.
+
+The split `causal4d.artifacts.v1` and `causal4d.inference.v1` namespaces are part
+of the strict inventory so their deliberately narrow public exports cannot drift
+away from the typed implementations they expose. The publication and provider
+modules are included because they are fail-closed boundaries: an untyped change
+there can invalidate archive identity, exact fallback, provider admission, or
+installed-wheel provenance even when the numerical estimator is unchanged.
 
 ## Repair boundary
 
