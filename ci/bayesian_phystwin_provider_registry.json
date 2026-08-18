@@ -33,6 +33,13 @@
       "local_contract_module": "causal4d.belief_provider_v2_contract"
     },
     {
+      "module": "bayesian_phystwin.causal4d_guarded_belief_provider_v1",
+      "api_version": 1,
+      "role": "guarded_complete_belief_handoff",
+      "lifecycle": "production_additive",
+      "local_contract_module": null
+    },
+    {
       "module": "bayesian_phystwin.causal4d_tree_block_provider_v1",
       "api_version": 1,
       "role": "claim_bearing_tree_block_query_covariance",

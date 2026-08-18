@@ -39,6 +39,9 @@ _DEDICATED_PROVIDER_REQUIREMENTS = {
     "bayesian_phystwin.causal4d_belief_provider_v3": (
         "CAUSAL4D_REQUIRE_BPT_BELIEF_PROVIDER_V3"
     ),
+    "bayesian_phystwin.causal4d_guarded_belief_provider_v1": (
+        "CAUSAL4D_REQUIRE_GUARDED_BPT_PROVIDER"
+    ),
     "bayesian_phystwin.causal4d_tree_block_provider_v1": (
         "CAUSAL4D_REQUIRE_TREE_BLOCK_QUERY_PROVIDER"
     ),

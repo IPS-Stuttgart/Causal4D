@@ -97,20 +97,14 @@ def _install_fake_bpt(monkeypatch: pytest.MonkeyPatch) -> None:
     package = ModuleType("bayesian_phystwin")
     package.__path__ = []  # type: ignore[attr-defined]
 
-    provider = ModuleType(
-        "bayesian_phystwin.causal4d_tree_block_provider_v1"
-    )
+    provider = ModuleType("bayesian_phystwin.causal4d_tree_block_provider_v1")
     provider.ClaimBearingTreeBlockProb4DUpdateV1 = _FakeUpdate
 
-    selection = ModuleType(
-        "bayesian_phystwin.guarded_belief_selection_v2"
+    guarded_provider = ModuleType(
+        "bayesian_phystwin.causal4d_guarded_belief_provider_v1"
     )
-    selection.GuardedBeliefSelectionReceiptV2 = _FakeSelection
-
-    runtime = ModuleType(
-        "bayesian_phystwin.provider_runtime_identity_v1"
-    )
-    runtime.Prob4DRuntimeIdentityV1 = _FakeRuntimeIdentity
+    guarded_provider.GuardedBeliefSelectionReceiptV2 = _FakeSelection
+    guarded_provider.Prob4DRuntimeIdentityV1 = _FakeRuntimeIdentity
 
     monkeypatch.setitem(sys.modules, "bayesian_phystwin", package)
     monkeypatch.setitem(
@@ -120,13 +114,8 @@ def _install_fake_bpt(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setitem(
         sys.modules,
-        "bayesian_phystwin.guarded_belief_selection_v2",
-        selection,
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "bayesian_phystwin.provider_runtime_identity_v1",
-        runtime,
+        "bayesian_phystwin.causal4d_guarded_belief_provider_v1",
+        guarded_provider,
     )
 
 
@@ -268,9 +257,7 @@ def test_accepted_handoff_consumes_exact_runtime_and_guarded_selection(
     handoff = bound.belief.metadata[GUARDED_BPT_HANDOFF_METADATA_KEY]
     assert handoff["selected_bpt_belief_id"] == selected_bpt.artifact_id
     assert (
-        BayesianPhysTwinGuardedBeliefHandoffReceiptV2.from_dict(
-            bound.receipt.as_dict()
-        )
+        BayesianPhysTwinGuardedBeliefHandoffReceiptV2.from_dict(bound.receipt.as_dict())
         == bound.receipt
     )
 

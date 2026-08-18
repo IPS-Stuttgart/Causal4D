@@ -30,9 +30,7 @@ from causal4d.tree_block_belief_query import (
 )
 
 GUARDED_BPT_HANDOFF_SCHEMA_VERSION = 2
-GUARDED_BPT_HANDOFF_ARTIFACT_KIND = (
-    "BayesianPhysTwinGuardedBeliefHandoffReceipt"
-)
+GUARDED_BPT_HANDOFF_ARTIFACT_KIND = "BayesianPhysTwinGuardedBeliefHandoffReceipt"
 GUARDED_BPT_HANDOFF_METADATA_KEY = "bayesian_phystwin_guarded_handoff_v2"
 GUARDED_BPT_HANDOFF_CLAIM_BOUNDARY = (
     "This receipt establishes exact Prob4D runtime, candidate construction, "
@@ -295,17 +293,12 @@ class BayesianPhysTwinGuardedBeliefHandoffReceiptV2:
                     "accepted handoff must consume observation evidence once"
                 )
             if self.covariance_consumed_count != 1:
-                raise ValueError(
-                    "accepted handoff must consume query covariance once"
-                )
+                raise ValueError("accepted handoff must consume query covariance once")
             if self.covariance_result_id is None:
                 raise ValueError(
                     "accepted handoff requires registered query covariance"
                 )
-            if (
-                self.delivered_causal4d_belief_id
-                == self.baseline_causal4d_belief_id
-            ):
+            if self.delivered_causal4d_belief_id == self.baseline_causal4d_belief_id:
                 raise ValueError(
                     "accepted handoff must deliver a distinct Causal4D belief"
                 )
@@ -319,17 +312,10 @@ class BayesianPhysTwinGuardedBeliefHandoffReceiptV2:
                     "fallback handoff must consume zero observation evidence"
                 )
             if self.covariance_consumed_count != 0:
-                raise ValueError(
-                    "fallback handoff must consume zero query covariance"
-                )
+                raise ValueError("fallback handoff must consume zero query covariance")
             if self.covariance_result_id is not None:
-                raise ValueError(
-                    "fallback handoff must not bind query covariance"
-                )
-            if (
-                self.delivered_causal4d_belief_id
-                != self.baseline_causal4d_belief_id
-            ):
+                raise ValueError("fallback handoff must not bind query covariance")
+            if self.delivered_causal4d_belief_id != self.baseline_causal4d_belief_id:
                 raise ValueError(
                     "fallback handoff changed the baseline Causal4D belief"
                 )
@@ -350,9 +336,7 @@ class BayesianPhysTwinGuardedBeliefHandoffReceiptV2:
             "runtime_identity_id": self.runtime_identity_id,
             "prob4d_source_repository": self.prob4d_source_repository,
             "prob4d_runtime_revision": self.prob4d_runtime_revision,
-            "runtime_revision_evidence_source": (
-                self.runtime_revision_evidence_source
-            ),
+            "runtime_revision_evidence_source": (self.runtime_revision_evidence_source),
             "candidate_construction_receipt_id": (
                 self.candidate_construction_receipt_id
             ),
@@ -423,24 +407,16 @@ class BayesianPhysTwinGuardedBeliefHandoffReceiptV2:
             candidate_construction_receipt_id=(
                 fields["candidate_construction_receipt_id"]
             ),
-            guarded_selection_receipt_id=(
-                fields["guarded_selection_receipt_id"]
-            ),
+            guarded_selection_receipt_id=(fields["guarded_selection_receipt_id"]),
             guard_certificate_id=fields["guard_certificate_id"],
             guard_decision_id=fields["guard_decision_id"],
             selection_id=fields["selection_id"],
             baseline_bpt_belief_id=fields["baseline_bpt_belief_id"],
             candidate_bpt_belief_id=fields["candidate_bpt_belief_id"],
             selected_bpt_belief_id=fields["selected_bpt_belief_id"],
-            baseline_causal4d_belief_id=(
-                fields["baseline_causal4d_belief_id"]
-            ),
-            delivered_causal4d_belief_id=(
-                fields["delivered_causal4d_belief_id"]
-            ),
-            update_inference_admissible=(
-                fields["update_inference_admissible"]
-            ),
+            baseline_causal4d_belief_id=(fields["baseline_causal4d_belief_id"]),
+            delivered_causal4d_belief_id=(fields["delivered_causal4d_belief_id"]),
+            update_inference_admissible=(fields["update_inference_admissible"]),
             selected_candidate=fields["selected_candidate"],
             exact_fallback=fields["exact_fallback"],
             evidence_consumed_count=fields["evidence_consumed_count"],
@@ -467,34 +443,23 @@ class BoundGuardedBayesianPhysTwinBeliefV2:
         if not isinstance(self.belief, TwinBelief):
             raise TypeError("belief must be a TwinBelief")
         if not isinstance(self.evidence_ledger, ConsumedEvidenceLedgerV1):
-            raise TypeError(
-                "evidence_ledger must be ConsumedEvidenceLedgerV1"
-            )
+            raise TypeError("evidence_ledger must be ConsumedEvidenceLedgerV1")
         if not isinstance(
             self.receipt,
             BayesianPhysTwinGuardedBeliefHandoffReceiptV2,
         ):
             raise TypeError("receipt has the wrong guarded handoff type")
-        if (
-            self.belief.artifact_id
-            != self.receipt.delivered_causal4d_belief_id
-        ):
-            raise ValueError(
-                "delivered belief and guarded receipt identities differ"
-            )
+        if self.belief.artifact_id != self.receipt.delivered_causal4d_belief_id:
+            raise ValueError("delivered belief and guarded receipt identities differ")
         if self.evidence_ledger.artifact_id != self.receipt.evidence_ledger_id:
-            raise ValueError(
-                "evidence ledger and guarded receipt identities differ"
-            )
+            raise ValueError("evidence ledger and guarded receipt identities differ")
         embedded = _ledger_from_metadata(self.belief)
         if self.receipt.selected_candidate and embedded is None:
             raise ValueError("accepted guarded belief omits evidence ledger")
         if embedded is not None and (
             embedded.as_dict() != self.evidence_ledger.as_dict()
         ):
-            raise ValueError(
-                "delivered belief embeds a different evidence ledger"
-            )
+            raise ValueError("delivered belief embeds a different evidence ledger")
 
 
 def _bound_candidate_belief(
@@ -567,10 +532,8 @@ def bind_guarded_bayesian_phystwin_belief_handoff_v2(
     from bayesian_phystwin.causal4d_tree_block_provider_v1 import (
         ClaimBearingTreeBlockProb4DUpdateV1,
     )
-    from bayesian_phystwin.guarded_belief_selection_v2 import (
+    from bayesian_phystwin.causal4d_guarded_belief_provider_v1 import (
         GuardedBeliefSelectionReceiptV2,
-    )
-    from bayesian_phystwin.provider_runtime_identity_v1 import (
         Prob4DRuntimeIdentityV1,
     )
 
@@ -579,9 +542,7 @@ def bind_guarded_bayesian_phystwin_belief_handoff_v2(
     if not isinstance(runtime_identity, Prob4DRuntimeIdentityV1):
         raise TypeError("runtime_identity must be Prob4DRuntimeIdentityV1")
     if not isinstance(guarded_selection, GuardedBeliefSelectionReceiptV2):
-        raise TypeError(
-            "guarded_selection must be GuardedBeliefSelectionReceiptV2"
-        )
+        raise TypeError("guarded_selection must be GuardedBeliefSelectionReceiptV2")
     if not isinstance(baseline_belief, TwinBelief):
         raise TypeError("baseline_belief must be a TwinBelief")
     if not isinstance(candidate_belief, TwinBelief):
@@ -603,10 +564,7 @@ def bind_guarded_bayesian_phystwin_belief_handoff_v2(
         raise ValueError("candidate construction changed inference admissibility")
     if runtime_identity.provider_manifest_id != update.provider_manifest_id:
         raise ValueError("runtime identity binds a different provider manifest")
-    if (
-        runtime_identity.runtime_revision_source
-        != update.runtime_revision_source
-    ):
+    if runtime_identity.runtime_revision_source != update.runtime_revision_source:
         raise ValueError("runtime evidence source differs from update lineage")
     if runtime_identity.independently_verified is not True:
         raise ValueError("runtime identity lacks independent verification")
@@ -615,10 +573,7 @@ def bind_guarded_bayesian_phystwin_belief_handoff_v2(
         raise TypeError("guarded selection candidate flag must be a bool")
     if type(guarded_selection.exact_fallback) is not bool:
         raise TypeError("guarded selection fallback flag must be a bool")
-    if (
-        guarded_selection.selected_candidate
-        == guarded_selection.exact_fallback
-    ):
+    if guarded_selection.selected_candidate == guarded_selection.exact_fallback:
         raise ValueError("guarded selection flags are not complements")
     expected_selected_bpt_id = (
         construction.candidate_belief_id
@@ -646,16 +601,12 @@ def bind_guarded_bayesian_phystwin_belief_handoff_v2(
 
     if guarded_selection.selected_candidate:
         if not update.inference_admissible:
-            raise ValueError(
-                "guard selected a candidate from inadmissible inference"
-            )
+            raise ValueError("guard selected a candidate from inadmissible inference")
         if not isinstance(
             query_covariance,
             ValidatedTreeBlockQueryCovarianceV1,
         ):
-            raise TypeError(
-                "selected candidate requires registered query covariance"
-            )
+            raise TypeError("selected candidate requires registered query covariance")
         if not query_covariance.inference_admissible:
             raise ValueError("query covariance is not inference-admissible")
         if query_covariance.update_id != update.update_id:
@@ -665,9 +616,7 @@ def bind_guarded_bayesian_phystwin_belief_handoff_v2(
         if query_covariance.inference_reason != update.result.reason:
             raise ValueError("query covariance inference reason changed")
         if candidate_belief.artifact_id == baseline_belief.artifact_id:
-            raise ValueError(
-                "selected candidate requires a distinct Causal4D belief"
-            )
+            raise ValueError("selected candidate requires a distinct Causal4D belief")
         group_id = _require_string(
             correlation_group_id or update.observation_artifact_id,
             name="correlation_group_id",
@@ -692,12 +641,8 @@ def bind_guarded_bayesian_phystwin_belief_handoff_v2(
                 "linearization_artifact_id": update.linearization_artifact_id,
                 "provider_manifest_id": update.provider_manifest_id,
                 "runtime_identity_id": runtime_identity.identity_id,
-                "candidate_construction_receipt_id": (
-                    construction.receipt_id
-                ),
-                "guard_certificate_id": (
-                    guarded_selection.guard_certificate_id
-                ),
+                "candidate_construction_receipt_id": (construction.receipt_id),
+                "guard_certificate_id": (guarded_selection.guard_certificate_id),
                 "guard_decision_id": guarded_selection.guard_decision_id,
                 "selection_id": guarded_selection.selection_id,
                 "query_covariance_result_id": query_covariance.result_id,
@@ -720,13 +665,9 @@ def bind_guarded_bayesian_phystwin_belief_handoff_v2(
         covariance_count = 1
     else:
         if query_covariance is not None:
-            raise ValueError(
-                "exact fallback must not consume query covariance"
-            )
+            raise ValueError("exact fallback must not consume query covariance")
         if candidate_belief.artifact_id != baseline_belief.artifact_id:
-            raise ValueError(
-                "exact fallback must retain the baseline Causal4D belief"
-            )
+            raise ValueError("exact fallback must retain the baseline Causal4D belief")
         next_ledger = ledger
         delivered = baseline_belief
         covariance_result_id = None
@@ -746,9 +687,7 @@ def bind_guarded_bayesian_phystwin_belief_handoff_v2(
         runtime_identity_id=runtime_identity.identity_id,
         prob4d_source_repository=runtime_identity.source_repository,
         prob4d_runtime_revision=runtime_identity.runtime_revision,
-        runtime_revision_evidence_source=(
-            runtime_identity.runtime_revision_source
-        ),
+        runtime_revision_evidence_source=(runtime_identity.runtime_revision_source),
         candidate_construction_receipt_id=construction.receipt_id,
         guarded_selection_receipt_id=guarded_selection.receipt_id,
         guard_certificate_id=guarded_selection.guard_certificate_id,
