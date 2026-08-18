@@ -1,7 +1,7 @@
 # Automation integrity
 
-This document separates three automation concerns that have different trust and
-reproducibility requirements.
+This document separates automation concerns that have different trust,
+reproducibility, and lifecycle requirements.
 
 ## Authenticated issue commands
 
@@ -14,13 +14,39 @@ whole. GitHub Actions permits at most one pending run in a concurrency group. If
 all opened issues enter a workflow-level group before the job guard is evaluated,
 an unrelated issue can replace a pending authorized command. Job-scoped
 concurrency means an unrelated issue produces only skipped jobs and never enters
-the command's serialization group. The execution-job groups also use `queue: max`, so
-multiple authenticated commands wait instead of replacing an earlier pending
-command.
+the command's serialization group. The execution-job groups also use
+`queue: max`, so multiple authenticated commands wait instead of replacing an
+earlier pending command.
 
 The policy test in `tests/test_issue_command_concurrency.py` inventories every
 opened-issue workflow. Adding another issue command therefore requires an
 explicit job name and concurrency group in the registry.
+
+## Workflow lifecycle
+
+A mergeable branch must not introduce one-shot workflow files whose names use
+`temporary-*`, `publish-reviewed-*`, `*one-shot*`, `*one_shot*`,
+`agent-apply-*`, or `branch-advance-*` conventions. The equivalent underscore
+forms are also blocked. `tests/test_no_temporary_workflows.py` enforces this
+boundary for both `.yml` and `.yaml` files.
+
+A temporary action should instead use one of these paths:
+
+- invoke an existing reusable workflow with immutable repository, commit,
+  configuration, and dataset inputs;
+- retain the run receipt or evidence bundle as an artifact, issue comment, tag,
+  or checked contract; or
+- keep the temporary workflow off every mergeable head and delete it before
+  review.
+
+The workflow file is an execution mechanism, not the scientific evidence. A
+completed one-shot workflow therefore should not remain active merely to retain
+provenance; the immutable inputs, exact head, logs, receipt, and result bundle
+carry that provenance.
+
+Long-lived branch cleanup remains a separate, fail-closed process. The stale
+agent-branch workflow is read-only and only proposes exact-tip candidates for
+manual review. See [branch_hygiene.md](branch_hygiene.md).
 
 ## Frozen and rolling compatibility lanes
 
@@ -31,8 +57,8 @@ claim-bearing release checks.
 
 `three-repository-rolling-canary.yml` is intentionally different. It follows the
 current `main` branches of Prob4D, BayesianPhysTwin, and Causal4D, records their
-exact revisions, builds all three wheels, verifies installed-only imports, creates
-an ephemeral stack lock, and runs the shared compatibility and provider-v2
+exact revisions, builds all three wheels, verifies installed-only imports,
+creates an ephemeral stack lock, and runs the shared compatibility and provider-v2
 contracts. Its artifacts always declare:
 
 - `claim_bearing = false`;
@@ -41,9 +67,9 @@ contracts. Its artifacts always declare:
 
 A successful rolling canary detects compatibility at those moving revisions. It
 does not update immutable pins and does not establish physical accuracy,
-calibration, counterfactual validity, deployment safety, or any scientific claim.
-A failure is an integration signal; frozen revisions remain unchanged until a
-reviewed pin update passes the frozen lane.
+calibration, counterfactual validity, deployment safety, or any scientific
+claim. A failure is an integration signal; frozen revisions remain unchanged
+until a reviewed pin update passes the frozen lane.
 
 ## Release metadata integrity
 
@@ -60,15 +86,16 @@ source distribution and requires agreement among:
 
 For a tag, the tag must be exactly `v<package-version>`, the package must not be a
 development or prerelease version, the `Unreleased` section must contain no
-pending changes, and the project-status required version must match. The workflow
-is read-only: it validates release inputs and uploads evidence but does not create
-a tag or publish a release.
+pending changes, and the project-status required version must match. The
+workflow is read-only: it validates release inputs and uploads evidence but does
+not create a tag or publish a release.
 
 ## Change procedure
 
 For an issue-command workflow, keep the authorization guard on the execution job
-and place its concurrency block below that guard. For compatibility changes, run
-both the moving-head canary and the immutable installed-wheel lane before updating
-any frozen pin. For a software release, first move all pending changelog entries
-into the release section, synchronize package, citation, and project-status
-versions, and only then create the exact matching tag.
+and place its concurrency block below that guard. For temporary automation, use
+a reusable workflow or remove the one-shot file before review. For compatibility
+changes, run both the moving-head canary and the immutable installed-wheel lane
+before updating any frozen pin. For a software release, first move all pending
+changelog entries into the release section, synchronize package, citation, and
+project-status versions, and only then create the exact matching tag.
