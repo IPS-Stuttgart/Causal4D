@@ -15,9 +15,7 @@ from typing import Any, Final, cast
 ROOT: Final = Path(__file__).resolve().parents[2]
 DEFAULT_REGISTRY: Final = ROOT / "docs" / "lifecycle_registry.json"
 DEFAULT_INDEX: Final = ROOT / "docs" / "README.md"
-ALLOWED_STATUSES: Final = frozenset(
-    {"current", "frozen", "historical", "superseded"}
-)
+ALLOWED_STATUSES: Final = frozenset({"current", "frozen", "historical", "superseded"})
 ALLOWED_KINDS: Final = frozenset(
     {"archive", "concept", "contract", "protocol", "result", "runbook"}
 )
@@ -58,9 +56,7 @@ def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def _reject_nonfinite_constant(value: str) -> None:
-    raise ValueError(
-        f"document lifecycle registry contains non-finite value {value!r}"
-    )
+    raise ValueError(f"document lifecycle registry contains non-finite value {value!r}")
 
 
 def _load_registry(path: Path) -> Mapping[str, Any]:
@@ -133,8 +129,7 @@ def _resolve_document(root: Path, raw_path: str) -> Path:
     relative = Path(raw_path)
     if relative.is_absolute() or relative.as_posix() != raw_path:
         raise ValueError(
-            "document path must be a normalized relative POSIX path: "
-            f"{raw_path}"
+            f"document path must be a normalized relative POSIX path: {raw_path}"
         )
     if not relative.parts or relative.parts[0] != "docs" or ".." in relative.parts:
         raise ValueError(f"document path must stay below docs/: {raw_path}")
@@ -242,9 +237,7 @@ def validate_document_lifecycle(
         )
 
         path = _require_string(document["path"], label=f"documents[{position}].path")
-        title = _require_string(
-            document["title"], label=f"documents[{position}].title"
-        )
+        title = _require_string(document["title"], label=f"documents[{position}].title")
         kind = _require_string(document["kind"], label=f"documents[{position}].kind")
         status = _require_string(
             document["status"], label=f"documents[{position}].status"
