@@ -87,11 +87,11 @@ def test_current_repository_metadata_is_internally_consistent() -> None:
 def test_current_release_tag_obeys_unreleased_boundary() -> None:
     summary = inspect_repository(ROOT)
 
-    if summary.unreleased_changes_present:
-        with pytest.raises(ReleaseMetadataError, match="empty Unreleased"):
-            inspect_repository(ROOT, tag=f"v{summary.package_version}")
-    elif summary.prerelease:
+    if summary.prerelease:
         with pytest.raises(ReleaseMetadataError, match="cannot be published"):
+            inspect_repository(ROOT, tag=f"v{summary.package_version}")
+    elif summary.unreleased_changes_present:
+        with pytest.raises(ReleaseMetadataError, match="empty Unreleased"):
             inspect_repository(ROOT, tag=f"v{summary.package_version}")
     else:
         tagged = inspect_repository(ROOT, tag=f"v{summary.package_version}")
