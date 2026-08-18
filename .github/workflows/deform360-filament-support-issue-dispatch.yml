@@ -117,7 +117,7 @@ jobs:
           receipt = {
               "schema_version": 1,
               "artifact_kind": "Causal4DDeform360FilamentSupportDispatch",
-              "repository": os.environ["GITHUB_REPOSITORY],
+              "repository": os.environ["GITHUB_REPOSITORY"],
               "reviewed_main_sha": os.environ["MAIN_SHA"],
               "trigger_issue_number": int(os.environ["ISSUE_NUMBER"]),
               "workflow_run_id": int(os.environ["RUN_ID"]),
