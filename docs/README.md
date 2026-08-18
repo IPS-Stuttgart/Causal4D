@@ -10,6 +10,13 @@ a new software user is:
 4. [Abduction, intervention, and prediction](causal4d_abduction_intervention_prediction.md)
 5. [Command-line interface](command_line.md)
 
+Operational document status is declared in the machine-readable
+[lifecycle registry](lifecycle_registry.json) and checked in CI. `current`
+documents are the mutable operator references, `frozen` documents are
+byte-locked protocol records, and `superseded` documents remain available only
+for provenance and identify their successor. Do not infer operational status
+from a filename or search result alone.
+
 ## Concepts and contracts
 
 - [Causal model and identification](causal_model_and_identification.md)
@@ -41,12 +48,32 @@ The files in this section are operational and evidence-bearing. Use the exact
 version associated with the frozen experiment rather than copying commands into
 another document.
 
+### Active operator references
+
 - [Physical-experiment milestone](causal4d_real_experiment_milestone.md)
 - [Source-panel acquisition](causal4d_source_panel_acquisition.md)
 - [Pre-acquisition readiness](causal4d_preacquisition_readiness.md)
 - [Real-evidence status and accounting](causal4d_real_evidence_status.md)
 - [Acquisition environment capsule](causal4d_acquisition_environment_capsule.md)
 - [Acquisition flight recorder](causal4d_acquisition_flight_recorder.md)
+- [Pre-acquisition next-action derivation](causal4d_preacquisition_next_action.md)
+- [Next-action packet](causal4d_preacquisition_next_action_packet.md)
+- [Next-action validation](causal4d_preacquisition_next_action_validation.md)
+- [Self-hosted pre-acquisition automation](self_hosted_preacquisition_automation.md)
+
+### Frozen amendment lineage
+
+- [Pre-acquisition amendment v4](causal4d_preacquisition_v4.md) is the active,
+  byte-locked amendment.
+- [Pre-acquisition amendment v3](causal4d_preacquisition_v3.md) is superseded by
+  v4 and retained unchanged for provenance.
+- [Pre-acquisition amendment v2](causal4d_preacquisition_v2.md) is superseded by
+  v3 and retained unchanged for provenance.
+
+The lifecycle validator requires every active operational role to be unique and
+linked here. It also verifies the Git blob identities of frozen and superseded
+amendments and rejects an unregistered future `causal4d_preacquisition_v*.md`
+document.
 
 ## Governance and scope
 

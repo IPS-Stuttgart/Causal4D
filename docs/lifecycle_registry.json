@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "required_active_roles": [
+    "acquisition-environment",
+    "acquisition-flight-recorder",
+    "next-action",
+    "next-action-packet",
+    "next-action-validation",
+    "preacquisition-amendment",
+    "preacquisition-readiness",
+    "real-evidence-accounting",
+    "real-experiment-milestone",
+    "self-hosted-preacquisition-automation",
+    "source-panel-acquisition"
+  ],
+  "covered_path_patterns": [
+    "docs/causal4d_preacquisition_v*.md"
+  ],
+  "documents": [
+    {
+      "path": "docs/causal4d_acquisition_environment_capsule.md",
+      "title": "Acquisition environment capsule",
+      "kind": "runbook",
+      "status": "current",
+      "claim_bearing": true,
+      "operational_role": "acquisition-environment",
+      "successor": null,
+      "git_blob_sha1": null
+    },
+    {
+      "path": "docs/causal4d_acquisition_flight_recorder.md",
+      "title": "Acquisition flight recorder",
+      "kind": "runbook",
+      "status": "current",
+      "claim_bearing": true,
+      "operational_role": "acquisition-flight-recorder",
+      "successor": null,
+      "git_blob_sha1": null
+    },
+    {
+      "path": "docs/causal4d_preacquisition_next_action.md",
+      "title": "Pre-acquisition next-action derivation",
+      "kind": "contract",
+      "status": "current",
+      "claim_bearing": true,
+      "operational_role": "next-action",
+      "successor": null,
+      "git_blob_sha1": null
+    },
+    {
+      "path": "docs/causal4d_preacquisition_next_action_packet.md",
+      "title": "Pre-acquisition next-action packet",
+      "kind": "contract",
+      "status": "current",
+      "claim_bearing": true,
+      "operational_role": "next-action-packet",
+      "successor": null,
+      "git_blob_sha1": null
+    },
+    {
+      "path": "docs/causal4d_preacquisition_next_action_validation.md",
+      "title": "Pre-acquisition next-action validation",
+      "kind": "contract",
+      "status": "current",
+      "claim_bearing": true,
+      "operational_role": "next-action-validation",
+      "successor": null,
+      "git_blob_sha1": null
+    },
+    {
+      "path": "docs/causal4d_preacquisition_readiness.md",
+      "title": "Pre-acquisition readiness",
+      "kind": "runbook",
+      "status": "current",
+      "claim_bearing": true,
+      "operational_role": "preacquisition-readiness",
+      "successor": null,
+      "git_blob_sha1": null
+    },
+    {
+      "path": "docs/causal4d_preacquisition_v2.md",
+      "title": "Pre-acquisition amendment v2",
+      "kind": "protocol",
+      "status": "superseded",
+      "claim_bearing": true,
+      "operational_role": null,
+      "successor": "docs/causal4d_preacquisition_v3.md",
+      "git_blob_sha1": "193c08f9d86ccdb600d3b43ff93101faaeef36ed"
+    },
+    {
+      "path": "docs/causal4d_preacquisition_v3.md",
+      "title": "Pre-acquisition amendment v3",
+      "kind": "protocol",
+      "status": "superseded",
+      "claim_bearing": true,
+      "operational_role": null,
+      "successor": "docs/causal4d_preacquisition_v4.md",
+      "git_blob_sha1": "f7842c0dd99eb0c628e509f9f30afffaca697c92"
+    },
+    {
+      "path": "docs/causal4d_preacquisition_v4.md",
+      "title": "Pre-acquisition amendment v4",
+      "kind": "protocol",
+      "status": "frozen",
+      "claim_bearing": true,
+      "operational_role": "preacquisition-amendment",
+      "successor": null,
+      "git_blob_sha1": "9c35910925cf49c456e2a848ac8528792689472d"
+    },
+    {
+      "path": "docs/causal4d_real_evidence_status.md",
+      "title": "Real-evidence status and accounting",
+      "kind": "runbook",
+      "status": "current",
+      "claim_bearing": true,
+      "operational_role": "real-evidence-accounting",
+      "successor": null,
+      "git_blob_sha1": null
+    },
+    {
+      "path": "docs/causal4d_real_experiment_milestone.md",
+      "title": "Physical-experiment milestone",
+      "kind": "runbook",
+      "status": "current",
+      "claim_bearing": true,
+      "operational_role": "real-experiment-milestone",
+      "successor": null,
+      "git_blob_sha1": null
+    },
+    {
+      "path": "docs/causal4d_source_panel_acquisition.md",
+      "title": "Source-panel acquisition",
+      "kind": "runbook",
+      "status": "current",
+      "claim_bearing": true,
+      "operational_role": "source-panel-acquisition",
+      "successor": null,
+      "git_blob_sha1": null
+    },
+    {
+      "path": "docs/self_hosted_preacquisition_automation.md",
+      "title": "Self-hosted pre-acquisition automation",
+      "kind": "runbook",
+      "status": "current",
+      "claim_bearing": false,
+      "operational_role": "self-hosted-preacquisition-automation",
+      "successor": null,
+      "git_blob_sha1": null
+    }
+  ]
+}

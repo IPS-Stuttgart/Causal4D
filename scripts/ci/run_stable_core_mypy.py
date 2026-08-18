@@ -17,11 +17,18 @@ STRICT_MYPY_OPTIONS: Final = (
 
 STABLE_CORE_TARGETS: Final = (
     "src/causal4d/api/v1.py",
+    "src/causal4d/artifacts/v1.py",
+    "src/causal4d/inference/v1.py",
     "src/causal4d/contracts.py",
     "src/causal4d/counterfactual.py",
     "src/causal4d/grouped_likelihood.py",
     "src/causal4d/intervention_abduction.py",
     "src/causal4d/observation_evidence.py",
+    "src/causal4d/atomic_io.py",
+    "src/causal4d/result_bundle_verification.py",
+    "src/causal4d/result_bundle_publication.py",
+    "src/causal4d/provider_contract.py",
+    "src/causal4d/replay_provider_contract.py",
 )
 
 
