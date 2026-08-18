@@ -11,6 +11,9 @@ modules:
   endpoint inference and immutable endpoint posteriors;
 - `bayesian_phystwin.causal4d_belief_provider_v2` for additive model-averaged
   endpoints and source-calibrated horizon discrepancy moments;
+- `bayesian_phystwin.causal4d_guarded_belief_provider_v1` for exact Prob4D
+  runtime, candidate-construction, complete-belief guard, and selected-belief
+  receipt identities;
 - `bayesian_phystwin.causal4d_tree_block_provider_v1` for strict claim-bearing
   tree-block posterior linear-query covariance without dense joint covariance;
 - `bayesian_phystwin.causal4d_graph_provider_v1` for the NumPy-only spring-graph
@@ -26,7 +29,11 @@ The graph module is explicitly parented to Bayesian-PhysTwin's immutable
 `causal4d_provider_v2` contract. Causal4D's belief exporter validates the
 separate belief-provider manifest and invokes only its fixed-anchor operation.
 Registered tree-block covariance queries use their own additive provider and
-local validation contract. The rollout-bank backend and resumable cache execute
+local validation contract. Guarded handoff v2 imports runtime and complete-belief
+selection contracts only through its dedicated versioned facade; an older pinned
+wheel may omit that additive module unless the paired compatibility lane sets
+`CAUSAL4D_REQUIRE_GUARDED_BPT_PROVIDER=1`. The rollout-bank backend and resumable
+cache execute
 replay exclusively through provider v2. Provider v1 remains only for frozen
 scientific and diagnostic compatibility operations.
 
@@ -186,6 +193,9 @@ CAUSAL4D_REQUIRE_TREE_BLOCK_QUERY_PROVIDER=1 python -m pytest -q \
   tests/test_bpt_tree_block_query_provider_integration.py \
   tests/test_tree_block_query_provider_contract.py \
   tests/test_tree_block_belief_query.py
+CAUSAL4D_REQUIRE_GUARDED_BPT_PROVIDER=1 python -m pytest -q \
+  tests/test_guarded_bpt_belief_handoff_v2.py \
+  tests/test_bpt_provider_import_boundary.py
 ```
 
 Package-based installations may use `python -m pip install ".[phystwin]"`;

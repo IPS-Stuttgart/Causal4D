@@ -1,0 +1,245 @@
+name: Guarded BPT exact-head compatibility
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/guarded-bpt-exact-head-compatibility.yml"
+      - "requirements/ci/bayesian-phystwin-guarded-provider.sha"
+      - "requirements/ci/prob4d-release-build-identity.sha"
+      - "ci/bayesian_phystwin_provider_registry.json"
+      - "ci/guarded_bpt_exact_head_smoke.py"
+      - "docs/bayesian_phystwin_provider.md"
+      - "docs/guarded_bpt_belief_handoff_v2.md"
+      - "src/causal4d/guarded_bpt_belief_handoff_v2.py"
+      - "tests/test_bpt_provider_import_boundary.py"
+      - "tests/test_bpt_provider_registry.py"
+      - "tests/test_guarded_bpt_belief_handoff_v2.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guarded-bpt-exact-head-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-head-installed-wheels:
+    name: Exact Prob4D, BPT, and Causal4D guarded-provider wheels
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact Causal4D revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: causal4d
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Resolve locked upstream revisions
+        id: revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          bpt="$(tr -d '[:space:]' < \
+            causal4d/requirements/ci/bayesian-phystwin-guarded-provider.sha)"
+          prob4d="$(tr -d '[:space:]' < \
+            causal4d/requirements/ci/prob4d-release-build-identity.sha)"
+          [[ "$bpt" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$prob4d" =~ ^[0-9a-f]{40}$ ]]
+          echo "bpt=$bpt" >> "$GITHUB_OUTPUT"
+          echo "prob4d=$prob4d" >> "$GITHUB_OUTPUT"
+          echo "causal4d=$(git -C causal4d rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Check out locked Prob4D revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: IPS-Stuttgart/Prob4D
+          ref: ${{ steps.revisions.outputs.prob4d }}
+          path: prob4d
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out locked BayesianPhysTwin revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: IPS-Stuttgart/BayesianPhysTwin
+          ref: ${{ steps.revisions.outputs.bpt }}
+          path: bayesian-phystwin
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact clean revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C prob4d rev-parse HEAD)" = \
+            "${{ steps.revisions.outputs.prob4d }}"
+          test "$(git -C bayesian-phystwin rev-parse HEAD)" = \
+            "${{ steps.revisions.outputs.bpt }}"
+          test "$(git -C causal4d rev-parse HEAD)" = \
+            "${{ steps.revisions.outputs.causal4d }}"
+          test -z "$(git -C prob4d status --porcelain=v1 --untracked-files=all)"
+          test -z "$(git -C bayesian-phystwin status --porcelain=v1 --untracked-files=all)"
+          test -z "$(git -C causal4d status --porcelain=v1 --untracked-files=all)"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            prob4d/pyproject.toml
+            bayesian-phystwin/pyproject.toml
+            causal4d/pyproject.toml
+
+      - name: Run focused source contracts
+        env:
+          CAUSAL4D_REQUIRE_GUARDED_BPT_PROVIDER: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install \
+            -e './prob4d[dev]' \
+            -e './bayesian-phystwin[dev]' \
+            -e './causal4d[dev]'
+          python -m ruff check \
+            prob4d/src/prob4d/_build_identity.py \
+            prob4d/src/prob4d/runtime_revision.py \
+            prob4d/tests/test_build_identity.py \
+            prob4d/tests/test_runtime_revision.py \
+            bayesian-phystwin/src/bayesian_phystwin/causal4d_guarded_belief_provider_v1.py \
+            bayesian-phystwin/tests/test_portable_contracts_causal4d_guarded_belief_provider_v1.py \
+            causal4d/src/causal4d/guarded_bpt_belief_handoff_v2.py \
+            causal4d/ci/guarded_bpt_exact_head_smoke.py \
+            causal4d/tests/test_guarded_bpt_belief_handoff_v2.py
+          python -m ruff format --check --diff \
+            prob4d/src/prob4d/_build_identity.py \
+            prob4d/src/prob4d/runtime_revision.py \
+            prob4d/tests/test_build_identity.py \
+            prob4d/tests/test_runtime_revision.py \
+            bayesian-phystwin/src/bayesian_phystwin/causal4d_guarded_belief_provider_v1.py \
+            bayesian-phystwin/tests/test_portable_contracts_causal4d_guarded_belief_provider_v1.py \
+            causal4d/src/causal4d/guarded_bpt_belief_handoff_v2.py \
+            causal4d/ci/guarded_bpt_exact_head_smoke.py \
+            causal4d/tests/test_guarded_bpt_belief_handoff_v2.py
+          python -m pytest -q -p no:cacheprovider \
+            prob4d/tests/test_build_identity.py \
+            prob4d/tests/test_runtime_revision.py \
+            bayesian-phystwin/tests/test_portable_contracts_provider_runtime_identity_v1.py \
+            bayesian-phystwin/tests/test_portable_contracts_guarded_belief_selection_v2.py \
+            bayesian-phystwin/tests/test_portable_contracts_causal4d_guarded_belief_provider_v1.py \
+            causal4d/tests/test_guarded_bpt_belief_handoff_v2.py \
+            causal4d/tests/test_bpt_provider_import_boundary.py \
+            causal4d/tests/test_bpt_provider_registry.py
+
+      - name: Build exact wheels
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade build pip
+          wheelhouse="$RUNNER_TEMP/guarded-bpt-wheelhouse"
+          mkdir -p "$wheelhouse"
+          python -m build --wheel --outdir "$wheelhouse" prob4d
+          python -m build --wheel --outdir "$wheelhouse" bayesian-phystwin
+          python -m build --wheel --outdir "$wheelhouse" causal4d
+          test "$(find "$wheelhouse" -maxdepth 1 -name '*.whl' | wc -l)" -eq 3
+          (
+            cd "$wheelhouse"
+            sha256sum ./*.whl | sort
+          ) | tee "$RUNNER_TEMP/guarded-bpt-wheel-sha256.txt"
+
+      - name: Install wheels in an isolated environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          venv="$RUNNER_TEMP/guarded-bpt-venv"
+          wheelhouse="$RUNNER_TEMP/guarded-bpt-wheelhouse"
+          python -m venv "$venv"
+          "$venv/bin/python" -m pip install --upgrade pip
+          mapfile -t wheels < <(find "$wheelhouse" -maxdepth 1 -name '*.whl' -print | sort)
+          "$venv/bin/python" -m pip install "${wheels[@]}"
+          "$venv/bin/python" -m pip check
+
+      - name: Verify installed origins and guarded provider smoke
+        env:
+          PROB4D_SOURCE: ${{ github.workspace }}/prob4d
+          BPT_SOURCE: ${{ github.workspace }}/bayesian-phystwin
+          CAUSAL4D_SOURCE: ${{ github.workspace }}/causal4d
+        shell: bash
+        run: |
+          set -euo pipefail
+          venv="$RUNNER_TEMP/guarded-bpt-venv"
+          run_dir="$RUNNER_TEMP/guarded-bpt-run"
+          mkdir -p "$run_dir"
+          cp causal4d/ci/guarded_bpt_exact_head_smoke.py "$run_dir/"
+          cd "$run_dir"
+          env -u PYTHONPATH "$venv/bin/python" - <<'PY'
+          import os
+          from pathlib import Path
+
+          import bayesian_phystwin
+          import causal4d
+          import prob4d
+          import bayesian_phystwin.causal4d_guarded_belief_provider_v1 as provider
+          import causal4d.guarded_bpt_belief_handoff_v2 as handoff
+          import prob4d.runtime_revision as runtime_revision
+
+          roots = tuple(
+              Path(os.environ[name]).resolve()
+              for name in ("PROB4D_SOURCE", "BPT_SOURCE", "CAUSAL4D_SOURCE")
+          )
+          for module in (
+              prob4d,
+              bayesian_phystwin,
+              causal4d,
+              runtime_revision,
+              provider,
+              handoff,
+          ):
+              origin = Path(module.__file__).resolve()
+              if any(origin.is_relative_to(root) for root in roots):
+                  raise SystemExit(f"source-tree import detected: {origin}")
+          PY
+          PROB4D_REVISION="${{ steps.revisions.outputs.prob4d }}" \
+            env -u PYTHONPATH "$venv/bin/python" - <<'PY'
+          import os
+
+          from prob4d.runtime_revision import assert_runtime_revision
+
+          attestation = assert_runtime_revision(os.environ["PROB4D_REVISION"])
+          if not attestation.matched or not attestation.independently_verified:
+              raise SystemExit("installed Prob4D wheel revision was not verified")
+          if attestation.source != "installed_vcs_metadata":
+              raise SystemExit("Prob4D revision did not come from packaged metadata")
+          PY
+          env -u PYTHONPATH "$venv/bin/python" guarded_bpt_exact_head_smoke.py \
+            --bpt-revision "${{ steps.revisions.outputs.bpt }}" \
+            --prob4d-revision "${{ steps.revisions.outputs.prob4d }}" \
+            | tee "$RUNNER_TEMP/guarded-bpt-exact-head-summary.json"
+          "$venv/bin/python" -m json.tool \
+            "$RUNNER_TEMP/guarded-bpt-exact-head-summary.json" >/dev/null
+          SUMMARY="$RUNNER_TEMP/guarded-bpt-exact-head-summary.json" \
+          BPT_REVISION="${{ steps.revisions.outputs.bpt }}" \
+          PROB4D_REVISION="${{ steps.revisions.outputs.prob4d }}" \
+            "$venv/bin/python" - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          summary = json.loads(Path(os.environ["SUMMARY"]).read_text())
+          if summary.get("valid") is not True:
+              raise SystemExit("guarded provider installed-wheel smoke failed")
+          if summary.get("claim_bearing_ready") is not False:
+              raise SystemExit("software compatibility must not promote a claim")
+          if summary.get("bpt_revision") != os.environ["BPT_REVISION"]:
+              raise SystemExit("summary changed the exact BPT revision")
+          if summary.get("prob4d_revision") != os.environ["PROB4D_REVISION"]:
+              raise SystemExit("summary changed the exact Prob4D revision")
+          if not summary.get("prob4d_provider_manifest_id"):
+              raise SystemExit("summary omitted the installed Prob4D manifest")
+          if set(summary.get("handoff_receipts", {})) != {"accepted", "fallback"}:
+              raise SystemExit("accepted/fallback receipt coverage is incomplete")
+          PY
