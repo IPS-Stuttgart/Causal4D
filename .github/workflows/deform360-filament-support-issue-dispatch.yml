@@ -108,31 +108,13 @@ jobs:
           RUN_URL: ${{ steps.run.outputs.run_url }}
         run: |
           set -euo pipefail
-          mkdir -p outputs/filament-support-dispatch
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          receipt = {
-              "schema_version": 1,
-              "artifact_kind": "Causal4DDeform360FilamentSupportDispatch",
-              "repository": os.environ["GITHUB_REPOSITORY"],
-              "reviewed_main_sha": os.environ["MAIN_SHA"],
-              "trigger_issue_number": int(os.environ["ISSUE_NUMBER"]),
-              "workflow_run_id": int(os.environ["RUN_ID"]),
-              "workflow_run_url": os.environ["RUN_URL"],
-              "run_source_diagnostic": True,
-              "target_outcomes_used": False,
-              "registered_physical_dataset_modified": False,
-              "physical_evidence_increment": 0,
-            }
-          Path("outputs/filament-support-dispatch/dispatch.json").write_text(
-              json.dumps(receipt, indent=2, sort_keys=True) + "\n",
-              encoding="utf-8",
-          )
-          print(json.dumps(receipt, indent=2, sort_keys=True))
-          PY
+          python scripts/ci/write_filament_support_dispatch_receipt.py \
+            --repository "${GITHUB_REPOSITORY}" \
+            --reviewed-main-sha "${MAIN_SHA}" \
+            --trigger-issue-number "${ISSUE_NUMBER}" \
+            --workflow-run-id "${RUN_ID}" \
+            --workflow-run-url "${RUN_URL}" \
+            --output outputs/filament-support-dispatch/dispatch.json
 
       - name: Upload dispatch receipt
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
