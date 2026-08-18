@@ -31,12 +31,14 @@ from a filename or search result alone.
 - [BayesianPhysTwin provider contract](bayesian_phystwin_provider.md)
 - [BayesianPhysTwin recursive provider contract](bayesian_phystwin_recursive_provider_contract.md)
 - [Belief handoff](bpt_belief_handoff.md)
+- [Action-bound factual abduction](bound_factual_abduction.md)
 - [Camera geometry contract](camera_geometry_contract.md)
 - [Migration from BayesianPhysTwin](migration_from_bayesian_phystwin.md)
 
 ## Reproduction and diagnostics
 
 - [Paper reproduction](paper_reproduction.md)
+- [Target-free real design sensitivity](causal4d_real_design_sensitivity.md)
 - [Controlled collaborator demonstration](controlled_collaborator_demo.md)
 - [Automation integrity](automation_integrity.md)
 - [Branch hygiene](branch_hygiene.md)
