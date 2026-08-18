@@ -77,9 +77,7 @@ def test_supported_inference_api_remains_provider_neutral() -> None:
 
 
 def test_handoff_contract_records_no_raw_prob4d_reinterpretation() -> None:
-    source = (ROOT / "src/causal4d/bpt_belief_handoff.py").read_text(
-        encoding="utf-8"
-    )
+    source = (ROOT / "src/causal4d/bpt_belief_handoff.py").read_text(encoding="utf-8")
     recursive_source = (
         ROOT / "src/causal4d/recursive_bpt_belief_handoff.py"
     ).read_text(encoding="utf-8")
