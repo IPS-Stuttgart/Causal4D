@@ -54,7 +54,7 @@
       "supported_versions": ">=0.4,<0.5"
     },
     "causal4d": {
-      "required_version": "0.5.0",
+      "required_version": "0.6.0.dev0",
       "role": "realized_intervention_abduction_and_prediction"
     },
     "prob4d": {

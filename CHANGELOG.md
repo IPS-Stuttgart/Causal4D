@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Changed
+
+- Mark post-0.5 development builds as `0.6.0.dev0` across package, citation,
+  and active project-status metadata. Development heads remain non-publishable
+  until the populated Unreleased section is curated into a final release.
+
 ### Added
 
 - Add registered source-only cross-branch query covariance for interventional

@@ -62,7 +62,7 @@ def test_project_status_v2_matches_causal4d_and_provider_contract() -> None:
     assert summary["schema_version"] == 2
     assert summary["status_id"] == "causal4d-project-status-v2"
     assert summary["claim_status"] == "controlled_passed_real_pending"
-    assert summary["versions"] == {"causal4d": "0.5.0"}
+    assert summary["versions"] == {"causal4d": "0.6.0.dev0"}
     assert summary["physical_confirmatory"] == {
         "acquired_executions": 0,
         "claim_ready": False,

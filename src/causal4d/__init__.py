@@ -575,4 +575,4 @@ def __dir__() -> list[str]:
     return sorted(set(globals()) | set(__all__))
 
 
-__version__ = "0.5.0"
+__version__ = "0.6.0.dev0"
