@@ -20,6 +20,7 @@ from bayesian_phystwin.causal4d_guarded_belief_provider_v1 import (
 from causal4d.guarded_bpt_belief_handoff_v2 import (
     BayesianPhysTwinGuardedBeliefHandoffReceiptV2,
 )
+from prob4d.provider_v2 import prob4d_provider_manifest
 
 
 def _digest(label: str) -> str:
@@ -29,6 +30,7 @@ def _digest(label: str) -> str:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--bpt-revision", required=True)
+    parser.add_argument("--prob4d-revision", required=True)
     return parser
 
 
@@ -71,13 +73,17 @@ def _selection(
     )
 
 
-def _runtime(bpt_revision: str) -> Prob4DRuntimeIdentityV1:
+def _runtime(
+    prob4d_revision: str,
+    bpt_revision: str,
+    provider_manifest_id: str,
+) -> Prob4DRuntimeIdentityV1:
     return Prob4DRuntimeIdentityV1(
         project_id="prob4d",
         source_repository="IPS-Stuttgart/Prob4D",
-        provider_manifest_id=_digest("prob4d-provider-manifest"),
-        expected_revision="a" * 40,
-        observed_revision="a" * 40,
+        provider_manifest_id=provider_manifest_id,
+        expected_revision=prob4d_revision,
+        observed_revision=prob4d_revision,
         revision_evidence_source="installed_vcs_metadata",
         clean_checkout=None,
         independently_verified=True,
@@ -113,25 +119,17 @@ def _handoff(
         prob4d_source_repository=runtime.source_repository,
         prob4d_runtime_revision=runtime.runtime_revision,
         runtime_revision_evidence_source=runtime.runtime_revision_source,
-        candidate_construction_receipt_id=(
-            selection.candidate_construction_receipt_id
-        ),
+        candidate_construction_receipt_id=(selection.candidate_construction_receipt_id),
         guarded_selection_receipt_id=selection.receipt_id,
         guard_certificate_id=selection.guard_certificate_id,
         guard_decision_id=selection.guard_decision_id,
         selection_id=selection.selection_id,
-        baseline_bpt_belief_id=(
-            selection.candidate_construction.baseline_belief_id
-        ),
-        candidate_bpt_belief_id=(
-            selection.candidate_construction.candidate_belief_id
-        ),
+        baseline_bpt_belief_id=(selection.candidate_construction.baseline_belief_id),
+        candidate_bpt_belief_id=(selection.candidate_construction.candidate_belief_id),
         selected_bpt_belief_id=selection.selected_belief_id,
         baseline_causal4d_belief_id=baseline_causal4d_id,
         delivered_causal4d_belief_id=(
-            _digest("causal4d-candidate")
-            if accepted
-            else baseline_causal4d_id
+            _digest("causal4d-candidate") if accepted else baseline_causal4d_id
         ),
         update_inference_admissible=(
             selection.candidate_construction.inference_admissible
@@ -140,23 +138,30 @@ def _handoff(
         exact_fallback=selection.exact_fallback,
         evidence_consumed_count=1 if accepted else 0,
         covariance_consumed_count=1 if accepted else 0,
-        covariance_result_id=(
-            _digest("query-covariance") if accepted else None
-        ),
+        covariance_result_id=(_digest("query-covariance") if accepted else None),
         evidence_ledger_id=_digest(f"evidence-ledger:{accepted}"),
         raw_prob4d_reinterpreted=False,
         metadata={"purpose": "installed-wheel-smoke"},
     )
 
 
-def run(*, bpt_revision: str) -> dict[str, Any]:
+def run(*, bpt_revision: str, prob4d_revision: str) -> dict[str, Any]:
     manifest = causal4d_guarded_belief_provider_v1_manifest(
         provider_revision=bpt_revision
     )
     if manifest["provider_revision"] != bpt_revision:
         raise RuntimeError("provider manifest changed the exact BPT revision")
 
-    runtime = _runtime(bpt_revision)
+    installed_prob4d_manifest = prob4d_provider_manifest(
+        provider_revision=prob4d_revision
+    )
+    if installed_prob4d_manifest["provider_revision"] != prob4d_revision:
+        raise RuntimeError("Prob4D manifest changed the exact runtime revision")
+    runtime = _runtime(
+        prob4d_revision,
+        bpt_revision,
+        installed_prob4d_manifest["manifest_id"],
+    )
     runtime_roundtrip = Prob4DRuntimeIdentityV1.from_record(runtime.to_record())
     if runtime_roundtrip != runtime:
         raise RuntimeError("runtime identity roundtrip changed")
@@ -180,10 +185,8 @@ def run(*, bpt_revision: str) -> dict[str, Any]:
             raise RuntimeError("guarded selection roundtrip changed")
 
         handoff = _handoff(runtime=runtime, selection=selection)
-        handoff_roundtrip = (
-            BayesianPhysTwinGuardedBeliefHandoffReceiptV2.from_dict(
-                handoff.as_dict()
-            )
+        handoff_roundtrip = BayesianPhysTwinGuardedBeliefHandoffReceiptV2.from_dict(
+            handoff.as_dict()
         )
         if handoff_roundtrip != handoff:
             raise RuntimeError("Causal4D handoff roundtrip changed")
@@ -203,7 +206,9 @@ def run(*, bpt_revision: str) -> dict[str, Any]:
     return {
         "valid": True,
         "bpt_revision": bpt_revision,
+        "prob4d_revision": prob4d_revision,
         "provider_api": manifest["metadata"]["provider_api"],
+        "prob4d_provider_manifest_id": runtime.provider_manifest_id,
         "runtime_identity_version": PROB4D_RUNTIME_IDENTITY_VERSION,
         "candidate_construction_version": CANDIDATE_CONSTRUCTION_SCHEMA_VERSION,
         "guarded_selection_version": GUARDED_SELECTION_SCHEMA_VERSION,
@@ -217,7 +222,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     print(
         json.dumps(
-            run(bpt_revision=args.bpt_revision),
+            run(
+                bpt_revision=args.bpt_revision,
+                prob4d_revision=args.prob4d_revision,
+            ),
             sort_keys=True,
             separators=(",", ":"),
         )
