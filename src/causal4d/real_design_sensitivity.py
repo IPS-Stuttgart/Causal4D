@@ -268,9 +268,7 @@ def _one_result(
         "sample_count": sample_count,
         "scenario_definition": definition,
         "eligible_panel_rate": float(np.mean(eligible)),
-        "null_positive_gate_rate": effect_rows[0][
-            "registered_positive_gate_pass_rate"
-        ],
+        "null_positive_gate_rate": effect_rows[0]["registered_positive_gate_pass_rate"],
         "primary_interval_width_sd": width_summary,
         "effect_grid": effect_rows,
         "minimum_detectable_grid_effect_at_target_power": detectable,

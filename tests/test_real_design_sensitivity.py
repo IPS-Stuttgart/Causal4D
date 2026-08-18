@@ -43,8 +43,7 @@ def test_additive_effect_power_is_monotone_for_every_scenario() -> None:
     report = build_real_design_sensitivity_report(_small_config())
     for result in report["results"]:
         rates = [
-            row["registered_positive_gate_pass_rate"]
-            for row in result["effect_grid"]
+            row["registered_positive_gate_pass_rate"] for row in result["effect_grid"]
         ]
         assert rates == sorted(rates)
 
@@ -62,19 +61,16 @@ def test_registered_interval_gate_is_unit_scale_invariant() -> None:
         seed=88,
     )
 
-    assert base["decision"]["positive_claim_interval_gate_passed"] == (
-        scaled["decision"]["positive_claim_interval_gate_passed"]
+    assert (
+        base["decision"]["positive_claim_interval_gate_passed"]
+        == (scaled["decision"]["positive_claim_interval_gate_passed"])
     )
     for name in ("primary", "robustness"):
         assert scaled[name]["point_estimate"] == pytest.approx(
             1_000.0 * base[name]["point_estimate"]
         )
-        assert scaled[name]["lower"] == pytest.approx(
-            1_000.0 * base[name]["lower"]
-        )
-        assert scaled[name]["upper"] == pytest.approx(
-            1_000.0 * base[name]["upper"]
-        )
+        assert scaled[name]["lower"] == pytest.approx(1_000.0 * base[name]["lower"])
+        assert scaled[name]["upper"] == pytest.approx(1_000.0 * base[name]["upper"])
 
 
 def test_report_publication_rejects_stale_identity_and_overwrite(

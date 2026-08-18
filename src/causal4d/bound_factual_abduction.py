@@ -70,9 +70,7 @@ def validate_factual_rollout_action_binding(
         "protocol_id": belief.context.protocol_id,
         "case_id": belief.context.case_id,
         "observed_action_id": expected_action_id,
-        "observed_action_trajectory_sha256": (
-            belief.context.u_obs.trajectory_sha256
-        ),
+        "observed_action_trajectory_sha256": (belief.context.u_obs.trajectory_sha256),
         "observed_action_frame_start": belief.context.u_obs.frame_start,
         "observed_action_frame_stop": belief.context.u_obs.frame_stop,
         "hypothesis_count": len(bank.hypothesis_ids),
