@@ -24,6 +24,10 @@ ISSUE_COMMAND_JOBS = {
         "correct",
         "correct-operator-registry-${{ github.sha }}",
     ),
+    "deform360-filament-support-issue-dispatch.yml": (
+        "dispatch",
+        "deform360-filament-support-issue-dispatch-${{ github.sha }}",
+    ),
     "deform360-reset-mechanics-issue-dispatch.yml": (
         "dispatch",
         "deform360-reset-mechanics-issue-dispatch-${{ github.sha }}",

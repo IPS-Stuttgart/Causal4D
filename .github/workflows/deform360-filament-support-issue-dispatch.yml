@@ -1,0 +1,137 @@
+name: Deform360 filament-support issue dispatcher
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+
+jobs:
+  dispatch:
+    name: Dispatch corrected filament-support diagnostic
+    if: >-
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.issue.user.login == 'FlorianPfaff' &&
+      github.event.issue.user.id == 6773539 &&
+      github.event.issue.title ==
+        '[self-hosted] run Causal4D Deform360 filament support'
+    concurrency:
+      group: deform360-filament-support-issue-dispatch-${{ github.sha }}
+      cancel-in-progress: false
+      queue: max
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+    steps:
+      - name: Verify exact reviewed main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          main_sha="$(
+            gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha
+          )"
+          test "${main_sha}" = "${GITHUB_SHA}"
+          echo "MAIN_SHA=${main_sha}" >> "${GITHUB_ENV}"
+
+      - name: Record existing workflow-dispatch runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run list \
+            --repo "${GITHUB_REPOSITORY}" \
+            --workflow deform360-filament-support.yml \
+            --branch main \
+            --event workflow_dispatch \
+            --limit 100 \
+            --json databaseId \
+            --jq '.[].databaseId' \
+            | sort -n > "${RUNNER_TEMP}/filament-support.before"
+
+      - name: Dispatch locked source-only filament support
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run deform360-filament-support.yml \
+            --repo "${GITHUB_REPOSITORY}" \
+            --ref main \
+            -f run_source_diagnostic=true
+
+      - name: Resolve and verify dispatched run
+        id: run
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id=""
+          for _ in $(seq 1 60); do
+            after="$(mktemp)"
+            gh run list \
+              --repo "${GITHUB_REPOSITORY}" \
+              --workflow deform360-filament-support.yml \
+              --branch main \
+              --event workflow_dispatch \
+              --limit 100 \
+              --json databaseId \
+              --jq '.[].databaseId' \
+              | sort -n > "${after}"
+            run_id="$(
+              comm -13 "${RUNNER_TEMP}/filament-support.before" "${after}" \
+                | tail -n 1
+            )"
+            rm -f "${after}"
+            if [[ -n "${run_id}" ]]; then
+              break
+            fi
+            sleep 2
+          done
+          test -n "${run_id}"
+          readarray -t identity < <(
+            gh run view "${run_id}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --json event,headSha,url \
+              --jq '.event, .headSha, .url'
+          )
+          test "${identity[0]}" = "workflow_dispatch"
+          test "${identity[1]}" = "${MAIN_SHA}"
+          echo "run_id=${run_id}" >> "${GITHUB_OUTPUT}"
+          echo "run_url=${identity[2]}" >> "${GITHUB_OUTPUT}"
+
+      - name: Write dispatch receipt
+        shell: bash
+        env:
+          RUN_ID: ${{ steps.run.outputs.run_id }}
+          RUN_URL: ${{ steps.run.outputs.run_url }}
+        run: |
+          set -euo pipefail
+          python scripts/ci/write_filament_support_dispatch_receipt.py \
+            --repository "${GITHUB_REPOSITORY}" \
+            --reviewed-main-sha "${MAIN_SHA}" \
+            --trigger-issue-number "${ISSUE_NUMBER}" \
+            --workflow-run-id "${RUN_ID}" \
+            --workflow-run-url "${RUN_URL}" \
+            --output outputs/filament-support-dispatch/dispatch.json
+
+      - name: Upload dispatch receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: causal4d-deform360-filament-support-dispatch
+          path: outputs/filament-support-dispatch/dispatch.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Report dispatched run
+        shell: bash
+        env:
+          RUN_URL: ${{ steps.run.outputs.run_url }}
+        run: |
+          set -euo pipefail
+          gh issue comment "${ISSUE_NUMBER}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --body "Deform360 filament-support source-only diagnostic dispatched from reviewed main \`${MAIN_SHA}\`: ${RUN_URL}
+
+          Target outcomes used: \`false\`. Registered physical dataset modified: \`false\`. Physical evidence increment: \`0\`."
