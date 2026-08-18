@@ -68,5 +68,7 @@ def test_dispatcher_calls_tested_nonphysical_receipt_writer() -> None:
     assert "target_outcomes_used=False" in writer
     assert "registered_physical_dataset_modified=False" in writer
     assert "physical_evidence_increment=0" in writer
-    assert "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in workflow
+    assert (
+        "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in workflow
+    )
     assert "causal4d-deform360-filament-support-dispatch" in workflow
