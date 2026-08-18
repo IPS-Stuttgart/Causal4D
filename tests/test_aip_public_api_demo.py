@@ -11,7 +11,38 @@ from causal4d.demo.aip import run_demo
 from causal4d.inference import v1 as inference_v1
 
 
-def test_artifact_api_v1_reexports_contract_identity() -> None:
+ARTIFACTS_V1_EXPORTS = (
+    "CONTRACT_VERSION",
+    "PUBLIC_API_NAME",
+    "PUBLIC_API_VERSION",
+    "ActionWindow",
+    "CausalContext",
+    "CounterfactualQuery",
+    "FactualIntervention",
+    "ObservationWindow",
+    "PhysicalPosterior",
+    "TaskPosterior",
+    "TwinBelief",
+    "array_sha256",
+    "build_causal_context",
+    "load_contract",
+    "save_contract",
+)
+INFERENCE_V1_EXPORTS = (
+    "PUBLIC_API_NAME",
+    "PUBLIC_API_VERSION",
+    "FactualAbductionConfig",
+    "HierarchicalAbductionResult",
+    "abduct_factual_intervention",
+    "abduct_hierarchical_interventions",
+    "apply_counterfactual_operator",
+    "factual_joint_weights",
+    "project_physical_posterior",
+)
+
+
+def test_artifact_api_v1_has_reviewed_exact_surface() -> None:
+    assert tuple(artifacts_v1.__all__) == ARTIFACTS_V1_EXPORTS
     assert artifacts_v1.PUBLIC_API_NAME == "causal4d.artifacts.v1"
     assert artifacts_v1.PUBLIC_API_VERSION == 1
     assert artifacts_v1.TwinBelief is contracts.TwinBelief
@@ -20,7 +51,8 @@ def test_artifact_api_v1_reexports_contract_identity() -> None:
     assert artifacts_v1.load_contract is contracts.load_contract
 
 
-def test_inference_api_v1_reexports_aip_operations() -> None:
+def test_inference_api_v1_has_reviewed_exact_surface() -> None:
+    assert tuple(inference_v1.__all__) == INFERENCE_V1_EXPORTS
     assert inference_v1.PUBLIC_API_NAME == "causal4d.inference.v1"
     assert inference_v1.PUBLIC_API_VERSION == 1
     assert (
