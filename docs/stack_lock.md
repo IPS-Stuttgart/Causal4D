@@ -6,6 +6,20 @@ portable release and CI artifact: it binds the three wheel contents to their
 reported package versions, exact tested source revisions, required provider
 modules, and the fixed `Prob4D -> BayesianPhysTwin -> Causal4D` pipeline.
 
+## Production-path ownership
+
+The arrow order is an ownership rule, not only an installation order. Prob4D
+publishes uncertainty-bearing observation artifacts; BayesianPhysTwin decides
+whether they change the complete physical belief; and Causal4D consumes only the
+selected BayesianPhysTwin belief and its handoff receipt for claim-bearing
+inference. Causal4D must not reopen raw Prob4D factors after a BayesianPhysTwin
+rejection or use a downstream result to rescue an upstream provider decision.
+
+The executable import and export policy is documented in
+[`production_belief_path_v1.md`](production_belief_path_v1.md). Historical
+Prob4D readers and adapters remain available for validation and frozen
+reproduction, but they are not a second supported production inference path.
+
 ## Create a lock
 
 Build all three wheels first, then provide one wheel and one exact 40-character
