@@ -39,6 +39,7 @@ from a filename or search result alone.
 
 - [Paper reproduction](paper_reproduction.md)
 - [Target-free real design sensitivity](causal4d_real_design_sensitivity.md)
+- [Core causal and numerical invariant certificate](core_invariant_certificate.md)
 - [Controlled collaborator demonstration](controlled_collaborator_demo.md)
 - [Automation integrity](automation_integrity.md)
 - [Branch hygiene](branch_hygiene.md)
