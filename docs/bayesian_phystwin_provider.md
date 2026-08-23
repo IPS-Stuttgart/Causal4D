@@ -11,6 +11,8 @@ modules:
   endpoint inference and immutable endpoint posteriors;
 - `bayesian_phystwin.causal4d_belief_provider_v2` for additive model-averaged
   endpoints and source-calibrated horizon discrepancy moments;
+- `bayesian_phystwin.causal4d_belief_provider_v3` for the additive dynamic
+  endpoint and recursive-belief surface retained by Bayesian-PhysTwin;
 - `bayesian_phystwin.causal4d_guarded_belief_provider_v1` for exact Prob4D
   runtime, candidate-construction, complete-belief guard, and selected-belief
   receipt identities;
@@ -32,10 +34,14 @@ Registered tree-block covariance queries use their own additive provider and
 local validation contract. Guarded handoff v2 imports runtime and complete-belief
 selection contracts only through its dedicated versioned facade; an older pinned
 wheel may omit that additive module unless the paired compatibility lane sets
-`CAUSAL4D_REQUIRE_GUARDED_BPT_PROVIDER=1`. The rollout-bank backend and resumable
-cache execute
-replay exclusively through provider v2. Provider v1 remains only for frozen
-scientific and diagnostic compatibility operations.
+`CAUSAL4D_REQUIRE_GUARDED_BPT_PROVIDER=1`. The additive v3 belief provider is
+registered so its public boundary cannot drift silently and so dedicated
+compatibility lanes can require it with
+`CAUSAL4D_REQUIRE_BPT_BELIEF_PROVIDER_V3=1`. Causal4D production source does not
+yet import v3, and registering it does not promote its dynamic covariance to a
+calibrated or claim-bearing result. The rollout-bank backend and resumable cache
+execute replay exclusively through provider v2. Provider v1 remains only for
+frozen scientific and diagnostic compatibility operations.
 
 Production source and scripts no longer import any unversioned
 Bayesian-PhysTwin implementation module. The canonical module inventory is
@@ -49,7 +55,8 @@ reviewable registry entry rather than synchronized hand-written inventories.
 
 Normal development accepts Bayesian-PhysTwin versions in the range
 `>=0.4,<0.5`. Compatibility is not inferred from the package version alone.
-Causal4D validates six deliberately separate provider manifests:
+Causal4D validates six deliberately separate provider manifests and registers
+one additional additive development surface:
 
 - scientific provider API/schema version 1 for frozen compatibility names and
   migrated diagnostics;
@@ -61,8 +68,11 @@ Causal4D validates six deliberately separate provider manifests:
 - additive belief provider API/schema version 2 for evidence-weighted endpoint
   model averaging and source-frozen horizon discrepancy prediction;
 - tree-block query provider API/schema version 1 for strict claim-bearing update
-  validation and exact factorized linear-query covariance; and
-- graph provider API/schema version 1 for graph and controller grouping values.
+  validation and exact factorized linear-query covariance;
+- graph provider API/schema version 1 for graph and controller grouping values;
+  and
+- additive belief provider API/schema version 3 as a registered compatibility
+  surface for dynamic endpoint and recursive-belief operations.
 
 The scientific manifest requires its existing `TwinBelief` and `GraphBelief`
 artifact schemas. The replay manifest additionally requires `ReplayRequest` and
@@ -87,6 +97,16 @@ The additive belief provider is checked separately for:
 - immutable endpoint, prediction, and calibration artifact schemas; and
 - an explicit boundary that keeps raw model covariance distinct from interval
   calibration and target-side coverage claims.
+
+The additive v3 provider remains an explicit development boundary rather than a
+production inference dependency. Compatibility checks require that the module
+imports from the installed Bayesian-PhysTwin distribution and that its public
+manifest can be emitted. Its dynamic endpoint, exact-persistence comparator,
+robust local-level/damped-trend components, and retained recursive Prob4D stream
+surface remain subject to their source-frozen evidence and calibration limits.
+A successful import or manifest check does not establish downstream Causal4D
+benefit, empirical interval coverage, unseen-object transfer, or state of the
+art.
 
 The tree-block query provider is checked separately for:
 
@@ -122,7 +142,9 @@ manifest is loaded with
 `load_bayesian_phystwin_tree_block_query_provider_manifest()` and checked with
 `validate_bayesian_phystwin_tree_block_query_provider()`. The graph manifest is
 loaded with `load_bayesian_phystwin_graph_provider_manifest()` and checked with
-`validate_bayesian_phystwin_graph_provider()`. A version, capability, artifact,
+`validate_bayesian_phystwin_graph_provider()`. The v3 manifest is emitted by the
+dedicated cross-repository compatibility lane; Causal4D has no production v3
+validator or local inference contract yet. A version, capability, artifact,
 provider-identity, inference-role, graph-provider, or parent-provider mismatch
 fails closed and is reported explicitly.
 
@@ -195,6 +217,8 @@ CAUSAL4D_REQUIRE_TREE_BLOCK_QUERY_PROVIDER=1 python -m pytest -q \
   tests/test_tree_block_belief_query.py
 CAUSAL4D_REQUIRE_GUARDED_BPT_PROVIDER=1 python -m pytest -q \
   tests/test_guarded_bpt_belief_handoff_v2.py \
+  tests/test_bpt_provider_import_boundary.py
+CAUSAL4D_REQUIRE_BPT_BELIEF_PROVIDER_V3=1 python -m pytest -q \
   tests/test_bpt_provider_import_boundary.py
 ```
 
