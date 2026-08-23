@@ -33,6 +33,13 @@
       "local_contract_module": "causal4d.belief_provider_v2_contract"
     },
     {
+      "module": "bayesian_phystwin.causal4d_belief_provider_v3",
+      "api_version": 3,
+      "role": "dynamic_endpoint_and_recursive_belief",
+      "lifecycle": "additive_development",
+      "local_contract_module": null
+    },
+    {
       "module": "bayesian_phystwin.causal4d_guarded_belief_provider_v1",
       "api_version": 1,
       "role": "guarded_complete_belief_handoff",
