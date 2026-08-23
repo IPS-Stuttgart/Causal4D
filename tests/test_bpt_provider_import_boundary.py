@@ -8,6 +8,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -29,7 +30,14 @@ def _allowed_bayesian_phystwin_modules() -> frozenset[str]:
     for entry in modules:
         if not isinstance(entry, dict) or type(entry.get("module")) is not str:
             raise AssertionError("provider registry entries require string modules")
-        result.add(entry["module"])
+        module_name = entry["module"]
+        if not module_name.startswith("bayesian_phystwin."):
+            raise AssertionError(
+                "provider registry modules must be Bayesian-PhysTwin submodules"
+            )
+        if module_name in result:
+            raise AssertionError("provider registry modules must be unique")
+        result.add(module_name)
     return frozenset(result)
 
 
@@ -55,6 +63,26 @@ def _python_sources() -> list[Path]:
         if directory.exists():
             sources.extend(directory.rglob("*.py"))
     return sorted(sources)
+
+
+def _import_registered_provider(module_name: str) -> ModuleType | None:
+    try:
+        return importlib.import_module(module_name)
+    except ModuleNotFoundError as error:
+        requirement = _DEDICATED_PROVIDER_REQUIREMENTS.get(module_name)
+        if (
+            error.name == module_name
+            and requirement is not None
+            and os.environ.get(requirement) != "1"
+        ):
+            return None
+        raise
+
+
+def test_provider_registry_is_complete_and_well_formed() -> None:
+    assert "bayesian_phystwin.causal4d_belief_provider_v3" in (
+        ALLOWED_BAYESIAN_PHYSTWIN_MODULES
+    )
 
 
 def test_causal4d_imports_bpt_only_through_versioned_provider_modules() -> None:
@@ -87,6 +115,13 @@ def test_causal4d_imports_bpt_only_through_versioned_provider_modules() -> None:
     )
 
 
+def test_every_registered_provider_resolves_when_bpt_is_installed() -> None:
+    if importlib.util.find_spec("bayesian_phystwin") is None:
+        pytest.skip("Bayesian-PhysTwin is not installed in the core-only environment")
+    for module_name in sorted(ALLOWED_BAYESIAN_PHYSTWIN_MODULES):
+        _import_registered_provider(module_name)
+
+
 def test_every_imported_provider_name_resolves_when_bpt_is_installed() -> None:
     if importlib.util.find_spec("bayesian_phystwin") is None:
         pytest.skip("Bayesian-PhysTwin is not installed in the core-only environment")
@@ -98,17 +133,9 @@ def test_every_imported_provider_name_resolves_when_bpt_is_installed() -> None:
             module_name = node.module or ""
             if module_name not in ALLOWED_BAYESIAN_PHYSTWIN_MODULES:
                 continue
-            try:
-                module = importlib.import_module(module_name)
-            except ModuleNotFoundError as error:
-                requirement = _DEDICATED_PROVIDER_REQUIREMENTS.get(module_name)
-                if (
-                    error.name == module_name
-                    and requirement is not None
-                    and os.environ.get(requirement) != "1"
-                ):
-                    continue
-                raise
+            module = _import_registered_provider(module_name)
+            if module is None:
+                continue
             for alias in node.names:
                 assert alias.name != "*"
                 assert hasattr(module, alias.name), (
