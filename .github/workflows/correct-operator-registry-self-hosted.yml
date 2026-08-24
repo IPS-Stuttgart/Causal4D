@@ -28,7 +28,7 @@ jobs:
       group: correct-operator-registry-${{ github.sha }}
       cancel-in-progress: false
       queue: max
-    runs-on: [self-hosted, Linux, X64, nvidia-smi]
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, data-causal4d-physical-v1]
     timeout-minutes: 45
     outputs:
       already_corrected: ${{ steps.summary.outputs.already_corrected }}
