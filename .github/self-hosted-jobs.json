@@ -17,7 +17,8 @@
         "self-hosted",
         "Linux",
         "X64",
-        "nvidia-smi"
+        "nvidia-smi",
+        "data-causal4d-physical-v1"
       ],
       "purpose": "Read-only registered acquisition readiness and interface qualification",
       "dataset_access": "registered-local-preacquisition-read-only",
@@ -31,7 +32,8 @@
         "self-hosted",
         "Linux",
         "X64",
-        "nvidia-smi"
+        "nvidia-smi",
+        "data-causal4d-physical-v1"
       ],
       "purpose": "Execute one exact allowlisted nonphysical registered next action",
       "dataset_access": "registered-local-preacquisition-single-template-write",
@@ -101,7 +103,8 @@
         "self-hosted",
         "Linux",
         "X64",
-        "nvidia-smi"
+        "nvidia-smi",
+        "data-causal4d-physical-v1"
       ],
       "purpose": "Replace the unsupported roster with the single real participant",
       "dataset_access": "registered-local-preacquisition-operator-registry-correction",
