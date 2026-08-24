@@ -53,10 +53,7 @@ def test_self_hosted_job_is_manual_main_only_and_non_mutating() -> None:
     assert "github.event_name == 'workflow_dispatch'" in text
     assert "github.ref == 'refs/heads/main'" in text
     assert "inputs.run_source_diagnostic" in text
-    assert (
-        "runs-on: [self-hosted, Linux, X64, nvidia-smi, data-deform360-v1]"
-        in text
-    )
+    assert "runs-on: [self-hosted, Linux, X64, nvidia-smi, data-deform360-v1]" in text
     assert "timeout-minutes: 120" in text
     assert "permissions:\n  contents: read" in text
     assert "pull-requests: write" not in text

@@ -19,10 +19,7 @@ def test_permanent_gpu_evidence_requires_explicit_dispatch() -> None:
     assert "github.event_name == 'workflow_dispatch'" in text
     assert "inputs.run_source_diagnostic" in text
     assert "needs: contract" in text
-    assert (
-        "runs-on: [self-hosted, Linux, X64, nvidia-smi, data-deform360-v1]"
-        in text
-    )
+    assert "runs-on: [self-hosted, Linux, X64, nvidia-smi, data-deform360-v1]" in text
     assert "permissions:\n  contents: read" in text
     assert "contents: write" not in text
     assert "continue-on-error: true" not in text
