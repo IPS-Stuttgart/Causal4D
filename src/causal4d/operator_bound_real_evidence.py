@@ -87,8 +87,7 @@ def build_operator_bound_real_evidence_status(
         registry = None
     else:
         if (
-            Path(repository_root)
-            / "configs/causal4d/sloth_preacquisition_v5.json"
+            Path(repository_root) / "configs/causal4d/sloth_preacquisition_v5.json"
         ).is_file():
             _, _, _, preacquisition = load_registered_preacquisition_chain(
                 repository_root
