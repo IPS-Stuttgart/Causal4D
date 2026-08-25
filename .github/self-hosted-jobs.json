@@ -6,6 +6,9 @@
     },
     "maintainer-issue-main": {
       "description": "Exact registered-maintainer issue trigger on reviewed refs/heads/main, exact GITHUB_SHA checkout, clean-tree verification, read-only self-hosted token, no issue text execution, and no secrets."
+    },
+    "single-operator-v5-issue-main": {
+      "description": "Exact registered-owner issue trigger on reviewed refs/heads/main for the nonphysical v5 scaffold bootstrap, exact GITHUB_SHA checkout, read-only self-hosted token, no issue text execution, and no secrets."
     }
   },
   "jobs": [
@@ -42,7 +45,7 @@
     {
       "workflow": "bootstrap-single-operator-v5-self-hosted.yml",
       "job": "bootstrap",
-      "authorization_model": "maintainer-issue-main",
+      "authorization_model": "single-operator-v5-issue-main",
       "runner_labels": [
         "self-hosted",
         "Linux",
