@@ -308,7 +308,5 @@ def test_v5_source_action_uses_disclosed_self_review_publication() -> None:
         "<registered-self-attesting-operator-id>"
     )
     assert "self_review_of_preflight_report" in action["operator_sequence"]
-    markdown = operator_flow.render_preacquisition_operator_next_action_markdown(
-        result
-    )
+    markdown = operator_flow.render_preacquisition_operator_next_action_markdown(result)
     assert "no independent review is claimed" in markdown
