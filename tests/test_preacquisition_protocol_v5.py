@@ -44,12 +44,12 @@ def test_registered_v5_chain_is_canonical_and_single_operator() -> None:
     assert v2["plan_id"]
     assert v3["plan_id"]
     assert v5["plan_id"] == PREACQUISITION_V5_PLAN_ID
-    assert v5["amendment_sha256"] == "c0128865c7b527304dc7a6177d7f935d753bfdbc1e4469243f1acaeae6ce8e93"
-    assert governance_allows_single_operator(v5) is True
     assert (
-        v5["governance"]["independent_preacquisition_attestation_claimed"]
-        is False
+        v5["amendment_sha256"]
+        == "c0128865c7b527304dc7a6177d7f935d753bfdbc1e4469243f1acaeae6ce8e93"
     )
+    assert governance_allows_single_operator(v5) is True
+    assert v5["governance"]["independent_preacquisition_attestation_claimed"] is False
 
 
 def test_v5_builder_matches_registered_artifact_and_preserves_v4() -> None:
@@ -98,9 +98,7 @@ def test_v5_records_zero_physical_execution_at_supersession() -> None:
     registered = load_preacquisition_v5(V5, _v4())
 
     assert (
-        registered["supersedes"][
-            "physical_executions_completed_before_supersession"
-        ]
+        registered["supersedes"]["physical_executions_completed_before_supersession"]
         == 0
     )
     assert registered["governance"]["scientific_method_changed"] is False
