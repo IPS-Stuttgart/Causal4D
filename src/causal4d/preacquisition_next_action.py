@@ -26,6 +26,11 @@ from causal4d.preacquisition_source_panel_control import build_source_panel_stat
 NEXT_ACTION_SCHEMA_VERSION = 1
 NEXT_ACTION_ARTIFACT_KIND = "Causal4DPreacquisitionNextAction"
 
+_INDEPENDENT_VERIFIER_MATERIALS = (
+    "docs/independent_verifier_onboarding.md",
+    "docs/independent_verifier_invitation_template.md",
+    "docs/independent_verifier_self_declaration_template.md",
+)
 _MANUAL = {
     "object_registration": (
         "Complete the fixed-object registration",
@@ -365,6 +370,10 @@ def _derive_action(
             "principal_investigator",
             category="governance_blocker",
             completion=next_check,
+            inputs=[
+                str(Path(repository) / relative)
+                for relative in _INDEPENDENT_VERIFIER_MATERIALS
+            ],
             blockers=[
                 "single_operator_project_cannot_satisfy_independent_verification"
             ],
@@ -679,6 +688,9 @@ def render_preacquisition_next_action_markdown(
     ):
         if action.get(field):
             lines += ["", f"### {heading}", "", "```bash", str(action[field]), "```"]
+    if action.get("input_paths"):
+        lines += ["", "### Input materials", ""]
+        lines += [f"- `{path}`" for path in action["input_paths"]]
     if action.get("blocking_items"):
         lines += ["", "### Blocking items", ""]
         lines += [f"- `{item}`" for item in action["blocking_items"]]
