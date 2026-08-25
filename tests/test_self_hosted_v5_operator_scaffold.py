@@ -99,7 +99,7 @@ def test_bootstrap_creates_fresh_v5_tree_and_advances_to_registration(
         "action_id": "complete_object_registration",
         "operator_role": "self_attesting_operator",
         "automatable": False,
-        "physical_acquisition_required": True,
+        "physical_acquisition_required": False,
         "target_outcomes_permitted": False,
     }
     assert report["target_outcomes_used"] is False
