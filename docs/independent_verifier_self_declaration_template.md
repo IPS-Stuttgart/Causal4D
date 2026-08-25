@@ -1,5 +1,7 @@
 # Independent-verifier self-declaration template
 
+> **V5 status:** This declaration is used only when a genuinely distinct verifier volunteers; active v5 does not require it.
+
 > This is a private onboarding aid, not a repository artifact and not an
 > attestation. The prospective verifier completes it in their own words and
 > returns it through an institutionally appropriate private channel. Do not
