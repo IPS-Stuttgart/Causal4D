@@ -38,12 +38,8 @@ def test_v5_bootstrap_has_one_exact_maintainer_issue_trigger() -> None:
 def test_v5_bootstrap_uses_fresh_fixed_root_and_exact_wheel() -> None:
     text = _workflow_text()
 
-    assert (
-        "/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1"
-    ) in text
-    assert (
-        "/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5"
-    ) in text
+    assert ("/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1") in text
+    assert ("/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5") in text
     assert "scripts/ci/bootstrap_self_hosted_v5_operator_scaffold.py" in text
     assert '--repository-root "${GITHUB_WORKSPACE}"' in text
     assert "ref: ${{ github.sha }}" in text
