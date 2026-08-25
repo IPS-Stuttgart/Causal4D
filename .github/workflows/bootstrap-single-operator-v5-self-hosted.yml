@@ -19,8 +19,9 @@ jobs:
       github.event.issue.title ==
         '[self-hosted] bootstrap Causal4D v5 operator scaffold'
     concurrency:
-      group: causal4d-single-operator-v5-bootstrap
+      group: causal4d-single-operator-v5-bootstrap-${{ github.sha }}
       cancel-in-progress: false
+      queue: max
     runs-on: [self-hosted, Linux, X64, nvidia-smi, data-causal4d-physical-v1]
     timeout-minutes: 45
     outputs:
@@ -65,13 +66,17 @@ jobs:
           set -euo pipefail
           mkdir -p outputs/single-operator-v5-bootstrap/wheels
           python -m venv .single-operator-v5-bootstrap-venv
-          .single-operator-v5-bootstrap-venv/bin/python -m pip install             --upgrade pip "build>=1.2"
-          .single-operator-v5-bootstrap-venv/bin/python -m build --wheel             --outdir outputs/single-operator-v5-bootstrap/wheels .
+          .single-operator-v5-bootstrap-venv/bin/python -m pip install \
+            --upgrade pip "build>=1.2"
+          .single-operator-v5-bootstrap-venv/bin/python -m build --wheel \
+            --outdir outputs/single-operator-v5-bootstrap/wheels .
           wheel="$(
-            find outputs/single-operator-v5-bootstrap/wheels -maxdepth 1               -name 'causal4d-*.whl' -print -quit
+            find outputs/single-operator-v5-bootstrap/wheels -maxdepth 1 \
+              -name 'causal4d-*.whl' -print -quit
           )"
           test -n "${wheel}"
-          sha256sum "${wheel}"             | tee outputs/single-operator-v5-bootstrap/wheel-sha256.txt
+          sha256sum "${wheel}" \
+            | tee outputs/single-operator-v5-bootstrap/wheel-sha256.txt
           .single-operator-v5-bootstrap-venv/bin/python -m pip install "${wheel}"
           .single-operator-v5-bootstrap-venv/bin/python -m pip check
           .single-operator-v5-bootstrap-venv/bin/python - <<'PY'
@@ -92,7 +97,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PYTHONPATH="" .single-operator-v5-bootstrap-venv/bin/python             scripts/ci/bootstrap_self_hosted_v5_operator_scaffold.py             --repository-root "${GITHUB_WORKSPACE}"             --source-dataset-root               /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1             --target-dataset-root               /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5             --output outputs/single-operator-v5-bootstrap/report.json             | tee outputs/single-operator-v5-bootstrap/report.txt
+          PYTHONPATH="" .single-operator-v5-bootstrap-venv/bin/python \
+            scripts/ci/bootstrap_self_hosted_v5_operator_scaffold.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --source-dataset-root \
+              /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1 \
+            --target-dataset-root \
+              /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5 \
+            --output outputs/single-operator-v5-bootstrap/report.json \
+            | tee outputs/single-operator-v5-bootstrap/report.txt
 
       - name: Verify and export sanitized result fields
         id: summary
@@ -128,6 +141,8 @@ jobs:
               raise SystemExit("fresh v5 scaffold did not reach registration")
           if action["operator_role"] != "self_attesting_operator":
               raise SystemExit("fresh v5 scaffold has the wrong operator role")
+          if action["target_outcomes_permitted"] is not False:
+              raise SystemExit("fresh v5 scaffold permits target outcomes")
           for field in (
               "target_outcomes_used",
               "device_nodes_opened",
@@ -181,7 +196,8 @@ jobs:
             echo "workflow_run_id=${GITHUB_RUN_ID}"
             uname -a
           } | tee outputs/single-operator-v5-bootstrap/runner.txt
-          nvidia-smi -L             | tee outputs/single-operator-v5-bootstrap/nvidia-smi-L.txt
+          nvidia-smi -L \
+            | tee outputs/single-operator-v5-bootstrap/nvidia-smi-L.txt
 
       - name: Upload sanitized bootstrap evidence
         if: always()
@@ -201,7 +217,9 @@ jobs:
         if: always()
         shell: bash
         run: |
-          rm -rf             .single-operator-v5-bootstrap-venv             outputs/single-operator-v5-bootstrap/wheels
+          rm -rf \
+            .single-operator-v5-bootstrap-venv \
+            outputs/single-operator-v5-bootstrap/wheels
 
   report:
     name: Report the v5 bootstrap to the trigger issue
@@ -264,4 +282,6 @@ jobs:
           This run claims no independent pre-acquisition attestation and does not authorize target access.
           EOF
           )"
-          gh issue comment "${ISSUE_NUMBER}"             --repo "${GITHUB_REPOSITORY}"             --body "${body}"
+          gh issue comment "${ISSUE_NUMBER}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --body "${body}"
