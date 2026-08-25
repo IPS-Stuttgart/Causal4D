@@ -1,31 +1,50 @@
 # Operator identity registry
 
-The confirmatory acquisition workflow uses a sealed operator roster so that approval independence is checked at the **person** level rather than by comparing free-form display strings.
+The acquisition workflow uses a sealed operator roster so approvals are bound to
+a real person rather than free-form display strings. Under the active
+pre-acquisition v5 policy, one registered person may perform every
+pre-acquisition role. The resulting evidence is self-attested; it is not
+independently attested.
 
-This is an operational-provenance control. It does not change the estimator, the 36-execution schedule, the registered analysis, the exclusion policy, or any scientific threshold.
+This governance change does not alter the estimator, 18-session/36-execution
+schedule, source/target split, registered analysis, exclusion policy, or any
+scientific threshold.
+
+## Active v5 policy
+
+The active policy is
+`causal4d-sloth-preacquisition-v5-single-operator`. It permits the same
+registered person to:
+
+- seal and self-attest the method freeze;
+- approve operational and software-environment gates;
+- review and publish source-panel evidence; and
+- perform the two chronological contact-registration review passes.
+
+Every report using this study must disclose:
+
+> One registered operator performed the pre-acquisition checks and
+> self-attested the freeze; no independent pre-acquisition attestation is
+> claimed.
+
+A genuinely distinct verifier can still be added later, but is not required for
+v5 readiness. Do not create aliases or duplicate identities to simulate
+independence.
 
 ## Identity model
 
-The canonical artifact is stored at:
+The canonical artifact is:
 
 ```text
 preacquisition/operator_registry.json
 ```
 
-Each entry contains only:
+Each entry contains a stable project-local `operator_id`, an `active` flag,
+registered roles, and `person_identity_sha256`. Raw email addresses, account
+names, personnel numbers, and the HMAC key must stay outside the repository and
+dataset.
 
-- a stable project-local `operator_id`;
-- an `active` flag;
-- registered roles; and
-- `person_identity_sha256`, a privacy-preserving stable person digest.
-
-Raw email addresses, account names, personnel numbers, and the HMAC key must not be written to the dataset. The registered digest method is:
-
-```text
-hmac-sha256-domain-separated-v1
-```
-
-A suitable institutional procedure is:
+The registered digest method is:
 
 ```text
 HMAC-SHA256(
@@ -34,24 +53,26 @@ HMAC-SHA256(
 )
 ```
 
-The secret and the stable institutional principal remain outside the repository and acquisition dataset. The same person must always produce the same digest, even when that person uses a different display name or project-local alias. Two registry entries may never share a person digest.
+The same person must always produce the same digest. Two registry entries may
+not share a person digest.
 
 ## Roles
 
-The supported roles are:
+Supported roles are:
 
-- `freezer`: may seal the method freeze;
-- `independent_verifier`: may attest the method freeze and counts as an independent software-lock approver;
-- `gate_approver`: may approve operational readiness gates; and
-- `software_environment_approver`: may independently approve the software-environment lock.
+- `freezer`;
+- `gate_approver`;
+- `software_environment_approver`; and
+- `independent_verifier`, retained for genuinely independent future review.
 
-Every gate approver must have `gate_approver`. The software-environment approver must additionally have either `independent_verifier` or `software_environment_approver`, and must have a different person digest from the method freezer.
-
-The method freezer and independent verifier must resolve to distinct person digests. Different `operator_id` strings do not establish independence.
+For a one-person v5 registry, one active operator needs at least
+`freezer`, `gate_approver`, and `software_environment_approver`.
+The `independent_verifier` role must not be assigned unless a distinct person
+actually performs that role.
 
 ## Lifecycle
 
-Scaffold the registered template after creating the dataset:
+Create the v5-bound template in a fresh, non-overwriting dataset scaffold:
 
 ```bash
 causal4d protocol readiness scaffold-operator-registry \
@@ -59,13 +80,22 @@ causal4d protocol readiness scaffold-operator-registry \
   /data/causal4d-sloth-multi-action-v1
 ```
 
-Edit only the `operators` array in:
+Edit only the `operators` array in
+`preacquisition/operator_registry.template.json`. A valid one-person entry has
+this shape, with roles sorted canonically:
 
-```text
-preacquisition/operator_registry.template.json
+```json
+{
+  "operator_id": "florianpfaff",
+  "person_identity_sha256": "<64 lowercase hex>",
+  "active": true,
+  "roles": [
+    "freezer",
+    "gate_approver",
+    "software_environment_approver"
+  ]
+}
 ```
-
-Keep the template artifact kind, `status: "template"`, registered protocol and amendment digests, `target_outcomes_used: false`, and all seal fields unchanged. Roles and operators are canonicalized during sealing.
 
 Seal the roster exactly once:
 
@@ -74,63 +104,44 @@ causal4d protocol readiness seal-operator-registry \
   /opt/causal4d-frozen \
   /data/causal4d-sloth-multi-action-v1 \
   /data/causal4d-sloth-multi-action-v1/preacquisition/operator_registry.template.json \
-  --sealed-by freezer.primary
+  --sealed-by florianpfaff
 ```
 
-The seal fails closed when:
-
-- the canonical registry already exists;
-- method-freeze or freeze-attestation evidence already exists;
-- an operational gate has already been approved;
-- confirmatory execution or session manifests already exist;
-- a person digest or operator ID is duplicated;
-- an operator is unknown, inactive, or missing a required role;
-- an unsupported or noncanonical field is present; or
-- target outcomes entered the identity artifact.
-
-The canonical registry is published atomically and cannot be replaced or resealed.
+The seal fails closed if evidence already exists, identities or roles are
+invalid, the template is not bound to v5, or target outcomes entered the
+artifact. An old v4-bound registry must not be edited in place; start a fresh
+v5-bound scaffold and retain the old tree as historical provenance.
 
 ## Governed approvals
 
-Use registered operator IDs, not names:
+Use the same registered operator ID honestly:
 
 ```bash
 causal4d protocol freeze seal \
   /opt/causal4d-frozen \
   /data/causal4d-sloth-multi-action-v1/method_freeze.json \
-  --frozen-by freezer.primary
+  --frozen-by florianpfaff
 
 causal4d protocol freeze attest \
   /data/causal4d-sloth-multi-action-v1/method_freeze.json \
   configs/causal4d/sloth_multi_action_v1.json \
   /opt/causal4d-frozen \
   /data/causal4d-sloth-multi-action-v1/method_freeze_validation.json \
-  --verified-by verifier.independent
+  --verified-by florianpfaff
 
 causal4d protocol readiness seal-gate \
   /opt/causal4d-frozen \
   /data/causal4d-sloth-multi-action-v1 \
   support_registration_passed \
-  --approved-by verifier.independent
+  --approved-by florianpfaff
 ```
 
-The registry must predate every governed approval. A postdated registry, role change, alias collision, unknown identity, or person-level independence failure blocks readiness and claim status.
+The registry must predate every governed approval. Readiness revalidates the
+complete identity chain, all roles, chronology, source hashes, and the explicit
+self-attestation policy at status time.
 
-## Status-time revalidation
+## Legacy v4 boundary
 
-Approval checks are not limited to the commands that create an artifact. Every readiness and claim-status evaluation reopens and validates the complete governed chain:
-
-- method freezer and independent freeze verifier;
-- timebase-calibration approver;
-- contact-registration approver; and
-- every operational readiness-gate approver.
-
-The derived `operator_identity_bindings` prerequisite records the canonical registry digest, the resolved person digests, approval-role bindings, and SHA-256 digests of all governed source artifacts. Missing or template evidence remains valid-but-incomplete. A completed artifact with an unknown, inactive, role-incompatible, postdated, aliased, or non-independent identity fails closed.
-
-This status-time validation prevents manually edited artifacts or legacy free-form identifiers from bypassing the creation-time checks.
-
-## Evidence identity
-
-The registry carries a canonical `artifact_sha256`. Pre-acquisition readiness and real-evidence status include that digest as a prerequisite. Portable readiness identity removes workstation-local paths but retains the registry digest and the governed source digests, so relocating an unchanged dataset preserves evidence identity while changing the roster or any approval artifact does not.
-
-Registry templates, dry runs, or scaffold output never count as physical executions and never change the valid evidence boundary from `0/36 acquired` until genuine acquisition begins.
+Artifacts created under v4 remain immutable and retain their original
+two-person requirement. V5 does not reinterpret them. Only evidence bound to the
+v5 plan and amendment digest may use the single-operator policy.
