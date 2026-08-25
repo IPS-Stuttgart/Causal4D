@@ -14,6 +14,7 @@ from causal4d.operator_identity_integration import (
 )
 from causal4d.operator_registry import load_operator_registry_prerequisite
 from causal4d.preacquisition_gate_validation import _validate_gate_file
+from causal4d.preacquisition_protocol_v5 import governance_allows_single_operator
 from causal4d.preacquisition_readiness_contracts import (
     GATE_EVIDENCE_ARTIFACT_KIND as GATE_EVIDENCE_ARTIFACT_KIND,
     GATE_EVIDENCE_SCHEMA_VERSION as GATE_EVIDENCE_SCHEMA_VERSION,
@@ -173,13 +174,21 @@ def evaluate_preacquisition_readiness(
         protocol, v4, root
     )
     prerequisites["operator_registry"] = operator_registry_result
-    prerequisites["operator_identity_bindings"] = (
-        validate_preacquisition_identity_bindings(
-            root,
-            operator_registry,
-            preacquisition=v4,
+    if governance_allows_single_operator(v4):
+        prerequisites["operator_identity_bindings"] = (
+            validate_preacquisition_identity_bindings(
+                root,
+                operator_registry,
+                preacquisition=v4,
+            )
         )
-    )
+    else:
+        prerequisites["operator_identity_bindings"] = (
+            validate_preacquisition_identity_bindings(
+                root,
+                operator_registry,
+            )
+        )
     gate_results = _identity_bound_gate_results(
         protocol,
         v2,
