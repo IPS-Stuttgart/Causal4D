@@ -120,21 +120,41 @@ def _load_v4(repository: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     return protocol, v4
 
 
-def _source_operator(repository: Path, source_dataset: Path) -> tuple[dict[str, Any], str]:
+def _source_operator(
+    repository: Path, source_dataset: Path
+) -> tuple[dict[str, Any], str]:
     protocol, v4 = _load_v4(repository)
     registry_path = source_dataset / OPERATOR_REGISTRY_PATH
     registry = _read_json_mapping(registry_path, name="historical v4 operator registry")
     summary = validate_operator_registry(protocol, v4, registry)
-    _require(summary.get("independent_verifier_available") is False, "source registry claims an independent verifier")
+    _require(
+        summary.get("independent_verifier_available") is False,
+        "source registry claims an independent verifier",
+    )
     operators = registry.get("operators")
-    _require(isinstance(operators, list) and len(operators) == 1, "source registry must contain exactly one person")
+    _require(
+        isinstance(operators, list) and len(operators) == 1,
+        "source registry must contain exactly one person",
+    )
     operator = dict(operators[0])
-    _require(operator.get("operator_id") == OPERATOR_ID, "source registry operator is not florianpfaff")
+    _require(
+        operator.get("operator_id") == OPERATOR_ID,
+        "source registry operator is not florianpfaff",
+    )
     _require(operator.get("active") is True, "source registry operator is inactive")
     roles = tuple(operator.get("roles", ()))
-    _require(roles == OPERATOR_ROLES, "source registry roles differ from the v5 one-person lock")
-    _require(ROLE_INDEPENDENT_VERIFIER not in roles, "source registry assigns a false independent role")
-    _require(registry.get("target_outcomes_used") is False, "target outcomes entered source identity evidence")
+    _require(
+        roles == OPERATOR_ROLES,
+        "source registry roles differ from the v5 one-person lock",
+    )
+    _require(
+        ROLE_INDEPENDENT_VERIFIER not in roles,
+        "source registry assigns a false independent role",
+    )
+    _require(
+        registry.get("target_outcomes_used") is False,
+        "target outcomes entered source identity evidence",
+    )
     for relative in _GOVERNED_SOURCE_PATHS:
         _require(
             not os.path.lexists(source_dataset / relative),
@@ -187,18 +207,31 @@ def _verify_target(
     source_registry_artifact_sha256: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     protocol, _, _, v5 = load_registered_preacquisition_chain(repository)
-    _require(load_protocol(target_dataset / "protocol.json") == protocol, "target protocol changed")
+    _require(
+        load_protocol(target_dataset / "protocol.json") == protocol,
+        "target protocol changed",
+    )
     registry_path = target_dataset / OPERATOR_REGISTRY_PATH
     registry = _read_json_mapping(registry_path, name="v5 operator registry")
     summary = validate_operator_registry(protocol, v5, registry)
     operators = registry.get("operators")
-    _require(isinstance(operators, list) and operators == [dict(source_operator)], "v5 registry changed the registered person")
-    _require(summary.get("independent_verifier_available") is False, "v5 registry claims independent verification")
+    _require(
+        isinstance(operators, list) and operators == [dict(source_operator)],
+        "v5 registry changed the registered person",
+    )
+    _require(
+        summary.get("independent_verifier_available") is False,
+        "v5 registry claims independent verification",
+    )
     receipt_path = target_dataset / RECEIPT_PATH
     receipt = _read_json_mapping(receipt_path, name="v5 bootstrap receipt")
-    _require(receipt.get("artifact_kind") == RECEIPT_ARTIFACT_KIND, "unexpected v5 bootstrap receipt")
     _require(
-        receipt.get("artifact_sha256") == _canonical_sha256(receipt, field="artifact_sha256"),
+        receipt.get("artifact_kind") == RECEIPT_ARTIFACT_KIND,
+        "unexpected v5 bootstrap receipt",
+    )
+    _require(
+        receipt.get("artifact_sha256")
+        == _canonical_sha256(receipt, field="artifact_sha256"),
         "v5 bootstrap receipt digest mismatch",
     )
     file_sha256, file_bytes = _sha256_file(registry_path)
@@ -217,7 +250,10 @@ def _verify_target(
         "physical_evidence_increment": 0,
     }
     for field, expected_value in expected.items():
-        _require(receipt.get(field) == expected_value, f"v5 bootstrap receipt {field} mismatch")
+        _require(
+            receipt.get(field) == expected_value,
+            f"v5 bootstrap receipt {field} mismatch",
+        )
     decision = build_preacquisition_operator_next_action(
         repository,
         target_dataset,
@@ -225,10 +261,22 @@ def _verify_target(
     )
     action = decision.get("action")
     _require(isinstance(action, Mapping), "v5 next action is missing")
-    _require(action.get("action_id") == "complete_object_registration", "v5 bootstrap did not advance to object registration")
-    _require(action.get("operator_role") == "self_attesting_operator", "v5 next action has the wrong operator role")
-    _require(action.get("automatable") is False, "object registration unexpectedly became automatable")
-    _require(action.get("target_outcomes_permitted") is False, "v5 next action permits target outcomes")
+    _require(
+        action.get("action_id") == "complete_object_registration",
+        "v5 bootstrap did not advance to object registration",
+    )
+    _require(
+        action.get("operator_role") == "self_attesting_operator",
+        "v5 next action has the wrong operator role",
+    )
+    _require(
+        action.get("automatable") is False,
+        "object registration unexpectedly became automatable",
+    )
+    _require(
+        action.get("target_outcomes_permitted") is False,
+        "v5 next action permits target outcomes",
+    )
     return receipt, dict(action)
 
 
@@ -242,17 +290,33 @@ def bootstrap_single_operator_v5(
     repository = repository_root.resolve(strict=True)
     source = source_dataset_root.resolve(strict=True)
     target = target_dataset_root.absolute()
-    _require(repository.is_dir() and source.is_dir(), "repository and source dataset must be directories")
-    _require(not _contains_symlink_component(repository), "repository contains a symlink component")
-    _require(not _contains_symlink_component(source), "source dataset contains a symlink component")
-    _require(not _contains_symlink_component(target), "target dataset contains a symlink component")
-    source_operator, source_registry_artifact_sha256 = _source_operator(repository, source)
+    _require(
+        repository.is_dir() and source.is_dir(),
+        "repository and source dataset must be directories",
+    )
+    _require(
+        not _contains_symlink_component(repository),
+        "repository contains a symlink component",
+    )
+    _require(
+        not _contains_symlink_component(source),
+        "source dataset contains a symlink component",
+    )
+    _require(
+        not _contains_symlink_component(target),
+        "target dataset contains a symlink component",
+    )
+    source_operator, source_registry_artifact_sha256 = _source_operator(
+        repository, source
+    )
 
     created = False
     if not target.exists():
         target.parent.mkdir(parents=True, exist_ok=True)
         staging = target.parent / f".{target.name}.bootstrap-v5.tmp"
-        _require(not os.path.lexists(staging), "v5 bootstrap staging path already exists")
+        _require(
+            not os.path.lexists(staging), "v5 bootstrap staging path already exists"
+        )
         try:
             protocol, _, _, v5 = load_registered_preacquisition_chain(repository)
             scaffold_dataset(protocol, staging)
@@ -260,7 +324,9 @@ def bootstrap_single_operator_v5(
             scaffold_preacquisition_readiness(repository, staging)
             scaffold_operator_registry(repository, staging)
             template_path = staging / OPERATOR_REGISTRY_TEMPLATE_PATH
-            template = _read_json_mapping(template_path, name="v5 operator registry template")
+            template = _read_json_mapping(
+                template_path, name="v5 operator registry template"
+            )
             template["operators"] = [dict(source_operator)]
             atomic_write_json(template_path, template, overwrite=True)
             timestamp = sealed_at_utc or datetime.now(timezone.utc).isoformat()
@@ -305,9 +371,7 @@ def bootstrap_single_operator_v5(
         "target_preacquisition_amendment_sha256": receipt[
             "target_preacquisition_amendment_sha256"
         ],
-        "target_registry_artifact_sha256": receipt[
-            "target_registry_artifact_sha256"
-        ],
+        "target_registry_artifact_sha256": receipt["target_registry_artifact_sha256"],
         "bootstrap_receipt_artifact_sha256": receipt["artifact_sha256"],
         "operator_ids": [OPERATOR_ID],
         "operator_roles": list(OPERATOR_ROLES),
@@ -316,9 +380,7 @@ def bootstrap_single_operator_v5(
             "action_id": action["action_id"],
             "operator_role": action["operator_role"],
             "automatable": action["automatable"],
-            "physical_acquisition_required": action[
-                "physical_acquisition_required"
-            ],
+            "physical_acquisition_required": action["physical_acquisition_required"],
             "target_outcomes_permitted": action["target_outcomes_permitted"],
         },
         "target_outcomes_used": False,
