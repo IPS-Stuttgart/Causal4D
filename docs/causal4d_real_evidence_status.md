@@ -1,7 +1,9 @@
 # Real-Evidence Status and Claim-Readiness Gate
 
 The same-object multi-action protocol contains 18 same-grasp sessions and 36
-preregistered executions. Scaffolded files are acquisition templates, not
+preregistered executions. Active v5 governance permits one registered operator
+to perform and self-attest pre-acquisition checks; no independent attestation is
+claimed. Scaffolded files are acquisition templates, not
 evidence. The version-2 status contract therefore separates acquisition
 progress, evidence completeness, statistical analysability, pre-acquisition
 chronology, and claim readiness.
@@ -11,26 +13,25 @@ chronology, and claim readiness.
 A claim-ready dataset contains the locked protocol and acquisition schedule plus:
 
 - `object_registration.json` and every hashed canonical contact-node set;
-- approved schema-3 `contact_registration.json`, including multiview overlays,
-  rejected attachment candidates, independent reviews, and source checksums that
-  bind the simple registration and each canonical node set;
+- approved schema-4 `contact_registration.json`, including multiview overlays,
+  rejected attachment candidates, two chronological self-review passes, and
+  source checksums that bind the simple registration and each canonical node set;
 - `slip_pilot.json` with the preregistered bounded-slip decision;
 - approved `timebase_calibration.json` for the exact timestamped-stream set and
   one common `clock_domain_id`;
 - sealed `method_freeze.json`, verified against a clean checkout at the frozen
   Causal4D commit and its Bayesian-PhysTwin pin;
-- independent `method_freeze_validation.json`, signed by someone other than the
+- self-attested `method_freeze_validation.json`, signed by the registered
   freezer and bound to the exact freeze-file SHA-256;
 - one completed `sessions/<session-id>/session.json` for each of the 18 sessions;
 - one completed and hash-verified execution manifest for each of the 36 locked
   executions.
 
 The calibrated and approved timebase, physical contact approval, method freeze,
-and independent freeze attestation must not postdate the first validated
+and registered freeze self-attestation must not postdate the first validated
 execution.
 
-Create the independent freeze attestation from a second operator account or
-review step after sealing:
+Create the v5 self-attestation after sealing:
 
 ```bash
 causal4d protocol freeze attest \
@@ -38,21 +39,21 @@ causal4d protocol freeze attest \
   configs/causal4d/sloth_multi_action_v1.json \
   /opt/causal4d-frozen \
   /data/causal4d-sloth-multi-action-v1/method_freeze_validation.json \
-  --verified-by "<independent-verifier>"
+  --verified-by "florianpfaff"
 ```
 
 The command revalidates the clean checkout, every locked file hash, and the
-Bayesian-PhysTwin pin before writing the attestation. It rejects a verifier ID
-that matches the original freezer.
+Bayesian-PhysTwin pin before writing the attestation. Under v5 it requires the
+attester to resolve to the same registered person as the freezer and records
+that independence is not claimed.
 
-The physical registration uses `PhysicalContactRegistration` schema 3 as the
+The physical registration uses `PhysicalContactRegistration` schema 4 as the
 authoritative contact record. Its `source_checksums` mapping must include
 `object_registration.json` and `contact_node_set:<region-id>` entries. The
 simpler registration remains as a compact acquisition index and is checked
-against the authoritative artifact. Every region must have case-insensitively
-distinct independent reviewer identities, every review and approval timestamp
-must be valid UTC, and the registration approval must not predate any
-independent review.
+against the authoritative artifact. Every region must contain two strictly
+chronological review passes by the registered operator; all review and approval
+timestamps must be valid UTC, and approval must not predate either pass.
 
 ## Scaffold
 
@@ -128,7 +129,7 @@ uses separate decisions:
   fit, calibration, and target execution and at least one same-grasp pair remains;
 - `full_registered_power`: no execution was excluded;
 - `preacquisition_chronology`: the calibrated and approved timebase, contact
-  approval, method freeze, and independent attestation do not postdate the
+  approval, method freeze, and registered self-attestation do not postdate the
   earliest validated execution; before any execution validates, the report has
   no earliest execution timestamp;
 - `claim_ready`: the evidence tree is complete, hash verified, and passes the
@@ -160,9 +161,9 @@ The command returns:
 - `2` when an input or locked contract cannot be interpreted;
 - `3` when `--require-complete` is requested but any evidence blocker remains.
 
-The gate rejects timebase approval before calibration, duplicate contact
-reviewers, contact approval before an independent review, and any timestamped
-method prerequisite after the first validated execution.
+The gate rejects timebase approval before calibration, malformed or
+nonchronological contact self-review passes, contact approval before review, and
+any timestamped method prerequisite after the first validated execution.
 
 `validate-dataset` applies the same version-2 contract. Without
 `--skip-file-hashes`, it fails unless the complete evidence tree is claim-ready.

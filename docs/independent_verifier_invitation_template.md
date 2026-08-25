@@ -1,5 +1,7 @@
 # Independent-verifier invitation template
 
+> **V5 status:** This invitation is optional under active v5 and must not be presented as a readiness requirement.
+
 > Copy this text into a private message to a prospective verifier. Replace only
 > the bracketed contact fields. Do not commit the completed message, the
 > recipient's identity, or private principal material to the repository or

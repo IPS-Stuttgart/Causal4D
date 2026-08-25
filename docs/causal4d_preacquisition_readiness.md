@@ -1,11 +1,12 @@
 # Pre-acquisition readiness attestation
 
-The registered v4 amendment defines the order of work before the 36-run
-confirmatory experiment, but its Boolean collection gate is intentionally frozen
-at `false`. It is a preregistration artifact, not a mutable checklist.
+The registered v5 amendment defines the order of work before the 36-run
+confirmatory experiment and supersedes v4 only for human-separation governance.
+Its Boolean collection gate is intentionally frozen at `false`; it is a
+preregistration artifact, not a mutable checklist.
 
 `causal4d protocol readiness` adds a separate, evidence-derived decision layer.
-It never rewrites the v2, v3, or v4 protocol files. The first confirmatory
+It never rewrites the v2, v3, v4, or v5 protocol files. The first confirmatory
 execution is permitted only when every prerequisite and operational gate below
 validates from immutable, checksummed evidence.
 
@@ -39,7 +40,7 @@ preacquisition/
 └── source_panel/executions/<execution-id>/manifest.template.json
 ```
 
-Each gate record binds the locked protocol and v4 amendment, its underlying
+Each gate record binds the locked protocol and active v5 amendment, its underlying
 files, completion and approval timestamps, the no-target-outcomes boundary, and
 a canonical SHA-256 digest. The scaffold also writes one source-panel manifest
 template per registered execution. Operators complete a separate staging copy;
@@ -126,7 +127,7 @@ The dry run may not reuse a confirmatory execution ID or use target outcomes.
 
 The software-environment gate is sealed after the method freeze. It binds:
 
-- the exact method-freeze and independent-attestation file hashes;
+- the exact method-freeze and registered self-attestation file hashes;
 - the frozen Causal4D and Bayesian-PhysTwin commits;
 - package versions and SHA-256 descriptors for the installed wheel or equivalent
   immutable distribution artifact;
@@ -171,15 +172,16 @@ causal4d protocol readiness seal-gate \
   --approved-by "<reviewer>"
 ```
 
-Seal the software environment after `method_freeze.json` and its independent
-attestation validate:
+Under v5, seal the software environment after `method_freeze.json` and its
+registered self-attestation validate. The same registered operator may approve
+this gate, and no independent attestation is claimed:
 
 ```bash
 causal4d protocol readiness seal-gate \
   /opt/causal4d-frozen \
   /data/causal4d-sloth-multi-action-v1 \
   software_environment_locked \
-  --approved-by "<independent-verifier>"
+  --approved-by "florianpfaff"
 ```
 
 Finally, require a hash-verified ready decision before execution 1:
