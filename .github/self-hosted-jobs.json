@@ -40,6 +40,21 @@
       "secrets_allowed": false
     },
     {
+      "workflow": "bootstrap-single-operator-v5-self-hosted.yml",
+      "job": "bootstrap",
+      "authorization_model": "maintainer-issue-main",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi",
+        "data-causal4d-physical-v1"
+      ],
+      "purpose": "Create or revalidate the fresh v5 single-operator acquisition scaffold",
+      "dataset_access": "registered-local-preacquisition-v5-scaffold-bootstrap",
+      "secrets_allowed": false
+    },
+    {
       "workflow": "contact-posterior-concentration.yml",
       "job": "evaluate",
       "authorization_model": "main-only",
