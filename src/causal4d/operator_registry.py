@@ -545,8 +545,7 @@ def validate_attestation_operator_identities(
     if allow_self_attestation:
         _require(
             verifier["operator_id"] == freezer["operator_id"]
-            and verifier["person_identity_sha256"]
-            == freezer["person_identity_sha256"],
+            and verifier["person_identity_sha256"] == freezer["person_identity_sha256"],
             "single-operator method freeze must be self-attested by its freezer",
         )
     else:
