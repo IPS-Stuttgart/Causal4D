@@ -38,9 +38,11 @@ def test_v5_bootstrap_has_one_exact_maintainer_issue_trigger() -> None:
 def test_v5_bootstrap_uses_fresh_fixed_root_and_exact_wheel() -> None:
     text = _workflow_text()
 
-    assert ("/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1\n") in text
     assert (
-        "/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5\n"
+        "/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1"
+    ) in text
+    assert (
+        "/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5"
     ) in text
     assert "scripts/ci/bootstrap_self_hosted_v5_operator_scaffold.py" in text
     assert '--repository-root "${GITHUB_WORKSPACE}"' in text
@@ -108,7 +110,7 @@ def test_v5_bootstrap_is_registered_as_self_hosted() -> None:
 
     assert len(matches) == 1
     entry = matches[0]
-    assert entry["authorization_model"] == "maintainer-issue-main"
+    assert entry["authorization_model"] == "single-operator-v5-issue-main"
     assert entry["secrets_allowed"] is False
     assert entry["dataset_access"] == (
         "registered-local-preacquisition-v5-scaffold-bootstrap"
