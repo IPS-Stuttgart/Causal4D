@@ -4,7 +4,7 @@ Status: **locked before any physical execution**
 
 Plan ID: `causal4d-sloth-preacquisition-v5-single-operator`
 
-Canonical amendment SHA-256: `680371b7a05f72ee13270d509275b396f9d0de9cff19b810af23034f260dec31`
+Canonical amendment SHA-256: `c0128865c7b527304dc7a6177d7f935d753bfdbc1e4469243f1acaeae6ce8e93`
 
 ## Decision
 
