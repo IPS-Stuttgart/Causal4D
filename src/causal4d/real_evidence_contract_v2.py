@@ -132,13 +132,10 @@ def build_real_evidence_status(
     if (
         repository_root is not None
         and (
-            Path(repository_root)
-            / "configs/causal4d/sloth_preacquisition_v5.json"
+            Path(repository_root) / "configs/causal4d/sloth_preacquisition_v5.json"
         ).is_file()
     ):
-        _, _, _, preacquisition = load_registered_preacquisition_chain(
-            repository_root
-        )
+        _, _, _, preacquisition = load_registered_preacquisition_chain(repository_root)
         require_single_operator_review = governance_allows_single_operator(
             preacquisition
         )
