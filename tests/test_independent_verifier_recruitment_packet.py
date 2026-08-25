@@ -163,9 +163,7 @@ def test_recruitment_documents_preserve_the_governance_boundary() -> None:
         assert not path.is_symlink()
 
     invitation = _normalized("docs/independent_verifier_invitation_template.md")
-    declaration = _normalized(
-        "docs/independent_verifier_self_declaration_template.md"
-    )
+    declaration = _normalized("docs/independent_verifier_self_declaration_template.md")
     onboarding = _normalized("docs/independent_verifier_onboarding.md")
 
     for marker in (
