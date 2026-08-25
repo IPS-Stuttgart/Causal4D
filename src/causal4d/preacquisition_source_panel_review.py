@@ -393,10 +393,11 @@ def validate_source_panel_review_receipt(
         "publisher_operator_id": publisher["operator_id"],
         "publisher_person_identity_sha256": publisher["person_identity_sha256"],
         "independent_people": (
-            reviewer["person_identity_sha256"]
-            != publisher["person_identity_sha256"]
+            reviewer["person_identity_sha256"] != publisher["person_identity_sha256"]
         ),
-        "governance_mode": preacquisition["governance"]["mode"],
+        "governance_mode": preacquisition.get("governance", {}).get(
+            "mode", "independent_two_person_v4"
+        ),
         "independent_preacquisition_attestation_claimed": not single_operator,
         "preflight_evidence_sha256": preflight["evidence_sha256"],
         "target_outcomes_used": False,
