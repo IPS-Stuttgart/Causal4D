@@ -125,15 +125,22 @@ def _identity_bound_gate_results(
                 result["error"] = "operator registry is unavailable"
             else:
                 try:
-                    result.update(
-                        validate_gate_file_operator_identity(
+                    if governance_allows_single_operator(v4):
+                        identity = validate_gate_file_operator_identity(
                             gate_id,
                             path,
                             registry,
                             prerequisites,
                             preacquisition=v4,
                         )
-                    )
+                    else:
+                        identity = validate_gate_file_operator_identity(
+                            gate_id,
+                            path,
+                            registry,
+                            prerequisites,
+                        )
+                    result.update(identity)
                 except (OSError, KeyError, TypeError, ValueError) as error:
                     message = str(error).strip()
                     result["valid"] = False
@@ -383,9 +390,7 @@ def evaluate_preacquisition_readiness(
         "preacquisition_plan_id": v4["plan_id"],
         "preacquisition_amendment_sha256": v4["amendment_sha256"],
         "governance": {
-            "mode": v4.get("governance", {}).get(
-                "mode", "independent_two_person_v4"
-            ),
+            "mode": v4.get("governance", {}).get("mode", "independent_two_person_v4"),
             "single_operator_allowed": v4.get("governance", {}).get(
                 "single_operator_allowed", False
             ),
