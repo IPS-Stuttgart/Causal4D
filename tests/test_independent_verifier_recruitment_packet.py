@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from causal4d.preacquisition_next_action import (
     derive_preacquisition_next_action,
@@ -35,7 +36,7 @@ def _gate() -> dict[str, object]:
     }
 
 
-def _readiness() -> dict[str, object]:
+def _readiness() -> dict[str, Any]:
     prerequisites = {
         name: _prerequisite()
         for name in (
@@ -89,7 +90,7 @@ def _readiness() -> dict[str, object]:
     }
 
 
-def _source_panel() -> dict[str, object]:
+def _source_panel() -> dict[str, Any]:
     return {
         "protocol_id": "protocol",
         "protocol_design_sha256": "a" * 64,
@@ -106,13 +107,17 @@ def _source_panel() -> dict[str, object]:
     }
 
 
-def _decision(repository: str, dataset: str) -> dict[str, object]:
+def _decision(repository: str, dataset: str) -> dict[str, Any]:
     return derive_preacquisition_next_action(
         _readiness(),
         _source_panel(),
         repository_root=repository,
         dataset_root=dataset,
     )
+
+
+def _normalized(relative: str) -> str:
+    return " ".join((ROOT / relative).read_text(encoding="utf-8").split())
 
 
 def test_verifier_stop_packet_surfaces_only_blank_recruitment_materials() -> None:
@@ -157,15 +162,11 @@ def test_recruitment_documents_preserve_the_governance_boundary() -> None:
         assert path.is_file()
         assert not path.is_symlink()
 
-    invitation = (
-        ROOT / "docs/independent_verifier_invitation_template.md"
-    ).read_text(encoding="utf-8")
-    declaration = (
-        ROOT / "docs/independent_verifier_self_declaration_template.md"
-    ).read_text(encoding="utf-8")
-    onboarding = (ROOT / "docs/independent_verifier_onboarding.md").read_text(
-        encoding="utf-8"
+    invitation = _normalized("docs/independent_verifier_invitation_template.md")
+    declaration = _normalized(
+        "docs/independent_verifier_self_declaration_template.md"
     )
+    onboarding = _normalized("docs/independent_verifier_onboarding.md")
 
     for marker in (
         "current evidence state is `0/36` acquired",
@@ -176,7 +177,10 @@ def test_recruitment_documents_preserve_the_governance_boundary() -> None:
         assert marker in invitation
 
     for marker in (
-        "This is a private onboarding aid, not a repository artifact and not an attestation",
+        (
+            "This is a private onboarding aid, not a repository artifact and "
+            "not an attestation"
+        ),
         "I am a real person",
         "I am not FlorianPfaff",
         "did not use confirmatory target outcomes",
