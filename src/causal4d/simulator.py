@@ -13,6 +13,33 @@ from causal4d.immutable_array import readonly_array
 PARAMETER_NAMES = ("stiffness", "damping", "contact_gain")
 
 
+def _require_nonempty_string(value: object, *, name: str) -> None:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{name} must be a non-empty string")
+
+
+def _require_finite_scalar(value: object, *, name: str) -> float:
+    if isinstance(value, (bool, np.bool_)):
+        raise ValueError(f"{name} must be a finite scalar")
+    try:
+        scalar = float(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{name} must be a finite scalar") from error
+    if not np.isfinite(scalar):
+        raise ValueError(f"{name} must be finite")
+    return scalar
+
+
+def _require_integer(value: object, *, name: str, minimum: int) -> int:
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)):
+        raise ValueError(f"{name} must be an integer")
+    integer = int(value)
+    if integer < minimum:
+        qualifier = "positive" if minimum == 1 else "non-negative"
+        raise ValueError(f"{name} must be {qualifier}")
+    return integer
+
+
 @dataclass(frozen=True)
 class PhysicalParameters:
     """Unknown object and contact parameters exposed to inference."""
@@ -20,6 +47,16 @@ class PhysicalParameters:
     stiffness: float
     damping: float
     contact_gain: float
+
+    def __post_init__(self) -> None:
+        values = {
+            "stiffness": self.stiffness,
+            "damping": self.damping,
+            "contact_gain": self.contact_gain,
+        }
+        for name, value in values.items():
+            if _require_finite_scalar(value, name=name) <= 0.0:
+                raise ValueError(f"{name} must be positive")
 
     def as_array(self) -> np.ndarray:
         return np.asarray(
@@ -50,27 +87,60 @@ class GraphObject:
     sensor_nodes: tuple[int, ...]
 
     def __post_init__(self) -> None:
+        _require_nonempty_string(self.name, name="name")
         positions = np.asarray(self.rest_positions, dtype=float)
         if positions.ndim != 2 or positions.shape[1] != 2:
             raise ValueError("rest_positions must have shape (node, 2)")
         if not np.all(np.isfinite(positions)):
             raise ValueError("rest_positions must be finite")
-        if self.mass <= 0.0:
+        if _require_finite_scalar(self.mass, name="mass") <= 0.0:
             raise ValueError("mass must be positive")
-        if self.support_stiffness < 0.0:
+        if (
+            _require_finite_scalar(
+                self.support_stiffness,
+                name="support_stiffness",
+            )
+            < 0.0
+        ):
             raise ValueError("support_stiffness must be non-negative")
+        if not isinstance(self.true_parameters, PhysicalParameters):
+            raise ValueError("true_parameters must be PhysicalParameters")
         node_count = positions.shape[0]
         if not self.edges:
             raise ValueError("at least one graph edge is required")
-        for first, second in self.edges:
+        seen_edges: set[tuple[int, int]] = set()
+        for edge in self.edges:
+            if len(edge) != 2:
+                raise ValueError("each graph edge must contain two node indices")
+            first, second = edge
+            if any(
+                isinstance(node, (bool, np.bool_))
+                or not isinstance(node, (int, np.integer))
+                for node in edge
+            ):
+                raise ValueError("edge node indices must be integers")
+            first = int(first)
+            second = int(second)
             if first == second or not (
                 0 <= first < node_count and 0 <= second < node_count
             ):
                 raise ValueError("edges must connect distinct valid nodes")
-        if not self.sensor_nodes or any(
-            node < 0 or node >= node_count for node in self.sensor_nodes
-        ):
+            canonical_edge = (min(first, second), max(first, second))
+            if canonical_edge in seen_edges:
+                raise ValueError("edges must not contain duplicates")
+            seen_edges.add(canonical_edge)
+        if not self.sensor_nodes:
             raise ValueError("sensor_nodes must contain valid node indices")
+        if any(
+            isinstance(node, (bool, np.bool_))
+            or not isinstance(node, (int, np.integer))
+            for node in self.sensor_nodes
+        ):
+            raise ValueError("sensor node indices must be integers")
+        if any(node < 0 or node >= node_count for node in self.sensor_nodes):
+            raise ValueError("sensor_nodes must contain valid node indices")
+        if len(set(map(int, self.sensor_nodes))) != len(self.sensor_nodes):
+            raise ValueError("sensor_nodes must not contain duplicates")
         object.__setattr__(
             self, "rest_positions", readonly_array(positions, dtype=float)
         )
@@ -109,9 +179,21 @@ class Action:
     commanded_forces: np.ndarray
 
     def __post_init__(self) -> None:
+        _require_nonempty_string(self.action_id, name="action_id")
         forces = np.asarray(self.commanded_forces, dtype=float)
         if self.split not in {"train", "validation", "test"}:
             raise ValueError("split must be train, validation, or test")
+        if not self.contact_nodes:
+            raise ValueError("contact_nodes must be non-empty")
+        if any(
+            isinstance(node, (bool, np.bool_))
+            or not isinstance(node, (int, np.integer))
+            or node < 0
+            for node in self.contact_nodes
+        ):
+            raise ValueError("contact_nodes must contain non-negative integers")
+        if len(set(map(int, self.contact_nodes))) != len(self.contact_nodes):
+            raise ValueError("contact_nodes must not contain duplicates")
         if forces.ndim != 3 or forces.shape[1:] != (len(self.contact_nodes), 2):
             raise ValueError(
                 "commanded_forces must have shape (transition, contact, 2)"
@@ -148,15 +230,39 @@ class WorldCondition:
     nonlinear_stiffening: float = 0.0
 
     def __post_init__(self) -> None:
-        if self.contact_gain_multiplier <= 0.0:
+        _require_nonempty_string(self.name, name="name")
+        if (
+            _require_finite_scalar(
+                self.contact_gain_multiplier,
+                name="contact_gain_multiplier",
+            )
+            <= 0.0
+        ):
             raise ValueError("contact_gain_multiplier must be positive")
-        if self.contact_delay_steps < 0:
-            raise ValueError("contact_delay_steps must be non-negative")
-        if not 0.0 <= self.contact_spread < 1.0:
+        _require_integer(
+            self.contact_delay_steps,
+            name="contact_delay_steps",
+            minimum=0,
+        )
+        if not isinstance(self.shift_contact_nodes, (bool, np.bool_)):
+            raise ValueError("shift_contact_nodes must be boolean")
+        contact_spread = _require_finite_scalar(
+            self.contact_spread,
+            name="contact_spread",
+        )
+        if not 0.0 <= contact_spread < 1.0:
             raise ValueError("contact_spread must be in [0, 1)")
-        if not np.isfinite(self.control_rotation_radians):
-            raise ValueError("control_rotation_radians must be finite")
-        if self.nonlinear_stiffening < 0.0:
+        _require_finite_scalar(
+            self.control_rotation_radians,
+            name="control_rotation_radians",
+        )
+        if (
+            _require_finite_scalar(
+                self.nonlinear_stiffening,
+                name="nonlinear_stiffening",
+            )
+            < 0.0
+        ):
             raise ValueError("nonlinear_stiffening must be non-negative")
 
     def plan_model(self) -> WorldCondition:
@@ -188,11 +294,22 @@ class SimulatorConfig:
     velocity_drag: float = 0.18
 
     def __post_init__(self) -> None:
-        if self.frame_count < 4:
+        frame_count = _require_integer(
+            self.frame_count,
+            name="frame_count",
+            minimum=1,
+        )
+        if frame_count < 4:
             raise ValueError("frame_count must be at least four")
-        if self.dt <= 0.0:
+        if _require_finite_scalar(self.dt, name="dt") <= 0.0:
             raise ValueError("dt must be positive")
-        if self.velocity_drag < 0.0:
+        if (
+            _require_finite_scalar(
+                self.velocity_drag,
+                name="velocity_drag",
+            )
+            < 0.0
+        ):
             raise ValueError("velocity_drag must be non-negative")
 
 
@@ -354,6 +471,10 @@ def simulate_particles(
     particles = np.asarray(particles, dtype=float)
     if particles.ndim != 2 or particles.shape[1] != len(PARAMETER_NAMES):
         raise ValueError("particles must have shape (particle, 3)")
+    if particles.shape[0] == 0:
+        raise ValueError("particles must be non-empty")
+    if not np.all(np.isfinite(particles)):
+        raise ValueError("particles must be finite")
     return np.stack(
         [
             simulate(
