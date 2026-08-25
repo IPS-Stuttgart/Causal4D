@@ -1,5 +1,7 @@
 # Single-operator registry correction
 
+> **V5 status:** This records the superseded v4 governance blocker. Active v5 permits disclosed single-operator self-attestation and does not require a second person.
+
 The workstation2 operator registry created in August 2026 contained unsupported
 person assignments. Those assignments were not provided or authorized by the
 project owner and must not be used as evidence of participation, consent,
