@@ -117,7 +117,8 @@ def _decision(repository: str, dataset: str) -> dict[str, Any]:
 
 
 def _normalized(relative: str) -> str:
-    return " ".join((ROOT / relative).read_text(encoding="utf-8").split())
+    text = (ROOT / relative).read_text(encoding="utf-8").replace("\n> ", "\n")
+    return " ".join(text.split())
 
 
 def test_verifier_stop_packet_surfaces_only_blank_recruitment_materials() -> None:
