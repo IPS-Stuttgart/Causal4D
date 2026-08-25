@@ -180,6 +180,43 @@ def _maintainer_issue_main_errors(workflow_text: str, block: str) -> list[str]:
     return errors
 
 
+def _single_operator_v5_issue_main_errors(
+    workflow_text: str,
+    block: str,
+) -> list[str]:
+    errors = _common_self_hosted_errors(block)
+    required = {
+        "github.event_name == 'issues'": "missing issue-event authorization",
+        "github.event.action == 'opened'": "missing issue-open authorization",
+        (
+            "github.event.issue.user.login == 'FlorianPfaff'"
+        ): "missing exact maintainer-login authorization",
+        (
+            "github.event.issue.user.id == 6773539"
+        ): "missing exact maintainer-ID authorization",
+        (
+            "'[self-hosted] bootstrap Causal4D v5 operator scaffold'"
+        ): "missing exact trigger-title authorization",
+    }
+    for fragment, message in required.items():
+        if fragment not in block:
+            errors.append(message)
+    if block.count("github.event.issue.title") != 1:
+        errors.append("issue title must be used only by the exact guard")
+    for forbidden in (
+        "github.event.issue.body",
+        "github.event.issue.labels",
+        "github.event.comment",
+    ):
+        if forbidden in block:
+            errors.append(
+                f"untrusted issue payload reaches self-hosted job: {forbidden}"
+            )
+    if not _issue_only_workflow(workflow_text):
+        errors.append("workflow is not issue-only")
+    return errors
+
+
 def _authorization_errors(
     authorization_model: str,
     workflow_text: str,
@@ -189,6 +226,8 @@ def _authorization_errors(
         return _main_only_errors(workflow_text, block)
     if authorization_model == "maintainer-issue-main":
         return _maintainer_issue_main_errors(workflow_text, block)
+    if authorization_model == "single-operator-v5-issue-main":
+        return _single_operator_v5_issue_main_errors(workflow_text, block)
     return [f"unsupported authorization model: {authorization_model}"]
 
 
@@ -198,6 +237,7 @@ def test_self_hosted_job_registry_is_complete_and_unique() -> None:
     assert set(payload["authorization_models"]) == {
         "main-only",
         "maintainer-issue-main",
+        "single-operator-v5-issue-main",
     }
 
     entries = payload["jobs"]

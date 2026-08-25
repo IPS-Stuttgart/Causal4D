@@ -16,6 +16,10 @@ ISSUE_COMMAND_JOBS = {
         "execute",
         "automatable-preacquisition-${{ github.sha }}",
     ),
+    "bootstrap-single-operator-v5-self-hosted.yml": (
+        "bootstrap",
+        "causal4d-single-operator-v5-bootstrap-${{ github.sha }}",
+    ),
     "controlled-execution-campaign.yml": (
         "dispatch",
         "controlled-execution-campaign-${{ github.sha }}",
