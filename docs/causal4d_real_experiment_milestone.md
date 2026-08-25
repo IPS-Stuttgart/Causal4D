@@ -32,8 +32,8 @@ The following rules apply to the primary real-experiment analysis:
   mechanism may enter the primary comparison before the 36-execution result is
   reported.
 - The exact Causal4D commit, clean-worktree state, protocol, acquisition
-  schedule, exact locked Bayesian-PhysTwin revision, final v4 pre-acquisition
-  amendment, mechanism-gate control evidence, scope document, and protocol
+  schedule, exact locked Bayesian-PhysTwin revision, final v5 pre-acquisition
+  governance amendment, mechanism-gate control evidence, scope document, and protocol
   document are sealed before the first confirmatory execution.
 - The confirmatory uncertainty path is
   `causal4d calibration execution-block`: one preregistered execution per
@@ -56,6 +56,10 @@ Every such change must be logged with its commit and reason.
 
 ## Freeze and acquisition workflow
 
+V5 permits Florian Pfaff to perform these checks as the single registered
+self-attesting operator. Every report must state that no independent
+pre-acquisition attestation is claimed.
+
 Start from a clean checkout of the commit intended for acquisition. Scaffold the
 non-overwriting dataset and readiness evidence first:
 
@@ -71,24 +75,24 @@ causal4d protocol readiness scaffold \
 
 Complete and seal the source-panel, actuator, support/gravity, and
 nonconfirmatory dry-run gates. These operational approvals must predate the
-method freeze. Then write and independently attest the freeze manifest:
+method freeze. Then write and self-attest the freeze manifest under v5:
 
 ```bash
 causal4d protocol freeze seal \
   /opt/causal4d-frozen \
   /data/causal4d-sloth-multi-action-v1/method_freeze.json \
-  --frozen-by "<operator-or-principal-investigator>"
+  --frozen-by "florianpfaff"
 
 causal4d protocol freeze attest \
   /data/causal4d-sloth-multi-action-v1/method_freeze.json \
   configs/causal4d/sloth_multi_action_v1.json \
   /opt/causal4d-frozen \
   /data/causal4d-sloth-multi-action-v1/method_freeze_validation.json \
-  --verified-by "<independent-verifier>"
+  --verified-by "florianpfaff"
 ```
 
-After the attestation, seal the software-environment gate. It binds the exact
-freeze and attestation hashes, Causal4D and Bayesian-PhysTwin package artifacts,
+After the self-attestation, seal the software-environment gate. It binds the
+exact freeze and attestation hashes, Causal4D and Bayesian-PhysTwin package artifacts,
 the observation producer, and an explicit Prob4D used-or-unused declaration.
 Finally, require the hash-verified readiness decision:
 
@@ -114,14 +118,14 @@ causal4d protocol freeze validate \
 
 The seal command refuses a dirty Git worktree. Freeze schema v2 records file
 checksums, the protocol design digest, the exact Bayesian-PhysTwin commit from
-`requirements/ci/bayesian-phystwin-provider-v1.sha`, the final v4 amendment
+`requirements/ci/bayesian-phystwin-provider-v1.sha`, the final v5 amendment
 digest, its mechanism-gate control digest, the six-frame observation boundary,
 and the registered analysis entrypoints. It also freezes the confirmatory
 execution-block score, calibration unit, fold count, finite rank, and
 non-claims. A manifest that substitutes the older coordinate-pooled calibration
 command fails validation.
 
-The separate readiness status does not mutate that freeze or the v4 amendment.
+The separate readiness status does not mutate that freeze or the v5 amendment.
 It derives the collection decision from the registered prerequisite validators,
 checksummed operational records, software lineage, chronology, and zero
 confirmatory manifests. See
@@ -140,7 +144,7 @@ Before confirmatory execution 1:
 - validate commanded versus measured actuation;
 - validate support, gravity, camera/controller, and shared-clock registration;
 - pass one nonconfirmatory end-to-end dry run;
-- seal and independently validate `method_freeze.json`;
+- seal and self-attest `method_freeze.json` with the registered operator;
 - bind the exact software distributions and observation producer;
 - confirm that no confirmatory manifest or target outcome exists; and
 - obtain `first_confirmatory_execution_allowed=true` from
