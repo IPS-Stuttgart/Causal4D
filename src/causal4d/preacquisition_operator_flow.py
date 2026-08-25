@@ -174,9 +174,7 @@ def enrich_preacquisition_next_action(
             if single_operator
             else "<registered-publisher-id>"
         )
-        action["independent_review_required_before_publication"] = (
-            not single_operator
-        )
+        action["independent_review_required_before_publication"] = not single_operator
         action["self_review_required_before_publication"] = single_operator
         action["claim_bearing_publication_argv"] = publication_argv
         action["claim_bearing_publication_text"] = publication_text
