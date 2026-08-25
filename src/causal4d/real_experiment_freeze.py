@@ -170,8 +170,7 @@ def _preacquisition_contract(
         "pre-acquisition v5 does not bind the registered single-operator policy",
     )
     _require(
-        plan["governance"]["independent_preacquisition_attestation_claimed"]
-        is False,
+        plan["governance"]["independent_preacquisition_attestation_claimed"] is False,
         "pre-acquisition v5 falsely claims independent attestation",
     )
 
