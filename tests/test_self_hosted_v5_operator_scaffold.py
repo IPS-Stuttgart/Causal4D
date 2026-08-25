@@ -16,9 +16,7 @@ from causal4d.operator_registry import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT_PATH = (
-    ROOT / "scripts" / "ci" / "bootstrap_self_hosted_v5_operator_scaffold.py"
-)
+SCRIPT_PATH = ROOT / "scripts" / "ci" / "bootstrap_self_hosted_v5_operator_scaffold.py"
 
 
 def _load_bootstrap() -> ModuleType:
@@ -107,17 +105,13 @@ def test_bootstrap_creates_fresh_v5_tree_and_advances_to_registration(
     assert report["physical_command_sent"] is False
     assert report["physical_evidence_increment"] == 0
 
-    registry = json.loads(
-        (target / OPERATOR_REGISTRY_PATH).read_text(encoding="utf-8")
-    )
+    registry = json.loads((target / OPERATOR_REGISTRY_PATH).read_text(encoding="utf-8"))
     assert registry["operators"][0]["operator_id"] == bootstrap.OPERATOR_ID
     assert registry["operators"][0]["person_identity_sha256"] == "1" * 64
     assert registry["operators"][0]["roles"] == list(bootstrap.OPERATOR_ROLES)
     assert "independent_verifier" not in registry["operators"][0]["roles"]
 
-    receipt = json.loads(
-        (target / bootstrap.RECEIPT_PATH).read_text(encoding="utf-8")
-    )
+    receipt = json.loads((target / bootstrap.RECEIPT_PATH).read_text(encoding="utf-8"))
     assert receipt["independent_preacquisition_attestation_claimed"] is False
     assert receipt["physical_evidence_increment"] == 0
 
@@ -144,11 +138,13 @@ def test_bootstrap_is_idempotent_and_does_not_reseal(tmp_path: Path) -> None:
     assert repeated["created"] is False
     assert repeated["dataset_modified"] is False
     assert _tree_snapshot(target) == snapshot
-    assert repeated["target_registry_artifact_sha256"] == (
-        first["target_registry_artifact_sha256"]
+    assert (
+        repeated["target_registry_artifact_sha256"]
+        == (first["target_registry_artifact_sha256"])
     )
-    assert repeated["bootstrap_receipt_artifact_sha256"] == (
-        first["bootstrap_receipt_artifact_sha256"]
+    assert (
+        repeated["bootstrap_receipt_artifact_sha256"]
+        == (first["bootstrap_receipt_artifact_sha256"])
     )
 
 
