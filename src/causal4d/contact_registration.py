@@ -14,6 +14,9 @@ from causal4d.real_protocol import validate_protocol
 
 
 CONTACT_REGISTRATION_SCHEMA_VERSION = 3
+SINGLE_OPERATOR_CONTACT_REGISTRATION_SCHEMA_VERSION = 4
+INDEPENDENT_REVIEW_POLICY = "independent_two_person_v1"
+SINGLE_OPERATOR_REVIEW_POLICY = "two_pass_single_operator_review_v1"
 
 
 def _require(condition: bool, message: str) -> None:
@@ -100,8 +103,9 @@ def build_contact_registration_template(
     *,
     camera_ids: Sequence[str],
     object_node_count: int,
+    review_policy: str = INDEPENDENT_REVIEW_POLICY,
 ) -> dict[str, Any]:
-    """Build an explicitly incomplete version-3 registration template."""
+    """Build an explicitly incomplete registration template."""
 
     validate_protocol(protocol)
     cameras = [str(value) for value in camera_ids]
@@ -113,10 +117,20 @@ def build_contact_registration_template(
         raise ValueError("at least three unique camera ids are required")
     if object_node_count < 1:
         raise ValueError("object_node_count must be positive")
+    if review_policy not in {
+        INDEPENDENT_REVIEW_POLICY,
+        SINGLE_OPERATOR_REVIEW_POLICY,
+    }:
+        raise ValueError("unsupported contact-registration review policy")
+    schema_version = (
+        SINGLE_OPERATOR_CONTACT_REGISTRATION_SCHEMA_VERSION
+        if review_policy == SINGLE_OPERATOR_REVIEW_POLICY
+        else CONTACT_REGISTRATION_SCHEMA_VERSION
+    )
     transform = {"matrix": None, "covariance_se3": None}
     descriptor = {"path": None, "sha256": None, "bytes": None}
     return {
-        "schema_version": CONTACT_REGISTRATION_SCHEMA_VERSION,
+        "schema_version": schema_version,
         "artifact_kind": "PhysicalContactRegistration",
         "protocol_id": protocol["protocol_id"],
         "protocol_design_sha256": protocol["design_sha256"],
@@ -179,7 +193,14 @@ def build_contact_registration_template(
                     }
                     for camera_id in cameras
                 },
-                "independent_reviews": [],
+                **(
+                    {
+                        "review_policy": SINGLE_OPERATOR_REVIEW_POLICY,
+                        "review_passes": [],
+                    }
+                    if review_policy == SINGLE_OPERATOR_REVIEW_POLICY
+                    else {"independent_reviews": []}
+                ),
                 "interreview_rms_m": None,
                 "multiview_reprojection_rmse_px": None,
             }
@@ -187,7 +208,11 @@ def build_contact_registration_template(
         },
         "acceptance": {
             "multiview_agreement_passed": None,
-            "independent_review_passed": None,
+            **(
+                {"review_policy_passed": None}
+                if review_policy == SINGLE_OPERATOR_REVIEW_POLICY
+                else {"independent_review_passed": None}
+            ),
             "attachment_uncertainty_separates_regions": None,
             "frame_closure_recorded": None,
             "target_outcomes_used": False,
@@ -208,7 +233,8 @@ def validate_contact_registration(
 
     validate_protocol(protocol)
     _require(
-        artifact.get("schema_version") in {2, 3},
+        artifact.get("schema_version")
+        in {2, 3, SINGLE_OPERATOR_CONTACT_REGISTRATION_SCHEMA_VERSION},
         "unsupported contact registration schema",
     )
     _require(
@@ -224,6 +250,10 @@ def validate_contact_registration(
     )
     _require(
         artifact.get("status") == "approved", "contact registration is not approved"
+    )
+    single_operator_review = (
+        artifact["schema_version"]
+        == SINGLE_OPERATOR_CONTACT_REGISTRATION_SCHEMA_VERSION
     )
     object_record = artifact["object"]
     _require(
@@ -484,8 +514,15 @@ def validate_contact_registration(
             _validate_descriptor(
                 overlay["artifact"], f"{region_id} {camera_id} overlay"
             )
-        reviews = list(region["independent_reviews"])
-        _require(len(reviews) >= 2, f"{region_id} needs two independent reviews")
+        if single_operator_review:
+            _require(
+                region.get("review_policy") == SINGLE_OPERATOR_REVIEW_POLICY,
+                f"{region_id} has the wrong self-review policy",
+            )
+            reviews = list(region["review_passes"])
+        else:
+            reviews = list(region["independent_reviews"])
+        _require(len(reviews) >= 2, f"{region_id} needs two review passes")
         reviewer_ids: list[str] = []
         review_times: list[datetime] = []
         for review in reviews:
@@ -502,11 +539,24 @@ def validate_contact_registration(
                 )
             )
             _vector(review["centroid_world_m"], 3, f"{region_id} review centroid")
-        _require(
-            len({reviewer_id.casefold() for reviewer_id in reviewer_ids})
-            == len(reviewer_ids),
-            f"{region_id} independent reviewers must be distinct",
-        )
+        if single_operator_review:
+            _require(
+                len({reviewer_id.casefold() for reviewer_id in reviewer_ids}) == 1,
+                f"{region_id} self-review passes must use one registered operator",
+            )
+            _require(
+                all(
+                    review_times[index] < review_times[index + 1]
+                    for index in range(len(review_times) - 1)
+                ),
+                f"{region_id} self-review passes must be chronologically ordered",
+            )
+        else:
+            _require(
+                len({reviewer_id.casefold() for reviewer_id in reviewer_ids})
+                == len(reviewer_ids),
+                f"{region_id} independent reviewers must be distinct",
+            )
         all_review_times.extend(review_times)
         for key in ("interreview_rms_m", "multiview_reprojection_rmse_px"):
             value = float(region[key])
@@ -530,9 +580,14 @@ def validate_contact_registration(
         )
 
     acceptance = artifact["acceptance"]
+    review_acceptance_key = (
+        "review_policy_passed"
+        if single_operator_review
+        else "independent_review_passed"
+    )
     for key in (
         "multiview_agreement_passed",
-        "independent_review_passed",
+        review_acceptance_key,
         "attachment_uncertainty_separates_regions",
         "frame_closure_recorded",
     ):
@@ -554,7 +609,11 @@ def validate_contact_registration(
     )
     _require(
         all(reviewed_at <= approved_at for reviewed_at in all_review_times),
-        "contact registration approval predates an independent review",
+        (
+            "contact registration approval predates a review pass"
+            if single_operator_review
+            else "contact registration approval predates an independent review"
+        ),
     )
     checksums = artifact.get("source_checksums", {})
     _require(
@@ -570,6 +629,12 @@ def validate_contact_registration(
         "object_node_count": node_count,
         "approved": True,
         "approved_at_utc": approval["approved_at_utc"],
+        "review_policy": (
+            SINGLE_OPERATOR_REVIEW_POLICY
+            if single_operator_review
+            else INDEPENDENT_REVIEW_POLICY
+        ),
+        "independent_review_claimed": not single_operator_review,
     }
 
 

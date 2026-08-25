@@ -7,6 +7,8 @@ import json
 from collections.abc import Sequence
 
 from causal4d.contact_registration import (
+    INDEPENDENT_REVIEW_POLICY,
+    SINGLE_OPERATOR_REVIEW_POLICY,
     build_contact_registration_template,
     validate_contact_registration,
     write_contact_registration,
@@ -22,6 +24,11 @@ def build_parser() -> argparse.ArgumentParser:
     template.add_argument("output_json")
     template.add_argument("--camera-id", action="append", required=True)
     template.add_argument("--object-node-count", type=int, required=True)
+    template.add_argument(
+        "--review-policy",
+        choices=(INDEPENDENT_REVIEW_POLICY, SINGLE_OPERATOR_REVIEW_POLICY),
+        default=INDEPENDENT_REVIEW_POLICY,
+    )
     validate = subparsers.add_parser("validate")
     validate.add_argument("protocol_json")
     validate.add_argument("registration_json")
@@ -37,6 +44,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 protocol,
                 camera_ids=args.camera_id,
                 object_node_count=args.object_node_count,
+                review_policy=args.review_policy,
             )
             output = write_contact_registration(args.output_json, artifact)
             result = {

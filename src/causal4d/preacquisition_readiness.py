@@ -14,6 +14,7 @@ from causal4d.operator_identity_integration import (
 )
 from causal4d.operator_registry import load_operator_registry_prerequisite
 from causal4d.preacquisition_gate_validation import _validate_gate_file
+from causal4d.preacquisition_protocol_v5 import governance_allows_single_operator
 from causal4d.preacquisition_readiness_contracts import (
     GATE_EVIDENCE_ARTIFACT_KIND as GATE_EVIDENCE_ARTIFACT_KIND,
     GATE_EVIDENCE_SCHEMA_VERSION as GATE_EVIDENCE_SCHEMA_VERSION,
@@ -124,14 +125,22 @@ def _identity_bound_gate_results(
                 result["error"] = "operator registry is unavailable"
             else:
                 try:
-                    result.update(
-                        validate_gate_file_operator_identity(
+                    if governance_allows_single_operator(v4):
+                        identity = validate_gate_file_operator_identity(
+                            gate_id,
+                            path,
+                            registry,
+                            prerequisites,
+                            preacquisition=v4,
+                        )
+                    else:
+                        identity = validate_gate_file_operator_identity(
                             gate_id,
                             path,
                             registry,
                             prerequisites,
                         )
-                    )
+                    result.update(identity)
                 except (OSError, KeyError, TypeError, ValueError) as error:
                     message = str(error).strip()
                     result["valid"] = False
@@ -172,9 +181,21 @@ def evaluate_preacquisition_readiness(
         protocol, v4, root
     )
     prerequisites["operator_registry"] = operator_registry_result
-    prerequisites["operator_identity_bindings"] = (
-        validate_preacquisition_identity_bindings(root, operator_registry)
-    )
+    if governance_allows_single_operator(v4):
+        prerequisites["operator_identity_bindings"] = (
+            validate_preacquisition_identity_bindings(
+                root,
+                operator_registry,
+                preacquisition=v4,
+            )
+        )
+    else:
+        prerequisites["operator_identity_bindings"] = (
+            validate_preacquisition_identity_bindings(
+                root,
+                operator_registry,
+            )
+        )
     gate_results = _identity_bound_gate_results(
         protocol,
         v2,
@@ -368,6 +389,21 @@ def evaluate_preacquisition_readiness(
         "protocol_design_sha256": protocol["design_sha256"],
         "preacquisition_plan_id": v4["plan_id"],
         "preacquisition_amendment_sha256": v4["amendment_sha256"],
+        "governance": {
+            "mode": v4.get("governance", {}).get("mode", "independent_two_person_v4"),
+            "single_operator_allowed": v4.get("governance", {}).get(
+                "single_operator_allowed", False
+            ),
+            "independent_verifier_required": v4.get("governance", {}).get(
+                "independent_verifier_required", True
+            ),
+            "independent_preacquisition_attestation_claimed": v4.get(
+                "governance", {}
+            ).get("independent_preacquisition_attestation_claimed", True),
+            "self_attestation_required": v4.get("governance", {}).get(
+                "self_attestation_required", False
+            ),
+        },
         "dataset_root": str(root.resolve()),
         "verify_file_hashes": verify_file_hashes,
         "registered_analysis_required": require_registered_analysis,

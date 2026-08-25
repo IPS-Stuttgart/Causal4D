@@ -70,8 +70,8 @@ def test_repository_document_lifecycle_registry_is_valid() -> None:
         "current_documents": 10,
         "frozen_documents": 1,
         "historical_documents": 0,
-        "registered_documents": 13,
-        "superseded_documents": 2,
+        "registered_documents": 14,
+        "superseded_documents": 3,
     }
 
 

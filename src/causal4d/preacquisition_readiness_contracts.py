@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from causal4d.preacquisition_protocol_v4 import load_v4_chain
+from causal4d.preacquisition_protocol_v5 import load_v5_chain
 
 READINESS_SCHEMA_VERSION = 2
 GATE_EVIDENCE_SCHEMA_VERSION = 2
@@ -22,6 +22,7 @@ PROTOCOL_PATH = "configs/causal4d/sloth_multi_action_v1.json"
 PREACQUISITION_V2_PATH = "configs/causal4d/sloth_preacquisition_v2.json"
 PREACQUISITION_V3_PATH = "configs/causal4d/sloth_preacquisition_v3.json"
 PREACQUISITION_V4_PATH = "configs/causal4d/sloth_preacquisition_v4.json"
+PREACQUISITION_V5_PATH = "configs/causal4d/sloth_preacquisition_v5.json"
 MECHANISM_GATE_EVIDENCE_PATH = (
     "runs/causal4d_preacquisition_v4/mechanism_gate_controls.json"
 )
@@ -468,15 +469,16 @@ def gate_evidence_template(
 def load_registered_preacquisition_chain(
     repository_root: str | Path,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
-    """Load and validate the immutable protocol-v2-v3-v4 chain."""
+    """Load and validate the immutable protocol-v2-v3-v4-v5 chain."""
 
     root = Path(repository_root)
-    return load_v4_chain(
+    return load_v5_chain(
         root / PROTOCOL_PATH,
         root / PREACQUISITION_V2_PATH,
         root / PREACQUISITION_V3_PATH,
         root / MECHANISM_GATE_EVIDENCE_PATH,
         root / PREACQUISITION_V4_PATH,
+        root / PREACQUISITION_V5_PATH,
     )
 
 
@@ -489,6 +491,7 @@ __all__ = [
     "PREACQUISITION_V2_PATH",
     "PREACQUISITION_V3_PATH",
     "PREACQUISITION_V4_PATH",
+    "PREACQUISITION_V5_PATH",
     "PROTOCOL_PATH",
     "READINESS_ARTIFACT_KIND",
     "READINESS_SCHEMA_VERSION",

@@ -424,3 +424,51 @@ def test_cli_returns_incomplete_exit_code_and_writes_reports(
 
     assert exit_code == 3
     assert written == [("json", output_json), ("markdown", output_markdown)]
+
+
+def _enable_single_operator_v5(readiness: dict) -> None:
+    readiness["governance"] = {
+        "mode": "single_operator_self_attested",
+        "single_operator_allowed": True,
+        "independent_verifier_required": False,
+        "independent_preacquisition_attestation_claimed": False,
+        "self_attestation_required": True,
+    }
+    readiness["prerequisites"]["operator_registry"][
+        "independent_verifier_available"
+    ] = False
+
+
+def test_v5_single_operator_advances_past_independent_verifier_block() -> None:
+    readiness = _readiness()
+    _enable_single_operator_v5(readiness)
+    readiness["prerequisites"]["object_registration"] = _prerequisite(
+        present=False,
+        valid=False,
+    )
+    readiness["missing_prerequisites"] = ["object_registration"]
+
+    decision = _derive(readiness, _source_panel())
+
+    action = decision["action"]
+    assert action["action_id"] == "complete_object_registration"
+    assert action["operator_role"] == "self_attesting_operator"
+    assert action["target_outcomes_permitted"] is False
+
+
+def test_v5_method_freeze_action_is_disclosed_self_attestation() -> None:
+    readiness = _readiness()
+    _enable_single_operator_v5(readiness)
+    readiness["prerequisites"]["method_freeze_validation"] = _prerequisite(
+        present=False,
+        valid=False,
+    )
+    readiness["missing_prerequisites"] = ["method_freeze_validation"]
+
+    decision = _derive(readiness, _source_panel())
+
+    action = decision["action"]
+    assert action["action_id"] == "attest_method_freeze"
+    assert action["operator_role"] == "self_attesting_operator"
+    assert "Self-attest" in action["title"]
+    assert "<registered-freezer-id>" in action["command_argv"]

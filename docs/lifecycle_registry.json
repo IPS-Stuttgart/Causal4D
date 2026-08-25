@@ -101,11 +101,21 @@
       "path": "docs/causal4d_preacquisition_v4.md",
       "title": "Pre-acquisition amendment v4",
       "kind": "protocol",
+      "status": "superseded",
+      "claim_bearing": true,
+      "operational_role": null,
+      "successor": "docs/causal4d_preacquisition_v5.md",
+      "git_blob_sha1": "9c35910925cf49c456e2a848ac8528792689472d"
+    },
+    {
+      "path": "docs/causal4d_preacquisition_v5.md",
+      "title": "Pre-acquisition governance amendment v5",
+      "kind": "protocol",
       "status": "frozen",
       "claim_bearing": true,
       "operational_role": "preacquisition-amendment",
       "successor": null,
-      "git_blob_sha1": "9c35910925cf49c456e2a848ac8528792689472d"
+      "git_blob_sha1": "f8df1d56673338bda661bb6a1b3fed4b8ca217b9"
     },
     {
       "path": "docs/causal4d_real_evidence_status.md",

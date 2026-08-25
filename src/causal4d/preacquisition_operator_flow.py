@@ -43,13 +43,20 @@ def _expected_publication_command(
 def enrich_preacquisition_next_action(
     decision: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Insert safe staging, verification, and two-person publication."""
+    """Insert safe staging, verification, and governed publication."""
 
     result = deepcopy(dict(decision))
     action_value = result.get("action")
     if not isinstance(action_value, Mapping):
         raise ValueError("next-action decision has no action object")
     action = deepcopy(dict(action_value))
+    governance = result.get("governance", {})
+    single_operator = bool(
+        isinstance(governance, Mapping)
+        and governance.get("mode") == "single_operator_self_attested"
+        and governance.get("single_operator_allowed") is True
+        and governance.get("independent_verifier_required") is False
+    )
     result["schema_version"] = NEXT_ACTION_SCHEMA_VERSION
     result["operator_flow_schema_version"] = OPERATOR_FLOW_SCHEMA_VERSION
 
@@ -121,7 +128,11 @@ def enrich_preacquisition_next_action(
                 dataset,
                 staging,
                 "--reviewed-by",
-                "<registered-reviewer-id>",
+                (
+                    "<registered-self-attesting-operator-id>"
+                    if single_operator
+                    else "<registered-reviewer-id>"
+                ),
             ]
         )
         publication_argv, publication_text = _command_pair(
@@ -130,7 +141,11 @@ def enrich_preacquisition_next_action(
                 "--review-receipt",
                 receipt,
                 "--published-by",
-                "<registered-publisher-id>",
+                (
+                    "<registered-self-attesting-operator-id>"
+                    if single_operator
+                    else "<registered-publisher-id>"
+                ),
             ]
         )
         action["after_completion_argv"] = None
@@ -148,17 +163,30 @@ def enrich_preacquisition_next_action(
         action["staged_review_argv"] = review_argv
         action["staged_review_text"] = review_text
         action["review_receipt_path"] = receipt
-        action["two_person_publication_required"] = True
-        action["reviewer_identity_placeholder"] = "<registered-reviewer-id>"
-        action["publisher_identity_placeholder"] = "<registered-publisher-id>"
-        action["independent_review_required_before_publication"] = True
+        action["two_person_publication_required"] = not single_operator
+        action["reviewer_identity_placeholder"] = (
+            "<registered-self-attesting-operator-id>"
+            if single_operator
+            else "<registered-reviewer-id>"
+        )
+        action["publisher_identity_placeholder"] = (
+            "<registered-self-attesting-operator-id>"
+            if single_operator
+            else "<registered-publisher-id>"
+        )
+        action["independent_review_required_before_publication"] = not single_operator
+        action["self_review_required_before_publication"] = single_operator
         action["claim_bearing_publication_argv"] = publication_argv
         action["claim_bearing_publication_text"] = publication_text
         action["operator_sequence"] = [
             "acquire_registered_source_execution",
             "build_staged_manifest_from_registered_template_and_artifact_bytes",
             "verify_staged_manifest_and_artifacts",
-            "independent_review_of_preflight_report",
+            (
+                "self_review_of_preflight_report"
+                if single_operator
+                else "independent_review_of_preflight_report"
+            ),
             "publish_exactly_once",
             "recompute_next_action",
         ]
@@ -183,6 +211,7 @@ def enrich_preacquisition_next_action(
         action.setdefault("reviewer_identity_placeholder", None)
         action.setdefault("publisher_identity_placeholder", None)
         action.setdefault("independent_review_required_before_publication", False)
+        action.setdefault("self_review_required_before_publication", False)
         action.setdefault("claim_bearing_publication_argv", None)
         action.setdefault("claim_bearing_publication_text", None)
         action.setdefault("operator_sequence", [])
@@ -239,6 +268,7 @@ def render_preacquisition_operator_next_action_markdown(
     action = decision.get("action")
     if not isinstance(action, Mapping):
         raise ValueError("next-action decision has no action object")
+    self_review = action.get("self_review_required_before_publication") is True
     lines = [
         "# Causal4D pre-acquisition next action",
         "",
@@ -264,7 +294,11 @@ def render_preacquisition_operator_next_action_markdown(
         ("Verify staged evidence", "post_acquisition_verification_text", None),
         ("Review and seal receipt", "staged_review_text", None),
         (
-            "Publish after independent review",
+            (
+                "Publish after registered self-review"
+                if self_review
+                else "Publish after independent review"
+            ),
             "claim_bearing_publication_text",
             None,
         ),
@@ -276,7 +310,16 @@ def render_preacquisition_operator_next_action_markdown(
             lines += ["", f"### {heading}", "", "```bash", str(value), "```"]
             if note_field and action.get(note_field):
                 lines += ["", str(action[note_field])]
-    if action.get("independent_review_required_before_publication") is True:
+    if self_review:
+        lines += [
+            "",
+            (
+                "Publication is claim-bearing and requires a registered self-review "
+                "receipt. Review and publication are performed by the same disclosed "
+                "operator; no independent review is claimed."
+            ),
+        ]
+    elif action.get("independent_review_required_before_publication") is True:
         lines += [
             "",
             "Publication is claim-bearing and requires independent review by a ",

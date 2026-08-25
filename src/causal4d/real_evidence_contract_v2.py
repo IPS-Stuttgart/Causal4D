@@ -9,6 +9,10 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from causal4d.preacquisition_protocol_v5 import governance_allows_single_operator
+from causal4d.preacquisition_readiness_contracts import (
+    load_registered_preacquisition_chain,
+)
 from causal4d.real_evidence_common import (
     EVIDENCE_STATUS_SCHEMA_VERSION,
     METHOD_FREEZE_ATTESTATION_SCHEMA_VERSION,
@@ -124,6 +128,17 @@ def build_real_evidence_status(
         root / "timebase_calibration.json",
         verify_file_hashes=verify_file_hashes,
     )
+    require_single_operator_review = False
+    if (
+        repository_root is not None
+        and (
+            Path(repository_root) / "configs/causal4d/sloth_preacquisition_v5.json"
+        ).is_file()
+    ):
+        _, _, _, preacquisition = load_registered_preacquisition_chain(repository_root)
+        require_single_operator_review = governance_allows_single_operator(
+            preacquisition
+        )
     contact_registration, _ = _validate_contact_registration_prerequisite(
         protocol,
         root,
@@ -131,6 +146,7 @@ def build_real_evidence_status(
         simple_registration=simple_registration,
         simple_registration_sha256=object_registration.get("sha256"),
         verify_file_hashes=verify_file_hashes,
+        require_single_operator_review=require_single_operator_review,
     )
     method_freeze, method_freeze_attestation, _ = _validate_method_freeze_prerequisites(
         protocol,

@@ -16,6 +16,9 @@ from causal4d.operator_registry import (
     OPERATOR_REGISTRY_PATH,
     load_registered_operator_registry,
 )
+from causal4d.preacquisition_readiness_contracts import (
+    load_registered_preacquisition_chain,
+)
 from causal4d.real_evidence_contract_v2 import build_real_evidence_status
 
 
@@ -72,6 +75,7 @@ def build_operator_bound_real_evidence_status(
         str(name): dict(result) for name, result in status["prerequisites"].items()
     }
 
+    preacquisition: Mapping[str, Any] | None = None
     if repository_root is None:
         registry_path = root / OPERATOR_REGISTRY_PATH
         registry_result: dict[str, Any] = {
@@ -82,13 +86,23 @@ def build_operator_bound_real_evidence_status(
         }
         registry = None
     else:
+        if (
+            Path(repository_root) / "configs/causal4d/sloth_preacquisition_v5.json"
+        ).is_file():
+            _, _, _, preacquisition = load_registered_preacquisition_chain(
+                repository_root
+            )
         registry_result, registry = load_registered_operator_registry(
             repository_root,
             root,
         )
     prerequisites["operator_registry"] = registry_result
     prerequisites["operator_identity_bindings"] = (
-        validate_preacquisition_identity_bindings(root, registry)
+        validate_preacquisition_identity_bindings(
+            root,
+            registry,
+            preacquisition=preacquisition,
+        )
     )
 
     freeze_result = prerequisites["method_freeze"]
@@ -116,6 +130,7 @@ def build_operator_bound_real_evidence_status(
                     method_freeze,
                     None,
                     registry,
+                    preacquisition=preacquisition,
                 )
                 freeze_result.update(identity)
                 freeze_result["operator_registry_artifact_sha256"] = registry_result[
@@ -140,6 +155,7 @@ def build_operator_bound_real_evidence_status(
                     method_freeze,
                     attestation,
                     registry,
+                    preacquisition=preacquisition,
                 )
                 freeze_result.update(
                     {

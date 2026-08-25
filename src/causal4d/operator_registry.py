@@ -519,26 +519,43 @@ def validate_attestation_operator_identities(
     method_freeze: Mapping[str, Any],
     attestation: Mapping[str, Any],
     registry: Mapping[str, Any],
+    *,
+    allow_self_attestation: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Resolve freezer and verifier and prove person-level independence."""
+    """Resolve the freezer and enforce the registered attestation policy."""
 
     freezer = validate_method_freeze_operator_identity(method_freeze, registry)
     verifier = resolve_operator(
         registry,
         attestation.get("verifier_id"),
-        required_role=ROLE_INDEPENDENT_VERIFIER,
-        name="method freeze verifier",
+        required_role=(
+            ROLE_FREEZER if allow_self_attestation else ROLE_INDEPENDENT_VERIFIER
+        ),
+        name=(
+            "method freeze self-attester"
+            if allow_self_attestation
+            else "method freeze verifier"
+        ),
     )
     require_registry_precedes_event(
         registry,
         attestation.get("verified_at_utc"),
         event_name="method freeze attestation",
     )
-    require_distinct_operator_people(
-        freezer,
-        verifier,
-        relationship="method freeze must be verified by a distinct registered person",
-    )
+    if allow_self_attestation:
+        _require(
+            verifier["operator_id"] == freezer["operator_id"]
+            and verifier["person_identity_sha256"] == freezer["person_identity_sha256"],
+            "single-operator method freeze must be self-attested by its freezer",
+        )
+    else:
+        require_distinct_operator_people(
+            freezer,
+            verifier,
+            relationship=(
+                "method freeze must be verified by a distinct registered person"
+            ),
+        )
     return freezer, verifier
 
 
@@ -549,6 +566,7 @@ def validate_gate_approver_identity(
     registry: Mapping[str, Any],
     *,
     freezer_person_identity_sha256: str | None = None,
+    allow_software_environment_self_approval: bool = False,
 ) -> dict[str, Any]:
     """Resolve a gate approver and enforce the software-lock independence policy."""
 
@@ -564,25 +582,32 @@ def validate_gate_approver_identity(
         event_name=f"{gate_id} approval",
     )
     if gate_id == "software_environment_locked":
+        permitted_roles = (
+            {ROLE_SOFTWARE_ENVIRONMENT_APPROVER}
+            if allow_software_environment_self_approval
+            else {
+                ROLE_INDEPENDENT_VERIFIER,
+                ROLE_SOFTWARE_ENVIRONMENT_APPROVER,
+            }
+        )
         _require(
-            bool(
-                set(approver["roles"])
-                & {
-                    ROLE_INDEPENDENT_VERIFIER,
-                    ROLE_SOFTWARE_ENVIRONMENT_APPROVER,
-                }
+            bool(set(approver["roles"]) & permitted_roles),
+            (
+                "software environment approver lacks the registered self-approval role"
+                if allow_software_environment_self_approval
+                else "software environment approver lacks an independent approval role"
             ),
-            "software environment approver lacks an independent approval role",
         )
         _require(
             isinstance(freezer_person_identity_sha256, str)
             and bool(_SHA64.fullmatch(freezer_person_identity_sha256)),
             "software environment approval cannot resolve the method freezer identity",
         )
-        _require(
-            approver["person_identity_sha256"] != freezer_person_identity_sha256,
-            "software environment approval is not independent of the method freezer",
-        )
+        if not allow_software_environment_self_approval:
+            _require(
+                approver["person_identity_sha256"] != freezer_person_identity_sha256,
+                "software environment approval is not independent of the method freezer",
+            )
     return approver
 
 
