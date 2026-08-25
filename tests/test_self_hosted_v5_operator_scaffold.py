@@ -174,7 +174,7 @@ def test_bootstrap_refuses_false_independent_role(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="claims an independent verifier"):
+    with pytest.raises(ValueError, match="roles differ from the v5 one-person lock"):
         bootstrap.bootstrap_single_operator_v5(
             repository_root=ROOT,
             source_dataset_root=source,
