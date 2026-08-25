@@ -1,5 +1,7 @@
 # Independent verifier onboarding
 
+> **V5 status:** A distinct verifier is optional under active v5. Use this guide only for a genuine additional independent review; it is not required for acquisition readiness.
+
 ## Purpose and current boundary
 
 The registered Causal4D same-object physical protocol requires a genuinely
