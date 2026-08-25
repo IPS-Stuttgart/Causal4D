@@ -121,8 +121,6 @@ def build_source_panel_review_receipt(
         dataset_root,
         source_json,
     )
-    _, _, _, preacquisition = load_registered_preacquisition_chain(repository_root)
-    single_operator = governance_allows_single_operator(preacquisition)
     registry_result, registry = _registry(repository_root, dataset_root)
     reviewer = resolve_operator(
         registry,
@@ -283,6 +281,8 @@ def validate_source_panel_review_receipt(
 ) -> dict[str, Any]:
     """Require a current review and the registered publication policy."""
 
+    _, _, _, preacquisition = load_registered_preacquisition_chain(repository_root)
+    single_operator = governance_allows_single_operator(preacquisition)
     _require(receipt_json is not None, "source-panel review receipt is required")
     _require(
         isinstance(published_by, str) and bool(published_by),
