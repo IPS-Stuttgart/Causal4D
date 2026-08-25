@@ -14,6 +14,23 @@ require transferring model-development, robot-operation, or data-analysis work.
 It does not register a person, infer an identity, relax independence, or
 authorize physical acquisition.
 
+## Recruitment materials
+
+Two copy-ready aids reduce the administrative burden without changing the
+protocol:
+
+- [`independent_verifier_invitation_template.md`](independent_verifier_invitation_template.md)
+  is a private invitation that explains the bounded role and current `0/36`
+  evidence state; and
+- [`independent_verifier_self_declaration_template.md`](independent_verifier_self_declaration_template.md)
+  is a private, candidate-completed consent and independence declaration.
+
+Only the blank templates belong in Git. A completed invitation, declaration,
+signature, stable principal, raw email address, personnel number, or HMAC secret
+must remain outside the repository and acquisition dataset. Receiving a private
+declaration does not itself register the candidate, authorize physical work, or
+constitute the final attestation.
+
 ## Bounded verifier role
 
 The independent verifier is responsible only for checking and attesting the
@@ -80,8 +97,9 @@ status.
 ## Onboarding and attestation sequence
 
 All commands must run from the exact deployed checkout and dataset selected for
-the physical study. Placeholder identities below must be replaced only by the
-real participants themselves.
+the physical study. Placeholder identities below must be replaced only after the
+real participants themselves have supplied and reviewed the required private
+material.
 
 1. Recompute the current decision and preserve the hash-verified result:
 
@@ -91,17 +109,55 @@ real participants themselves.
      /data/causal4d-sloth-multi-action-v1
    ```
 
-2. Scaffold or update the operator-registry template through the registered
-   readiness route. Do not edit the sealed registry in place.
+   Until a truthful sealed registry validates, the action must remain
+   `stop_independent_verifier_unavailable` and must not authorize physical work.
 
-3. Have the verifier supply and review their own identity and independence
-   declaration. Seal the corrected registry with the real principal
-   investigator identity.
+2. Send the bounded invitation privately. The candidate reviews this guide and
+   the blank self-declaration, then replies and completes the declaration in
+   their own words. Do not enter a candidate into the registry before their
+   informed consent.
 
-4. Recompute the next action. The governance blocker must disappear before any
-   physical or claim-bearing operation is attempted.
+3. Scaffold the protocol-bound registry template through the registered CLI:
 
-5. After all source-only readiness gates pass, seal the exact method freeze:
+   ```bash
+   causal4d protocol readiness scaffold-operator-registry \
+     /opt/causal4d-frozen \
+     /data/causal4d-sloth-multi-action-v1
+   ```
+
+4. The authorized identity custodian derives the person-level commitment using
+   the registered institution-held, domain-separated HMAC procedure. Edit only
+   the `operators` array in:
+
+   ```text
+   /data/causal4d-sloth-multi-action-v1/preacquisition/operator_registry.template.json
+   ```
+
+   The real verifier entry must use the consented project-local operator ID,
+   role `independent_verifier`, and the derived person-level commitment. Do not
+   copy raw identity or the completed declaration into the template.
+
+5. Seal the roster exactly once with the registered freezer identity:
+
+   ```bash
+   causal4d protocol readiness seal-operator-registry \
+     /opt/causal4d-frozen \
+     /data/causal4d-sloth-multi-action-v1 \
+     /data/causal4d-sloth-multi-action-v1/preacquisition/operator_registry.template.json \
+     --sealed-by "<registered-freezer-id>"
+   ```
+
+6. Recompute the next action. The governance blocker must disappear before any
+   object registration, source-panel acquisition, gate approval, freeze
+   attestation, or confirmatory physical operation is attempted:
+
+   ```bash
+   causal4d protocol readiness next-action \
+     /opt/causal4d-frozen \
+     /data/causal4d-sloth-multi-action-v1
+   ```
+
+7. After all source-only readiness gates pass, seal the exact method freeze:
 
    ```bash
    causal4d protocol freeze seal \
@@ -110,7 +166,7 @@ real participants themselves.
      --frozen-by "<registered-freezer-id>"
    ```
 
-6. The distinct verifier independently validates and attests that freeze:
+8. The distinct verifier independently validates and attests that freeze:
 
    ```bash
    causal4d protocol freeze attest \
@@ -121,7 +177,7 @@ real participants themselves.
      --verified-by "<registered-independent-verifier-id>"
    ```
 
-7. Obtain the final hash-verified readiness decision. Confirmatory execution 1
+9. Obtain the final hash-verified readiness decision. Confirmatory execution 1
    remains forbidden unless both `ready=true` and
    `first_confirmatory_execution_allowed=true` are present.
 
@@ -161,7 +217,9 @@ negative or bounded result.
 
 See also:
 
+- [`operator_identity_registry.md`](operator_identity_registry.md)
 - [`single_operator_registry_correction.md`](single_operator_registry_correction.md)
 - [`causal4d_real_experiment_milestone.md`](causal4d_real_experiment_milestone.md)
 - [`causal4d_paper_scope.md`](causal4d_paper_scope.md)
+- [governance blocker issue #377](https://github.com/IPS-Stuttgart/Causal4D/issues/377)
 - [primary milestone issue #25](https://github.com/IPS-Stuttgart/Causal4D/issues/25)
