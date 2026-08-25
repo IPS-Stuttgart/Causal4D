@@ -1,70 +1,57 @@
-# Two-person source-panel publication receipt
+# Governance-bound source-panel publication receipt
 
 A successful staged preflight proves that the next source manifest and all
-referenced artifacts are valid at one instant. It does not prove that a second
-person inspected the result, and it must not allow the same person to approve
-and publish claim-bearing evidence under two operator aliases.
+referenced artifacts are valid at one instant. The review-receipt flow adds a
+registered human review before the existing exactly-once publisher.
 
-The review-receipt flow adds a registered two-person boundary before the
-existing exactly-once publisher.
+Under active v5 governance, the same registered operator may review and publish.
+The receipt records that fact and must not claim independent review. Historical
+v4 evidence retains its two-person requirement.
 
-## Operator sequence
+## V5 operator sequence
 
 ```text
 acquire registered source execution
         ↓
 hash-verify staged manifest and artifacts
         ↓
-registered reviewer seals a content-addressed receipt
+registered operator seals a content-addressed review receipt
         ↓
-distinct registered publisher reruns validation and publishes exactly once
+the same registered operator reruns validation and publishes exactly once
         ↓
 recompute readiness and the next action
 ```
 
 The reviewer must be active in the sealed operator registry with either the
-`gate_approver` or `independent_verifier` role. The publisher must be another
-active registered person. Distinct operator IDs are insufficient: the two
-records must have different `person_identity_sha256` values.
+`gate_approver` or `independent_verifier` role. A one-person v5 project uses
+the registered `gate_approver`; it does not assign or claim an independent role.
 
 ## Review command
 
-After the staged preflight succeeds, a reviewer runs:
+After staged preflight succeeds:
 
 ```bash
 causal4d protocol readiness source-panel-review-staged \
   /opt/causal4d-frozen \
   /data/causal4d-sloth-multi-action-v1 \
   /data/causal4d-sloth-multi-action-v1/staging/<execution-id>.json \
-  --reviewed-by <registered-reviewer-id>
+  --reviewed-by florianpfaff
 ```
 
-The command reruns the complete preflight. It writes the receipt exactly once to:
+The command reruns the complete preflight and writes exactly once to:
 
 ```text
 staging/reviews/<execution-id>.json
 ```
 
-The review timestamp must follow execution completion, and the sealed operator
-registry must predate the review. The receipt binds:
-
-- protocol and pre-acquisition amendment identities;
-- execution and independent-session identities;
-- staged manifest path, SHA-256, and byte count;
-- source execution completion timestamp;
-- portable and host-local staged-preflight identities;
-- the source-panel evidence identity before publication;
-- the exact operator-registry identity;
-- reviewer operator ID, person identity, and active roles;
-- review timestamp; and
-- the explicit no-target-outcomes and no-method-change boundary.
-
-The receipt carries its own canonical `artifact_sha256`. Publication refuses a
-modified or relocated receipt.
+The review must follow execution completion, and the operator registry must
+predate it. The receipt binds protocol and amendment identities, execution and
+session identities, staged manifest bytes and digest, source completion time,
+preflight identities, source-panel state before publication, registry identity,
+operator identity and roles, review time, and the no-target/no-method-change
+boundary.
 
 ## Publication command
-
-A distinct registered publisher runs:
 
 ```bash
 causal4d protocol readiness source-panel-publish \
@@ -73,40 +60,37 @@ causal4d protocol readiness source-panel-publish \
   /data/causal4d-sloth-multi-action-v1/staging/<execution-id>.json \
   --review-receipt \
   /data/causal4d-sloth-multi-action-v1/staging/reviews/<execution-id>.json \
-  --published-by <registered-publisher-id>
+  --published-by florianpfaff
 ```
 
-The claim-bearing CLI has no receipt-free route. Before publication it:
+Before publication the CLI reruns preflight, validates the canonical receipt,
+revalidates the operator and roles, checks receipt stability, and invokes the
+exactly-once publisher. Under v5 the result records:
 
-1. reruns the complete staged preflight;
-2. verifies the receipt path and canonical digest;
-3. verifies every receipt field against the current preflight;
-4. revalidates the sealed operator registry;
-5. resolves reviewer and publisher as active operators;
-6. proves person-level independence;
-7. checks receipt stability while validation runs; and
-8. invokes the existing exactly-once publisher, which validates all source
-   artifacts again immediately before the final write.
+```text
+governance_mode=single_operator_self_attested
+independent_people=false
+independent_preacquisition_attestation_claimed=false
+```
 
-The publication result includes both operator identities, the review-receipt
-file descriptor, the bound preflight evidence identity, and
-`independent_people=true`.
+Under historical v4 governance, reviewer and publisher must still resolve to
+different person digests and `independent_people=true`.
 
 ## Failure handling
 
-A receipt becomes stale if the staged manifest, any referenced artifact, the
-source-panel prefix, or the operator registry changes. Generate a fresh
-preflight and a new receipt. A receipt path is non-overwriting; do not edit or
-replace an existing receipt to rescue a failed publication.
+A receipt becomes stale if the staged manifest, a referenced artifact, the
+source-panel prefix, or the operator registry changes. Review receipts are
+non-overwriting; preserve a failed receipt and create a newly versioned
+pre-acquisition process rather than editing it in place.
 
-Self-review, duplicate person identities under different operator IDs, inactive
-operators, unsupported reviewer roles, review before execution completion,
-receipt-field drift, target-outcome fields, symlinks, and noncanonical receipt
-paths fail closed before the final manifest can be created.
+Unknown or inactive operators, unsupported roles, review before execution
+completion, field drift, target-outcome fields, symlinks, and noncanonical paths
+fail closed. V5 permits same-person review and publication only when the exact
+validated v5 governance policy is active.
 
 ## Scientific boundary
 
 The receipt does not make an execution valid, increment evidence count, reserve
 the next source slot, alter the estimator, or authorize confirmatory collection.
-It records only that a registered second person reviewed the current source
-preflight before a distinct registered person invoked exactly-once publication.
+It records a checksummed self-review before publication. It is not independent
+reproduction or independent attestation.
