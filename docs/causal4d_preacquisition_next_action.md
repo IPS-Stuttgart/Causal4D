@@ -1,7 +1,8 @@
 # Pre-acquisition next-action decision
 
-The registered physical experiment has independent prerequisite, source-panel,
-approval, freeze, and software-lineage gates. The authoritative status commands
+The registered physical experiment has prerequisite, source-panel, approval,
+freeze, and software-lineage gates. Active v5 applies disclosed single-operator
+self-attestation to their human review steps. The authoritative status commands
 remain the source of truth, but their complete blocker lists are not an operator
 runbook.
 
@@ -47,13 +48,13 @@ action from this sequence:
 4. stop on malformed evidence, chronology violations, unexpected source-panel
    entries, or confirmatory collection that began before readiness;
 5. complete the fixed object registration, slip pilot, shared timebase, and
-   independently reviewed contact registration;
-6. acquire, safely stage, verify, independently review, and publish exactly the
-   next registered source-panel execution;
+   two-pass self-reviewed contact registration;
+6. acquire, safely stage, verify, self-review, and publish exactly the next
+   registered source-panel execution;
 7. seal source-panel completion, actuator synchronization, support/gravity, and
    nonconfirmatory end-to-end dry-run gates;
 8. seal the exact clean method freeze;
-9. obtain an independent freeze attestation;
+9. self-attest the freeze with the registered freezer;
 10. seal the deployed software environment;
 11. run the final hash-verified readiness gate; and
 12. validate the freeze and begin only the first registered confirmatory session.
@@ -83,7 +84,7 @@ build the staging manifest from the registered template and actual artifact byte
         ↓
 verify the staged manifest and every referenced artifact
         ↓
-independently review the content-addressed preflight report
+self-review the content-addressed preflight report
         ↓
 publish the manifest exactly once
         ↓
@@ -102,8 +103,8 @@ It does not verify, review, publish, or mutate the final claim-bearing manifest.
 
 The read-only preflight command is emitted under
 `post_acquisition_verification_argv` and writes the path in
-`preflight_report_path`. Independent review is emitted under `staged_review_argv`
-and produces `review_receipt_path`. Publication is separate under
+`preflight_report_path`. The governance-bound self-review is emitted under `staged_review_argv` and
+produces `review_receipt_path`. Publication is separate under
 `claim_bearing_publication_argv`; it is never presented as the immediate
 post-acquisition command.
 
@@ -111,8 +112,9 @@ These fields make the human boundary explicit:
 
 ```json
 {
-  "two_person_publication_required": true,
-  "independent_review_required_before_publication": true,
+  "two_person_publication_required": false,
+  "independent_review_required_before_publication": false,
+  "self_review_required_before_publication": true,
   "changes_registered_method": false,
   "target_outcomes_permitted": false
 }
@@ -169,8 +171,8 @@ source-panel blockers, or premature-collection condition. It deliberately does n
 synthesize a repair command because a method-affecting defect may require a new
 protocol version rather than mutation of the current registration.
 
-Resolve the first invalid boundary under the applicable runbook and independent
-review policy, then rerun the decision command.
+Resolve the first invalid boundary under the applicable runbook and active v5
+self-attestation policy, then rerun the decision command.
 
 ## Scientific boundary
 
