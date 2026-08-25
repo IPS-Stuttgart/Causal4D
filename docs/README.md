@@ -66,8 +66,11 @@ another document.
 
 ### Frozen amendment lineage
 
-- [Pre-acquisition amendment v4](causal4d_preacquisition_v4.md) is the active,
-  byte-locked amendment.
+- [Pre-acquisition governance amendment v5](causal4d_preacquisition_v5.md)
+  is the active, byte-locked amendment. It permits disclosed single-operator
+  self-attestation and makes no independent-attestation claim.
+- [Pre-acquisition amendment v4](causal4d_preacquisition_v4.md) is superseded by
+  v5 and retained unchanged for provenance.
 - [Pre-acquisition amendment v3](causal4d_preacquisition_v3.md) is superseded by
   v4 and retained unchanged for provenance.
 - [Pre-acquisition amendment v2](causal4d_preacquisition_v2.md) is superseded by

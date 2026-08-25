@@ -489,3 +489,40 @@ def test_identity_bindings_reject_nonindependent_freeze_verifier(
 
     assert result["valid"] is False
     assert "lacks required role" in result["error"]
+
+
+def test_v5_allows_truthful_freezer_self_attestation() -> None:
+    registry = _single_operator_registry()
+    method_freeze = {
+        "frozen_by": "florianpfaff",
+        "frozen_at_utc": "2026-07-30T09:00:00Z",
+    }
+    attestation = {
+        "verifier_id": "florianpfaff",
+        "verified_at_utc": "2026-07-30T09:05:00Z",
+    }
+
+    freezer, attester = validate_attestation_operator_identities(
+        method_freeze,
+        attestation,
+        registry,
+        allow_self_attestation=True,
+    )
+
+    assert freezer["operator_id"] == "florianpfaff"
+    assert attester["operator_id"] == freezer["operator_id"]
+
+
+def test_v5_allows_registered_software_environment_self_approval() -> None:
+    registry = _single_operator_registry()
+
+    approver = validate_gate_approver_identity(
+        "software_environment_locked",
+        "florianpfaff",
+        "2026-07-30T09:10:00Z",
+        registry,
+        freezer_person_identity_sha256="3" * 64,
+        allow_software_environment_self_approval=True,
+    )
+
+    assert approver["operator_id"] == "florianpfaff"

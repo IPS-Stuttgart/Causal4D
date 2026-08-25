@@ -14,6 +14,7 @@ from typing import Any
 
 from causal4d.contact_registration import (
     CONTACT_REGISTRATION_SCHEMA_VERSION,
+    SINGLE_OPERATOR_CONTACT_REGISTRATION_SCHEMA_VERSION,
     validate_contact_registration,
 )
 from causal4d.real_protocol import (
@@ -421,8 +422,12 @@ def _cross_check_contact_registration(
     simple_sha256: str,
 ) -> None:
     _require(
-        physical.get("schema_version") == CONTACT_REGISTRATION_SCHEMA_VERSION,
-        "physical contact registration must use schema 3",
+        physical.get("schema_version")
+        in {
+            CONTACT_REGISTRATION_SCHEMA_VERSION,
+            SINGLE_OPERATOR_CONTACT_REGISTRATION_SCHEMA_VERSION,
+        },
+        "physical contact registration must use schema 3 or 4",
     )
     object_record = physical["object"]
     _require(
@@ -459,6 +464,7 @@ def _validate_contact_registration_prerequisite(
     simple_registration: Mapping[str, Any] | None,
     simple_registration_sha256: str | None,
     verify_file_hashes: bool,
+    require_single_operator_review: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     result = _prerequisite_result(path)
     result["file_hashes_verified"] = None if not verify_file_hashes else False
@@ -475,6 +481,12 @@ def _validate_contact_registration_prerequisite(
             "object registration digest is unavailable",
         )
         physical = _load_json_mapping(path)
+        if require_single_operator_review:
+            _require(
+                physical.get("schema_version")
+                == SINGLE_OPERATOR_CONTACT_REGISTRATION_SCHEMA_VERSION,
+                "single-operator governance requires contact registration schema 4",
+            )
         validation = validate_contact_registration(physical, protocol)
         _cross_check_contact_registration(
             physical,

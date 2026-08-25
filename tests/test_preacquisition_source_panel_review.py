@@ -9,6 +9,7 @@ import pytest
 
 import causal4d.preacquisition_source_panel_review as review
 import causal4d.preacquisition_source_panel_review_publication as publication
+from causal4d.preacquisition_protocol_v5 import single_operator_governance_policy
 from causal4d.cli import preacquisition_readiness as readiness_cli
 
 
@@ -407,3 +408,67 @@ def test_cli_review_and_publication_routes(
         == 0
     )
     assert calls == ["review", "publish"]
+
+
+def test_v5_allows_disclosed_same_operator_review_and_publication(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "staging" / "source-01.json"
+    _write_source(source)
+    preflight = _preflight(source)
+    operator = _operator(
+        "florianpfaff",
+        "4" * 64,
+        ["freezer", "gate_approver"],
+    )
+    monkeypatch.setattr(
+        review,
+        "load_registered_preacquisition_chain",
+        lambda root: (
+            {"protocol_id": "protocol", "design_sha256": "a" * 64},
+            {},
+            {},
+            {
+                "plan_id": "plan",
+                "amendment_sha256": "b" * 64,
+                "governance": single_operator_governance_policy(),
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        review,
+        "verify_source_panel_manifest_staging",
+        lambda *args: deepcopy(preflight),
+    )
+    monkeypatch.setattr(
+        review,
+        "_registry",
+        lambda *args: (
+            {"valid": True, "artifact_sha256": "5" * 64, "error": None},
+            {
+                "sealed_at_utc": "2026-08-04T07:00:00Z",
+                "operators": [operator],
+            },
+        ),
+    )
+    receipt = review.build_source_panel_review_receipt(
+        tmp_path,
+        tmp_path,
+        source,
+        reviewed_by="florianpfaff",
+        reviewed_at_utc="2026-08-04T08:02:00Z",
+    )
+    receipt_path = review.write_source_panel_review_receipt(tmp_path, receipt)
+
+    result = review.validate_source_panel_review_receipt(
+        tmp_path,
+        tmp_path,
+        source,
+        receipt_path,
+        published_by="florianpfaff",
+    )
+
+    assert result["independent_people"] is False
+    assert result["independent_preacquisition_attestation_claimed"] is False
+    assert result["governance_mode"] == "single_operator_self_attested"

@@ -1,4 +1,4 @@
-"""Two-person review receipts for staged source-panel publication."""
+"""Governance-bound review receipts for staged source-panel publication."""
 
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ from causal4d.operator_registry import (
     require_registry_precedes_event,
     resolve_operator,
 )
+from causal4d.preacquisition_protocol_v5 import governance_allows_single_operator
 from causal4d.preacquisition_readiness_contracts import (
     _canonical_sha256,
     _read_json_mapping,
@@ -120,6 +121,8 @@ def build_source_panel_review_receipt(
         dataset_root,
         source_json,
     )
+    _, _, _, preacquisition = load_registered_preacquisition_chain(repository_root)
+    single_operator = governance_allows_single_operator(preacquisition)
     registry_result, registry = _registry(repository_root, dataset_root)
     reviewer = resolve_operator(
         registry,
@@ -278,7 +281,7 @@ def validate_source_panel_review_receipt(
     *,
     published_by: str | None,
 ) -> dict[str, Any]:
-    """Require a current review and a distinct registered publisher."""
+    """Require a current review and the registered publication policy."""
 
     _require(receipt_json is not None, "source-panel review receipt is required")
     _require(
@@ -320,13 +323,14 @@ def validate_source_panel_review_receipt(
         published_by,
         name="source-panel publisher",
     )
-    require_distinct_operator_people(
-        reviewer,
-        publisher,
-        relationship=(
-            "source-panel staging review and publication require distinct people"
-        ),
-    )
+    if not single_operator:
+        require_distinct_operator_people(
+            reviewer,
+            publisher,
+            relationship=(
+                "source-panel staging review and publication require distinct people"
+            ),
+        )
     require_registry_precedes_event(
         registry,
         receipt.get("reviewed_at_utc"),
@@ -388,7 +392,12 @@ def validate_source_panel_review_receipt(
         "reviewer_person_identity_sha256": reviewer["person_identity_sha256"],
         "publisher_operator_id": publisher["operator_id"],
         "publisher_person_identity_sha256": publisher["person_identity_sha256"],
-        "independent_people": True,
+        "independent_people": (
+            reviewer["person_identity_sha256"]
+            != publisher["person_identity_sha256"]
+        ),
+        "governance_mode": preacquisition["governance"]["mode"],
+        "independent_preacquisition_attestation_claimed": not single_operator,
         "preflight_evidence_sha256": preflight["evidence_sha256"],
         "target_outcomes_used": False,
     }

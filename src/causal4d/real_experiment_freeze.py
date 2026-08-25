@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from causal4d.atomic_io import atomic_write_json
+from causal4d.preacquisition_protocol_v5 import governance_allows_single_operator
 from causal4d.real_analysis_interval_amendment import (
     REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH,
     REAL_ANALYSIS_INTERVAL_EVIDENCE_REPOSITORY_PATH,
@@ -24,8 +25,8 @@ MILESTONE_ID = "causal4d-same-object-real-v1"
 BPT_PIN_PATH = "requirements/ci/bayesian-phystwin-provider-v1.sha"
 PROTOCOL_PATH = "configs/causal4d/sloth_multi_action_v1.json"
 ACQUISITION_CANDIDATE_PATH = "configs/causal4d/sloth_acquisition_candidate_v1.json"
-PREACQUISITION_PATH = "configs/causal4d/sloth_preacquisition_v4.json"
-PREACQUISITION_PLAN_ID = "causal4d-sloth-preacquisition-v4"
+PREACQUISITION_PATH = "configs/causal4d/sloth_preacquisition_v5.json"
+PREACQUISITION_PLAN_ID = "causal4d-sloth-preacquisition-v5-single-operator"
 MECHANISM_GATE_EVIDENCE_PATH = (
     "runs/causal4d_preacquisition_v4/mechanism_gate_controls.json"
 )
@@ -33,6 +34,7 @@ REQUIRED_LOCKED_PATHS = (
     PROTOCOL_PATH,
     ACQUISITION_CANDIDATE_PATH,
     "configs/causal4d/sloth_multi_action_v1_schedule.csv",
+    "configs/causal4d/sloth_preacquisition_v4.json",
     PREACQUISITION_PATH,
     MECHANISM_GATE_EVIDENCE_PATH,
     REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH,
@@ -41,6 +43,7 @@ REQUIRED_LOCKED_PATHS = (
     "docs/causal4d_same_object_multi_action_protocol.md",
     "docs/causal4d_real_experiment_milestone.md",
     "docs/causal4d_preacquisition_v4.md",
+    "docs/causal4d_preacquisition_v5.md",
     "docs/execution_block_conformal_calibration.md",
     "src/causal4d/execution_block_calibration.py",
     "src/causal4d/cli/execution_block_calibration.py",
@@ -141,8 +144,8 @@ def _preacquisition_contract(
         "wrong pre-acquisition plan id",
     )
     _require(
-        plan.get("status") == "supersedes_v3_before_any_physical_execution",
-        "pre-acquisition v4 was not locked before physical execution",
+        plan.get("status") == "supersedes_v4_before_any_physical_execution",
+        "pre-acquisition v5 was not locked before physical execution",
     )
     amendment_sha256 = plan.get("amendment_sha256")
     _require(
@@ -159,7 +162,17 @@ def _preacquisition_contract(
             "physical_executions_completed_before_supersession"
         )
         == 0,
-        "pre-acquisition v4 was introduced after physical execution began",
+        "pre-acquisition v5 was introduced after physical execution began",
+    )
+
+    _require(
+        governance_allows_single_operator(plan),
+        "pre-acquisition v5 does not bind the registered single-operator policy",
+    )
+    _require(
+        plan["governance"]["independent_preacquisition_attestation_claimed"]
+        is False,
+        "pre-acquisition v5 falsely claims independent attestation",
     )
 
     base_protocol = plan.get("base_protocol", {})
@@ -218,6 +231,8 @@ def _preacquisition_contract(
         "amendment_sha256": amendment_sha256,
         "base_protocol_design_sha256": protocol_design_sha256,
         "confirmatory_execution_count": 36,
+        "governance_mode": plan["governance"]["mode"],
+        "independent_preacquisition_attestation_claimed": False,
         "mechanism_gate_control": {
             "path": MECHANISM_GATE_EVIDENCE_PATH,
             "result_sha256": evidence_sha256,

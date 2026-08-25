@@ -193,7 +193,7 @@ def publish_reviewed_source_panel_manifest(
     review_receipt_json: str | Path,
     published_by: str,
 ) -> dict[str, Any]:
-    """Require a current independent receipt, then publish exactly once."""
+    """Require a current governance-bound receipt, then publish exactly once."""
 
     review = validate_source_panel_review_receipt(
         repository_root,

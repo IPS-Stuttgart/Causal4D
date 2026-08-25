@@ -6,6 +6,8 @@ import numpy as np
 import pytest
 
 from causal4d.contact_registration import (
+    SINGLE_OPERATOR_CONTACT_REGISTRATION_SCHEMA_VERSION,
+    SINGLE_OPERATOR_REVIEW_POLICY,
     build_contact_registration_template,
     validate_contact_registration,
 )
@@ -200,3 +202,41 @@ def test_contact_registration_keeps_approved_schema2_artifacts_readable() -> Non
     result = validate_contact_registration(legacy, protocol)
     assert result["passed"] is True
     assert result["schema_version"] == 2
+
+
+def test_schema4_accepts_two_chronological_self_review_passes() -> None:
+    protocol, artifact = _approved_artifact()
+    artifact["schema_version"] = SINGLE_OPERATOR_CONTACT_REGISTRATION_SCHEMA_VERSION
+    for region in artifact["contact_regions"].values():
+        reviews = region.pop("independent_reviews")
+        reviews[0]["reviewer_id"] = "florianpfaff"
+        reviews[1]["reviewer_id"] = "florianpfaff"
+        region["review_policy"] = SINGLE_OPERATOR_REVIEW_POLICY
+        region["review_passes"] = reviews
+    artifact["acceptance"].pop("independent_review_passed")
+    artifact["acceptance"]["review_policy_passed"] = True
+
+    result = validate_contact_registration(artifact, protocol)
+
+    assert result["passed"] is True
+    assert result["review_policy"] == SINGLE_OPERATOR_REVIEW_POLICY
+    assert result["independent_review_claimed"] is False
+
+
+def test_schema4_rejects_nonchronological_self_review_passes() -> None:
+    protocol, artifact = _approved_artifact()
+    artifact["schema_version"] = SINGLE_OPERATOR_CONTACT_REGISTRATION_SCHEMA_VERSION
+    for region in artifact["contact_regions"].values():
+        reviews = region.pop("independent_reviews")
+        reviews[0]["reviewer_id"] = "florianpfaff"
+        reviews[1]["reviewer_id"] = "florianpfaff"
+        region["review_policy"] = SINGLE_OPERATOR_REVIEW_POLICY
+        region["review_passes"] = reviews
+    artifact["acceptance"].pop("independent_review_passed")
+    artifact["acceptance"]["review_policy_passed"] = True
+    artifact["contact_regions"]["left_forepaw"]["review_passes"][1][
+        "reviewed_at_utc"
+    ] = "2026-07-12T11:59:00Z"
+
+    with pytest.raises(ValueError, match="chronologically ordered"):
+        validate_contact_registration(artifact, protocol)

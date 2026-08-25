@@ -284,3 +284,31 @@ def test_json_and_markdown_writers_are_atomic(tmp_path: Path) -> None:
     markdown = markdown_path.read_text(encoding="utf-8")
     assert "Build staged manifest" in markdown
     assert "Verify staged evidence" in markdown
+
+
+def test_v5_source_action_uses_disclosed_self_review_publication() -> None:
+    decision = _source_decision()
+    decision["governance"] = {
+        "mode": "single_operator_self_attested",
+        "single_operator_allowed": True,
+        "independent_verifier_required": False,
+        "independent_preacquisition_attestation_claimed": False,
+    }
+
+    result = operator_flow.enrich_preacquisition_next_action(decision)
+
+    action = result["action"]
+    assert action["two_person_publication_required"] is False
+    assert action["independent_review_required_before_publication"] is False
+    assert action["self_review_required_before_publication"] is True
+    assert action["reviewer_identity_placeholder"] == (
+        "<registered-self-attesting-operator-id>"
+    )
+    assert action["publisher_identity_placeholder"] == (
+        "<registered-self-attesting-operator-id>"
+    )
+    assert "self_review_of_preflight_report" in action["operator_sequence"]
+    markdown = operator_flow.render_preacquisition_operator_next_action_markdown(
+        result
+    )
+    assert "no independent review is claimed" in markdown

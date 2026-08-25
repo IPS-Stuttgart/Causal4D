@@ -281,6 +281,17 @@ def _derive_action(
     protocol = Path(repository) / PROTOCOL_PATH
     next_check = _readiness("next-action", repository, dataset)
     gates = readiness.get("operational_gates", {})
+    governance = readiness.get("governance", {})
+    single_operator = bool(
+        isinstance(governance, Mapping)
+        and governance.get("mode") == "single_operator_self_attested"
+        and governance.get("single_operator_allowed") is True
+        and governance.get("independent_verifier_required") is False
+        and governance.get("independent_preacquisition_attestation_claimed") is False
+    )
+    verification_role = (
+        "self_attesting_operator" if single_operator else "independent_verifier"
+    )
     if (
         bool(gates)
         and all(not value.get("present") for value in gates.values())
@@ -302,7 +313,11 @@ def _derive_action(
         return _action(
             "stop_and_repair_invalid_evidence",
             "Stop and repair the first invalid evidence boundary",
-            "principal_investigator_and_independent_verifier",
+            (
+                "principal_investigator_and_self_attester"
+                if single_operator
+                else "principal_investigator_and_independent_verifier"
+            ),
             category="invalid_evidence",
             command=_readiness("status", repository, dataset, "--verify-file-hashes"),
             completion=next_check,
@@ -363,7 +378,10 @@ def _derive_action(
             automatable=operation.startswith("scaffold"),
         )
 
-    if registry.get("independent_verifier_available") is not True:
+    if (
+        registry.get("independent_verifier_available") is not True
+        and not single_operator
+    ):
         return _action(
             "stop_independent_verifier_unavailable",
             "Stop: independent verification is unavailable in a single-person project",
@@ -383,7 +401,11 @@ def _derive_action(
         return _action(
             "stop_and_repair_invalid_evidence",
             "Stop and repair the first invalid evidence boundary",
-            "principal_investigator_and_independent_verifier",
+            (
+                "principal_investigator_and_self_attester"
+                if single_operator
+                else "principal_investigator_and_independent_verifier"
+            ),
             category="invalid_evidence",
             command=_readiness("status", repository, dataset, "--verify-file-hashes"),
             completion=next_check,
@@ -407,7 +429,14 @@ def _derive_action(
 
     for name in _MANUAL:
         if _pending(readiness, "prerequisites", name):
-            return _manual_action(name, repository, dataset)
+            action = _manual_action(name, repository, dataset)
+            if single_operator:
+                action["operator_role"] = "self_attesting_operator"
+                if name == "contact_registration":
+                    action["title"] = (
+                        "Complete the two-pass self-reviewed contact registration"
+                    )
+            return action
 
     if source.get("complete") is not True:
         execution = source.get("next_execution")
@@ -464,8 +493,12 @@ def _derive_action(
         attestation = str(root / "method_freeze_validation.json")
         return _action(
             "attest_method_freeze",
-            "Independently attest the sealed method freeze",
-            "independent_verifier",
+            (
+                "Self-attest the sealed method freeze under v5 governance"
+                if single_operator
+                else "Independently attest the sealed method freeze"
+            ),
+            verification_role,
             category="attest",
             command=_freeze(
                 "attest",
@@ -474,7 +507,11 @@ def _derive_action(
                 repository,
                 attestation,
                 "--verified-by",
-                "<registered-independent-verifier-id>",
+                (
+                    "<registered-freezer-id>"
+                    if single_operator
+                    else "<registered-independent-verifier-id>"
+                ),
             ),
             completion=next_check,
             inputs=[freeze],
@@ -488,7 +525,7 @@ def _derive_action(
         return _action(
             "run_final_hash_verified_readiness_gate",
             "Run the final hash-verified readiness gate",
-            "independent_verifier",
+            verification_role,
             category="final_verification",
             command=_readiness(
                 "status",
@@ -523,7 +560,7 @@ def _derive_action(
     return _action(
         "rerun_readiness_diagnostics",
         "Rerun the complete readiness diagnostics",
-        "independent_verifier",
+        verification_role,
         category="final_verification",
         command=_readiness("status", repository, dataset, "--verify-file-hashes"),
         completion=next_check,
@@ -554,6 +591,11 @@ def _decision(
         "readiness_status_sha256": value(readiness, "status_sha256"),
         "source_panel_evidence_sha256": value(source, "evidence_sha256"),
         "source_panel_status_sha256": value(source, "status_sha256"),
+        "governance": (
+            None
+            if readiness is None
+            else deepcopy(dict(readiness.get("governance", {})))
+        ),
         "readiness_valid": (
             None if readiness is None else readiness.get("valid") is True
         ),

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from causal4d.preacquisition_protocol_v5 import single_operator_governance_policy
 from causal4d.real_analysis_interval_amendment import (
     REAL_ANALYSIS_INTERVAL_AMENDMENT_REPOSITORY_PATH,
     REAL_ANALYSIS_INTERVAL_EVIDENCE_REPOSITORY_PATH,
@@ -88,10 +89,11 @@ def _repository(tmp_path: Path) -> Path:
     amendment: dict[str, object] = {
         "schema_version": 1,
         "plan_id": PREACQUISITION_PLAN_ID,
-        "status": "supersedes_v3_before_any_physical_execution",
+        "status": "supersedes_v4_before_any_physical_execution",
         "supersedes": {
             "physical_executions_completed_before_supersession": 0,
         },
+        "governance": single_operator_governance_policy(),
         "base_protocol": {
             "design_sha256": PROTOCOL_SHA,
             "confirmatory_execution_count": 36,

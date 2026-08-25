@@ -16,6 +16,7 @@ from causal4d.operator_registry import (
     validate_gate_approver_identity,
     validate_method_freeze_operator_identity,
 )
+from causal4d.preacquisition_protocol_v5 import governance_allows_single_operator
 
 
 def _require(condition: bool, message: str) -> None:
@@ -63,6 +64,8 @@ def validate_gate_file_operator_identity(
     path: str | Path,
     registry: Mapping[str, Any],
     prerequisites: Mapping[str, Mapping[str, Any]],
+    *,
+    preacquisition: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Validate the identity behind one otherwise-valid operational gate."""
 
@@ -87,6 +90,10 @@ def validate_gate_file_operator_identity(
         freezer_person_identity_sha256=(
             str(freezer_digest) if freezer_digest is not None else None
         ),
+        allow_software_environment_self_approval=(
+            preacquisition is not None
+            and governance_allows_single_operator(preacquisition)
+        ),
     )
     return {
         "approver_operator_id": str(approver["operator_id"]),
@@ -98,8 +105,10 @@ def validate_method_freeze_identity_evidence(
     method_freeze: Mapping[str, Any],
     attestation: Mapping[str, Any] | None,
     registry: Mapping[str, Any],
+    *,
+    preacquisition: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Resolve the freezer and, when present, the independent verifier."""
+    """Resolve the freezer and the policy-compatible registered attester."""
 
     freezer = validate_method_freeze_operator_identity(method_freeze, registry)
     result = {
@@ -111,12 +120,20 @@ def validate_method_freeze_identity_evidence(
             method_freeze,
             attestation,
             registry,
+            allow_self_attestation=(
+                preacquisition is not None
+                and governance_allows_single_operator(preacquisition)
+            ),
         )
         result.update(
             {
                 "verifier_operator_id": str(verifier["operator_id"]),
                 "verifier_person_identity_sha256": str(
                     verifier["person_identity_sha256"]
+                ),
+                "attestation_independent": (
+                    verifier["person_identity_sha256"]
+                    != freezer["person_identity_sha256"]
                 ),
             }
         )
@@ -126,14 +143,16 @@ def validate_method_freeze_identity_evidence(
 def validate_preacquisition_identity_bindings(
     dataset_root: str | Path,
     registry: Mapping[str, Any] | None,
+    *,
+    preacquisition: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Validate every person identity that governs acquisition evidence.
 
-    This derived prerequisite covers the method freezer, independent freeze
-    verifier, timebase and contact-registration approvers, and all operational
+    This derived prerequisite covers the method freezer, the registered freeze
+    attester, timebase and contact-registration approvers, and all operational
     readiness-gate approvers. Missing or still-template evidence is reported as
     incomplete; completed evidence with an unknown, inactive, role-incompatible,
-    postdated, or non-independent identity fails closed.
+    postdated, or policy-incompatible identity fails closed.
     """
 
     from causal4d.preacquisition_readiness_contracts import GATE_PATHS
@@ -217,6 +236,7 @@ def validate_preacquisition_identity_bindings(
             method_freeze,
             attestation,
             registry,
+            preacquisition=preacquisition,
         )
         freezer_digest = identity["freezer_person_identity_sha256"]
         approvals: dict[str, dict[str, str]] = {}
@@ -247,6 +267,11 @@ def validate_preacquisition_identity_bindings(
                     if gate_id == "software_environment_locked"
                     else None
                 ),
+                allow_software_environment_self_approval=(
+                    gate_id == "software_environment_locked"
+                    and preacquisition is not None
+                    and governance_allows_single_operator(preacquisition)
+                ),
             )
             approvals[f"operational_gate:{gate_id}"] = {
                 "operator_id": str(approver["operator_id"]),
@@ -263,7 +288,14 @@ def validate_preacquisition_identity_bindings(
                 "approval_bindings": approvals,
                 "source_sha256": source_sha256,
                 "software_environment_approval_policy": (
-                    "independent_registered_person_distinct_from_method_freezer"
+                    "registered_self_approval_disclosed"
+                    if preacquisition is not None
+                    and governance_allows_single_operator(preacquisition)
+                    else "independent_registered_person_distinct_from_method_freezer"
+                ),
+                "independent_preacquisition_attestation_claimed": not (
+                    preacquisition is not None
+                    and governance_allows_single_operator(preacquisition)
                 ),
                 "template": False,
                 "valid": True,
@@ -295,7 +327,10 @@ def seal_registered_preacquisition_gate(
     """Require a registered, role-compatible approver before sealing a gate."""
 
     from causal4d.preacquisition_gate_validation import seal_preacquisition_gate
-    from causal4d.preacquisition_readiness_contracts import GATE_PATHS
+    from causal4d.preacquisition_readiness_contracts import (
+        GATE_PATHS,
+        load_registered_preacquisition_chain,
+    )
 
     _require(gate_id in GATE_PATHS, f"unknown pre-acquisition gate: {gate_id}")
     gate_path = Path(dataset_root) / GATE_PATHS[gate_id]
@@ -311,6 +346,7 @@ def seal_registered_preacquisition_gate(
         registry_result.get("valid") is True and registry is not None,
         str(registry_result.get("error") or "operator registry is invalid"),
     )
+    _, _, _, preacquisition = load_registered_preacquisition_chain(repository_root)
     approved_at = approved_at_utc or datetime.now(timezone.utc).isoformat()
     freezer_digest: str | None = None
     if gate_id == "software_environment_locked":
@@ -326,6 +362,9 @@ def seal_registered_preacquisition_gate(
         approved_at,
         registry,
         freezer_person_identity_sha256=freezer_digest,
+        allow_software_environment_self_approval=(
+            governance_allows_single_operator(preacquisition)
+        ),
     )
     result = seal_preacquisition_gate(
         repository_root,
