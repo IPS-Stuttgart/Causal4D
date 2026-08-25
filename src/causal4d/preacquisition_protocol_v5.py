@@ -14,7 +14,9 @@ from causal4d.preacquisition_protocol_v4 import load_v4_chain
 PREACQUISITION_V5_SCHEMA_VERSION = 1
 PREACQUISITION_V5_PLAN_ID = "causal4d-sloth-preacquisition-v5-single-operator"
 SINGLE_OPERATOR_GOVERNANCE_MODE = "single_operator_self_attested"
-_CANONICAL_V5_SHA256 = "c0128865c7b527304dc7a6177d7f935d753bfdbc1e4469243f1acaeae6ce8e93"
+_CANONICAL_V5_SHA256 = (
+    "c0128865c7b527304dc7a6177d7f935d753bfdbc1e4469243f1acaeae6ce8e93"
+)
 _INHERITED_V4_FIELDS = (
     "base_protocol",
     "unchanged_acquisition_design",
@@ -113,9 +115,7 @@ def build_preacquisition_v5(v4: Mapping[str, Any]) -> dict[str, Any]:
             "physical_executions_completed_before_supersession": 0,
         },
     }
-    amendment.update(
-        {field: deepcopy(v4[field]) for field in _INHERITED_V4_FIELDS}
-    )
+    amendment.update({field: deepcopy(v4[field]) for field in _INHERITED_V4_FIELDS})
     amendment["governance"] = deepcopy(_CANONICAL_GOVERNANCE)
     amendment["amendment_sha256"] = preacquisition_v5_sha256(amendment)
     validate_preacquisition_v5(amendment, v4)
