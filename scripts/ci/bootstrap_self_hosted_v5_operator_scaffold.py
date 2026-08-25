@@ -136,7 +136,8 @@ def _source_operator(
         isinstance(operators, list) and len(operators) == 1,
         "source registry must contain exactly one person",
     )
-    operator = dict(cast(Mapping[str, Any], operators[0]))
+    operator_values = cast(list[Any], operators)
+    operator = dict(cast(Mapping[str, Any], operator_values[0]))
     _require(
         operator.get("operator_id") == OPERATOR_ID,
         "source registry operator is not florianpfaff",
