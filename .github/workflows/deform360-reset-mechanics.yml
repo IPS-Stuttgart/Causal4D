@@ -93,7 +93,7 @@ jobs:
       github.ref == 'refs/heads/main' &&
       inputs.run_source_diagnostic
     needs: contract
-    runs-on: [self-hosted, Linux, X64, nvidia-smi]
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, data-deform360-v1]
     timeout-minutes: 480
     env:
       DEFORM360_REPLICATION_ROOT: ${{ inputs.data_root }}

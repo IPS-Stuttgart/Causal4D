@@ -53,7 +53,7 @@ def test_self_hosted_job_is_manual_main_only_and_non_mutating() -> None:
     assert "github.event_name == 'workflow_dispatch'" in text
     assert "github.ref == 'refs/heads/main'" in text
     assert "inputs.run_source_diagnostic" in text
-    assert "runs-on: [self-hosted, Linux, X64, nvidia-smi]" in text
+    assert "runs-on: [self-hosted, Linux, X64, nvidia-smi, data-deform360-v1]" in text
     assert "timeout-minutes: 120" in text
     assert "permissions:\n  contents: read" in text
     assert "pull-requests: write" not in text
@@ -112,7 +112,13 @@ def test_registry_binds_the_self_hosted_job_and_fixed_entrypoint() -> None:
     entries = {(entry["workflow"], entry["job"]): entry for entry in payload["jobs"]}
     entry = entries[("deform360-filament-support.yml", "source-diagnostic")]
 
-    assert entry["runner_labels"] == ["self-hosted", "Linux", "X64", "nvidia-smi"]
+    assert entry["runner_labels"] == [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi",
+        "data-deform360-v1",
+    ]
     assert entry["authorization_model"] == "main-only"
     assert entry["purpose"] == "Locked Deform360 source filament-support diagnostic"
     assert entry["dataset_access"] == "approved-source-only-deform360"

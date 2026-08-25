@@ -118,7 +118,8 @@
         "self-hosted",
         "Linux",
         "X64",
-        "nvidia-smi"
+        "nvidia-smi",
+        "data-deform360-v1"
       ],
       "purpose": "Locked Deform360 source contact/support diagnostic",
       "dataset_access": "approved-source-only-deform360",
@@ -132,7 +133,8 @@
         "self-hosted",
         "Linux",
         "X64",
-        "nvidia-smi"
+        "nvidia-smi",
+        "data-deform360-v1"
       ],
       "purpose": "Locked Deform360 source filament-support diagnostic",
       "dataset_access": "approved-source-only-deform360",
@@ -146,7 +148,8 @@
         "self-hosted",
         "Linux",
         "X64",
-        "nvidia-smi"
+        "nvidia-smi",
+        "data-deform360-v1"
       ],
       "purpose": "Locked Deform360 source prefix-kinematics diagnostic",
       "dataset_access": "approved-source-only-deform360",
@@ -160,7 +163,8 @@
         "self-hosted",
         "Linux",
         "X64",
-        "nvidia-smi"
+        "nvidia-smi",
+        "data-deform360-v1"
       ],
       "purpose": "Locked Deform360 source reset-mechanics diagnostic",
       "dataset_access": "approved-source-only-deform360",
@@ -216,7 +220,8 @@
         "self-hosted",
         "Linux",
         "X64",
-        "nvidia-smi"
+        "nvidia-smi",
+        "host-workstation2"
       ],
       "purpose": "CUDA qualification and controlled replication",
       "dataset_access": "none",

@@ -47,7 +47,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' &&
       github.ref == 'refs/heads/main'
-    runs-on: [self-hosted, Linux, X64, nvidia-smi]
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, host-workstation2]
     timeout-minutes: 180
     steps:
       - name: Check out exact reviewed Causal4D revision

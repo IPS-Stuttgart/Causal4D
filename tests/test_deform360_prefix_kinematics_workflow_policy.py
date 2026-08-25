@@ -41,7 +41,7 @@ def test_prefix_kinematics_gpu_evidence_requires_explicit_dispatch() -> None:
     assert "workflow_dispatch:" in text
     assert "github.event_name == 'workflow_dispatch'" in text
     assert "inputs.run_source_diagnostic" in text
-    assert "runs-on: [self-hosted, Linux, X64, nvidia-smi]" in text
+    assert "runs-on: [self-hosted, Linux, X64, nvidia-smi, data-deform360-v1]" in text
     assert "Check out pinned public BayesianPhysTwin" in text
     assert "BPT_READ_SSH_KEY" not in text
     assert "ssh-key:" not in text
