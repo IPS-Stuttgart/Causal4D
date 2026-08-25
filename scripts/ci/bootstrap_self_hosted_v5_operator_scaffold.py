@@ -11,7 +11,7 @@ import shutil
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from causal4d.atomic_io import atomic_write_json
 from causal4d.operator_registry import (
@@ -136,7 +136,7 @@ def _source_operator(
         isinstance(operators, list) and len(operators) == 1,
         "source registry must contain exactly one person",
     )
-    operator = dict(operators[0])
+    operator = dict(cast(Mapping[str, Any], operators[0]))
     _require(
         operator.get("operator_id") == OPERATOR_ID,
         "source registry operator is not florianpfaff",
