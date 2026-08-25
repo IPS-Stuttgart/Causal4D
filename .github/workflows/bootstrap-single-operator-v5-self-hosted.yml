@@ -1,0 +1,267 @@
+name: Bootstrap single-operator v5 scaffold
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    name: Bootstrap the fresh v5 acquisition scaffold on workstation2
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.event.issue.user.login == 'FlorianPfaff' &&
+      github.event.issue.user.id == 6773539 &&
+      github.event.issue.title ==
+        '[self-hosted] bootstrap Causal4D v5 operator scaffold'
+    concurrency:
+      group: causal4d-single-operator-v5-bootstrap
+      cancel-in-progress: false
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, data-causal4d-physical-v1]
+    timeout-minutes: 45
+    outputs:
+      created: ${{ steps.summary.outputs.created }}
+      dataset_modified: ${{ steps.summary.outputs.dataset_modified }}
+      plan_id: ${{ steps.summary.outputs.plan_id }}
+      registry_artifact_sha256: >-
+        ${{ steps.summary.outputs.registry_artifact_sha256 }}
+      receipt_artifact_sha256: >-
+        ${{ steps.summary.outputs.receipt_artifact_sha256 }}
+      operator_count: ${{ steps.summary.outputs.operator_count }}
+      independent_verifier_available: >-
+        ${{ steps.summary.outputs.independent_verifier_available }}
+      next_action: ${{ steps.summary.outputs.next_action }}
+      physical_required: ${{ steps.summary.outputs.physical_required }}
+      physical_evidence_increment: >-
+        ${{ steps.summary.outputs.physical_evidence_increment }}
+    steps:
+      - name: Check out exact reviewed main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Verify reviewed main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Build and install the exact Causal4D wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p outputs/single-operator-v5-bootstrap/wheels
+          python -m venv .single-operator-v5-bootstrap-venv
+          .single-operator-v5-bootstrap-venv/bin/python -m pip install             --upgrade pip "build>=1.2"
+          .single-operator-v5-bootstrap-venv/bin/python -m build --wheel             --outdir outputs/single-operator-v5-bootstrap/wheels .
+          wheel="$(
+            find outputs/single-operator-v5-bootstrap/wheels -maxdepth 1               -name 'causal4d-*.whl' -print -quit
+          )"
+          test -n "${wheel}"
+          sha256sum "${wheel}"             | tee outputs/single-operator-v5-bootstrap/wheel-sha256.txt
+          .single-operator-v5-bootstrap-venv/bin/python -m pip install "${wheel}"
+          .single-operator-v5-bootstrap-venv/bin/python -m pip check
+          .single-operator-v5-bootstrap-venv/bin/python - <<'PY'
+          from pathlib import Path
+
+          import causal4d
+
+          source_root = (Path.cwd() / "src").resolve()
+          origin = Path(causal4d.__file__).resolve()
+          print("installed import", origin)
+          if origin.is_relative_to(source_root):
+              raise SystemExit(
+                  "Causal4D resolved from the checkout instead of the wheel"
+              )
+          PY
+
+      - name: Create or revalidate the fresh v5 scaffold
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="" .single-operator-v5-bootstrap-venv/bin/python             scripts/ci/bootstrap_self_hosted_v5_operator_scaffold.py             --repository-root "${GITHUB_WORKSPACE}"             --source-dataset-root               /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1             --target-dataset-root               /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5             --output outputs/single-operator-v5-bootstrap/report.json             | tee outputs/single-operator-v5-bootstrap/report.txt
+
+      - name: Verify and export sanitized result fields
+        id: summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          .single-operator-v5-bootstrap-venv/bin/python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(
+              Path(
+                  "outputs/single-operator-v5-bootstrap/report.json"
+              ).read_text(encoding="utf-8")
+          )
+          if report["artifact_kind"] != (
+              "Causal4DSingleOperatorV5BootstrapReport"
+          ):
+              raise SystemExit("unexpected bootstrap report")
+          if report["reviewed_main_commit"] != os.environ["GITHUB_SHA"]:
+              raise SystemExit("bootstrap report commit mismatch")
+          if report["target_preacquisition_plan_id"] != (
+              "causal4d-sloth-preacquisition-v5-single-operator"
+          ):
+              raise SystemExit("bootstrap report plan mismatch")
+          if report["operator_ids"] != ["florianpfaff"]:
+              raise SystemExit("bootstrap report operator mismatch")
+          if report["independent_verifier_available"] is not False:
+              raise SystemExit("bootstrap report claims independent verification")
+          action = report["next_action"]
+          if action["action_id"] != "complete_object_registration":
+              raise SystemExit("fresh v5 scaffold did not reach registration")
+          if action["operator_role"] != "self_attesting_operator":
+              raise SystemExit("fresh v5 scaffold has the wrong operator role")
+          for field in (
+              "target_outcomes_used",
+              "device_nodes_opened",
+              "physical_command_sent",
+              "registered_method_changed",
+          ):
+              if report[field] is not False:
+                  raise SystemExit(f"bootstrap crossed forbidden boundary: {field}")
+          if report["physical_evidence_increment"] != 0:
+              raise SystemExit("bootstrap changed physical evidence")
+
+          print(f"created={str(report['created']).lower()}")
+          print(
+              f"dataset_modified={str(report['dataset_modified']).lower()}"
+          )
+          print(f"plan_id={report['target_preacquisition_plan_id']}")
+          print(
+              "registry_artifact_sha256="
+              f"{report['target_registry_artifact_sha256']}"
+          )
+          print(
+              "receipt_artifact_sha256="
+              f"{report['bootstrap_receipt_artifact_sha256']}"
+          )
+          print(f"operator_count={len(report['operator_ids'])}")
+          print(
+              "independent_verifier_available="
+              f"{str(report['independent_verifier_available']).lower()}"
+          )
+          print(f"next_action={action['action_id']}")
+          print(
+              "physical_required="
+              f"{str(action['physical_acquisition_required']).lower()}"
+          )
+          print(
+              "physical_evidence_increment="
+              f"{report['physical_evidence_increment']}"
+          )
+          PY
+
+      - name: Record runner identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "commit=${GITHUB_SHA}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            uname -a
+          } | tee outputs/single-operator-v5-bootstrap/runner.txt
+          nvidia-smi -L             | tee outputs/single-operator-v5-bootstrap/nvidia-smi-L.txt
+
+      - name: Upload sanitized bootstrap evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: causal4d-single-operator-v5-bootstrap
+          path: |
+            outputs/single-operator-v5-bootstrap/report.json
+            outputs/single-operator-v5-bootstrap/report.txt
+            outputs/single-operator-v5-bootstrap/runner.txt
+            outputs/single-operator-v5-bootstrap/nvidia-smi-L.txt
+            outputs/single-operator-v5-bootstrap/wheel-sha256.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove isolated environment and wheel
+        if: always()
+        shell: bash
+        run: |
+          rm -rf             .single-operator-v5-bootstrap-venv             outputs/single-operator-v5-bootstrap/wheels
+
+  report:
+    name: Report the v5 bootstrap to the trigger issue
+    if: >-
+      always() &&
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.issue.user.login == 'FlorianPfaff' &&
+      github.event.issue.user.id == 6773539 &&
+      github.event.issue.title ==
+        '[self-hosted] bootstrap Causal4D v5 operator scaffold'
+    needs: bootstrap
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      BOOTSTRAP_RESULT: ${{ needs.bootstrap.result }}
+      CREATED: ${{ needs.bootstrap.outputs.created }}
+      DATASET_MODIFIED: ${{ needs.bootstrap.outputs.dataset_modified }}
+      PLAN_ID: ${{ needs.bootstrap.outputs.plan_id }}
+      REGISTRY_ARTIFACT_SHA256: >-
+        ${{ needs.bootstrap.outputs.registry_artifact_sha256 }}
+      RECEIPT_ARTIFACT_SHA256: >-
+        ${{ needs.bootstrap.outputs.receipt_artifact_sha256 }}
+      OPERATOR_COUNT: ${{ needs.bootstrap.outputs.operator_count }}
+      INDEPENDENT_VERIFIER_AVAILABLE: >-
+        ${{ needs.bootstrap.outputs.independent_verifier_available }}
+      NEXT_ACTION: ${{ needs.bootstrap.outputs.next_action }}
+      PHYSICAL_REQUIRED: ${{ needs.bootstrap.outputs.physical_required }}
+      PHYSICAL_EVIDENCE_INCREMENT: >-
+        ${{ needs.bootstrap.outputs.physical_evidence_increment }}
+    steps:
+      - name: Comment with the sanitized bootstrap result
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/"
+          run_url+="${GITHUB_RUN_ID}"
+          body="$(cat <<EOF
+          Causal4D v5 single-operator scaffold bootstrap: **${BOOTSTRAP_RESULT}**
+
+          - Exact reviewed main commit: `${GITHUB_SHA}`
+          - Registered plan: `${PLAN_ID:-unavailable}`
+          - Fresh scaffold created: `${CREATED:-unknown}`
+          - Dataset modified: `${DATASET_MODIFIED:-unknown}`
+          - Registered operator count: `${OPERATOR_COUNT:-unknown}`
+          - Independent verifier available: `${INDEPENDENT_VERIFIER_AVAILABLE:-unknown}`
+          - Registry artifact: `${REGISTRY_ARTIFACT_SHA256:-unavailable}`
+          - Bootstrap receipt: `${RECEIPT_ARTIFACT_SHA256:-unavailable}`
+          - Derived next action: `${NEXT_ACTION:-unavailable}`
+          - Physical acquisition required by next action: `${PHYSICAL_REQUIRED:-unknown}`
+          - Physical evidence increment from this run: `${PHYSICAL_EVIDENCE_INCREMENT:-unknown}`
+          - Workflow run: ${run_url}
+          - Artifact: `causal4d-single-operator-v5-bootstrap`
+
+          This run claims no independent pre-acquisition attestation and does not authorize target access.
+          EOF
+          )"
+          gh issue comment "${ISSUE_NUMBER}"             --repo "${GITHUB_REPOSITORY}"             --body "${body}"
