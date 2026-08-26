@@ -430,6 +430,13 @@ COMMANDS = (
         removed_in=REMOVED_EXECUTABLE_VERSION,
     ),
     CommandSpec(
+        route=("protocol", "reset-mode0-crosscheck"),
+        target="causal4d.cli.reset_mode0_crosscheck:main",
+        summary="Evaluate the preregistered fresh-reset mode-zero scale check.",
+        lifecycle="stable",
+        claim_bearing=True,
+    ),
+    CommandSpec(
         route=("protocol", "contact-registration"),
         target="causal4d.cli.contact_registration:main",
         summary="Create or validate registered physical contact geometry.",

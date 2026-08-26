@@ -62,6 +62,7 @@ another document.
 - [Pre-acquisition next-action derivation](causal4d_preacquisition_next_action.md)
 - [Next-action packet](causal4d_preacquisition_next_action_packet.md)
 - [Next-action validation](causal4d_preacquisition_next_action_validation.md)
+- [Fresh-reset mode-0 cross-check](causal4d_reset_mode0_pilot.md)
 - [Self-hosted pre-acquisition automation](self_hosted_preacquisition_automation.md)
 
 ### Frozen amendment lineage

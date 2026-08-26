@@ -25,6 +25,7 @@ from causal4d.preacquisition_readiness_contracts import (
     SOURCE_PANEL_MANIFEST_PATH as SOURCE_PANEL_MANIFEST_PATH,
     SOURCE_PANEL_MANIFEST_TEMPLATE_PATH,
     _parse_utc_timestamp,
+    _require,
     gate_evidence_sha256 as gate_evidence_sha256,
     gate_evidence_template,
     load_registered_preacquisition_chain,
@@ -36,6 +37,7 @@ from causal4d.real_evidence_contract_v2 import build_real_evidence_status
 from causal4d.registered_real_analysis_prerequisite import (
     validate_registered_real_analysis_prerequisite,
 )
+from causal4d.reset_mode0_crosscheck import load_reset_mode0_crosscheck_prerequisite
 
 
 def _publish_template(
@@ -169,6 +171,12 @@ def evaluate_preacquisition_readiness(
     prerequisites = {
         str(name): dict(value) for name, value in real_status["prerequisites"].items()
     }
+    require_reset_mode0_crosscheck = "prospective_mode0_reset_crosscheck" in v4
+    if require_reset_mode0_crosscheck:
+        _require(
+            "reset_mode0_crosscheck" in prerequisites,
+            "v5 readiness is missing the reset mode-0 prerequisite",
+        )
     if require_registered_analysis:
         prerequisites["registered_analysis"] = (
             validate_registered_real_analysis_prerequisite(
@@ -211,6 +219,7 @@ def evaluate_preacquisition_readiness(
         "acquisition_schedule",
         "object_registration",
         "slip_pilot",
+        *(() if not require_reset_mode0_crosscheck else ("reset_mode0_crosscheck",)),
         "timebase_calibration",
         "contact_registration",
         "operator_registry",
@@ -375,6 +384,10 @@ def evaluate_preacquisition_readiness(
         flags["primary_analysis_registered"] = prerequisites["registered_analysis"].get(
             "valid", False
         )
+    if require_reset_mode0_crosscheck:
+        flags["reset_mode0_crosscheck_completed"] = prerequisites[
+            "reset_mode0_crosscheck"
+        ].get("valid", False)
     ready = not blockers and all(flags.values())
     flags["first_confirmatory_execution_allowed"] = ready
     valid = (
@@ -447,6 +460,14 @@ def build_preacquisition_readiness(
         dataset_root,
         repository_root=repository_root,
         verify_file_hashes=verify_file_hashes,
+    )
+    real_status["prerequisites"]["reset_mode0_crosscheck"] = (
+        load_reset_mode0_crosscheck_prerequisite(
+            protocol,
+            v4,
+            dataset_root,
+            verify_file_hashes=verify_file_hashes,
+        )
     )
     return evaluate_preacquisition_readiness(
         protocol,

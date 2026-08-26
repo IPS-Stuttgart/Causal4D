@@ -200,6 +200,34 @@ def test_publish_is_exactly_once_and_advances_registered_order(
         source_control.publish_source_panel_manifest(tmp_path, tmp_path, source)
 
 
+def test_v5_publish_rejects_missing_mode0_audit_before_reading_source(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _, _, v4 = _patch_chain(monkeypatch)
+    v4["prospective_mode0_reset_crosscheck"] = {}
+    calls = []
+
+    def missing(protocol, preacquisition, root, *, verify_file_hashes):
+        calls.append((protocol, preacquisition, root, verify_file_hashes))
+        return {
+            "present": False,
+            "valid": False,
+            "error": "reset-mode0-crosscheck.json is missing",
+        }
+
+    monkeypatch.setattr(
+        source_control,
+        "load_reset_mode0_crosscheck_prerequisite",
+        missing,
+    )
+    with pytest.raises(ValueError, match="requires the valid reset mode-0"):
+        source_control.publish_source_panel_manifest(
+            tmp_path, tmp_path, tmp_path / "source-must-not-be-read.json"
+        )
+    assert len(calls) == 1
+
+
 def test_publish_rejects_bad_artifact_hash_without_final_manifest(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

@@ -22,6 +22,10 @@ from causal4d.preacquisition_readiness_contracts import (
     load_registered_preacquisition_chain,
 )
 from causal4d.preacquisition_source_panel_control import build_source_panel_status
+from causal4d.reset_mode0_crosscheck import (
+    RESET_MODE0_ARTIFACT_PATH,
+    RESET_MODE0_INPUT_PATH,
+)
 
 NEXT_ACTION_SCHEMA_VERSION = 1
 NEXT_ACTION_ARTIFACT_KIND = "Causal4DPreacquisitionNextAction"
@@ -427,7 +431,7 @@ def _derive_action(
             automatable=True,
         )
 
-    for name in _MANUAL:
+    for name in ("object_registration", "contact_registration", "slip_pilot"):
         if _pending(readiness, "prerequisites", name):
             action = _manual_action(name, repository, dataset)
             if single_operator:
@@ -438,9 +442,48 @@ def _derive_action(
                     )
             return action
 
+    if (
+        "reset_mode0_crosscheck" in readiness.get("prerequisites", {})
+        and _pending(readiness, "prerequisites", "reset_mode0_crosscheck")
+    ):
+        input_path = str(root / RESET_MODE0_INPUT_PATH)
+        output_path = str(root / RESET_MODE0_ARTIFACT_PATH)
+        input_present = Path(input_path).is_file()
+        return _action(
+            "run_reset_mode0_crosscheck",
+            (
+                "Run the preregistered fresh-reset mode-0 cross-check"
+                if input_present
+                else "Prepare the fresh-reset NPZ and run the mode-0 cross-check"
+            ),
+            "acquisition_operator",
+            category="preacquisition_analysis",
+            command=_cmd(
+                "protocol",
+                "reset-mode0-crosscheck",
+                repository,
+                dataset,
+                input_path,
+                output_path,
+            ),
+            completion=next_check,
+            inputs=[
+                input_path,
+                str(root / "object_registration.json"),
+                str(root / "contact_registration.json"),
+            ],
+            outputs=[output_path],
+            blockers=[] if input_present else ["fresh_reset_pilot_npz_missing"],
+            automatable=input_present,
+        )
+
+    if _pending(readiness, "prerequisites", "timebase_calibration"):
+        return _manual_action("timebase_calibration", repository, dataset)
+
     if source.get("complete") is not True:
         execution = source.get("next_execution")
-        _require(isinstance(execution, Mapping), "next source execution is missing")
+        if not isinstance(execution, Mapping):
+            raise ValueError("next source execution is missing")
         execution_id = str(execution["execution_id"])
         staging = str(root / "staging" / f"{execution_id}.json")
         return _action(
@@ -632,7 +675,9 @@ def derive_preacquisition_next_action(
         ),
     }
     for name, value in identity.items():
-        _require(isinstance(value, str) and value, f"readiness {name} is missing")
+        _require(
+            isinstance(value, str) and bool(value), f"readiness {name} is missing"
+        )
         _require(value == source_panel.get(name), f"status {name} values differ")
     _require(
         source_panel.get("target_outcomes_used") is False,
