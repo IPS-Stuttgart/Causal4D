@@ -1414,6 +1414,7 @@ def validate_object_registration(
         )
         _require(
             isinstance(descriptor.get("node_count"), int)
+            and not isinstance(descriptor["node_count"], bool)
             and descriptor["node_count"] > 0,
             f"contact node count is invalid: {region_id}",
         )

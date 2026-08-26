@@ -6,6 +6,10 @@ import argparse
 import json
 from collections.abc import Sequence
 
+from causal4d.object_registration import (
+    seal_object_registration,
+    sha256_ordinary_file,
+)
 from causal4d.operator_bound_real_evidence import (
     build_operator_bound_real_evidence_status as build_real_evidence_status,
     validate_operator_bound_real_dataset as validate_real_dataset_v2,
@@ -56,6 +60,36 @@ def build_parser() -> argparse.ArgumentParser:
     )
     scaffold.add_argument("protocol_json")
     scaffold.add_argument("output_root")
+
+    object_registration = subparsers.add_parser(
+        "object-registration-seal",
+        help="hash and atomically seal the fixed object and contact-node registration",
+    )
+    object_registration.add_argument("protocol_json")
+    object_registration.add_argument("dataset_root")
+    object_registration.add_argument("--object-instance-serial", required=True)
+    object_registration.add_argument("--phystwin-model-id", required=True)
+    model_source = object_registration.add_mutually_exclusive_group(required=True)
+    model_source.add_argument(
+        "--phystwin-model-file",
+        help="ordinary model artifact whose SHA-256 is registered",
+    )
+    model_source.add_argument(
+        "--phystwin-model-sha256",
+        help="precomputed SHA-256 when the exact model artifact is unavailable locally",
+    )
+    for region_id in ("left_forepaw", "right_forepaw", "upper_torso"):
+        option = region_id.replace("_", "-")
+        object_registration.add_argument(
+            f"--{option}-node-set",
+            required=True,
+            help="ordinary canonical node-set file below the dataset root",
+        )
+        object_registration.add_argument(
+            f"--{option}-node-count",
+            required=True,
+            type=int,
+        )
 
     analysis_seal = subparsers.add_parser(
         "analysis-manifest-seal",
@@ -146,6 +180,31 @@ def main(argv: Sequence[str] | None = None) -> int:
                 **result,
                 **scaffold_real_evidence_v2_templates(protocol, args.output_root),
             }
+        elif args.command == "object-registration-seal":
+            if args.phystwin_model_file:
+                model_sha256, _ = sha256_ordinary_file(
+                    args.phystwin_model_file,
+                    name="PhysTwin model artifact",
+                )
+            else:
+                model_sha256 = args.phystwin_model_sha256
+            result = seal_object_registration(
+                load_protocol(args.protocol_json),
+                args.dataset_root,
+                object_instance_serial=args.object_instance_serial,
+                phystwin_model_id=args.phystwin_model_id,
+                phystwin_model_sha256=model_sha256,
+                contact_node_set_paths={
+                    "left_forepaw": args.left_forepaw_node_set,
+                    "right_forepaw": args.right_forepaw_node_set,
+                    "upper_torso": args.upper_torso_node_set,
+                },
+                contact_node_counts={
+                    "left_forepaw": args.left_forepaw_node_count,
+                    "right_forepaw": args.right_forepaw_node_count,
+                    "upper_torso": args.upper_torso_node_count,
+                },
+            )
         elif args.command == "analysis-manifest-seal":
             result = seal_registered_real_analysis_manifest(
                 args.repository_root,
