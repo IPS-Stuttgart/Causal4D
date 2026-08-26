@@ -38,6 +38,12 @@ _MANUAL = {
         "object_registration.json",
         False,
     ),
+    "contact_registration": (
+        "Publish the independently reviewed contact registration",
+        "contact_registration.staging.json",
+        "contact_registration.json",
+        False,
+    ),
     "slip_pilot": (
         "Complete the preregistered slip go/no-go pilot",
         "slip_pilot.template.json",
@@ -49,12 +55,6 @@ _MANUAL = {
         "timebase_calibration.template.json",
         "timebase_calibration.json",
         True,
-    ),
-    "contact_registration": (
-        "Publish the independently reviewed contact registration",
-        "contact_registration.staging.json",
-        "contact_registration.json",
-        False,
     ),
 }
 _GATE = {

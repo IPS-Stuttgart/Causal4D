@@ -47,17 +47,18 @@ action from this sequence:
 3. scaffold and seal the operator identity registry;
 4. stop on malformed evidence, chronology violations, unexpected source-panel
    entries, or confirmatory collection that began before readiness;
-5. complete the fixed object registration, slip pilot, shared timebase, and
-   two-pass self-reviewed contact registration;
-6. acquire, safely stage, verify, self-review, and publish exactly the next
+5. complete the fixed object registration, then the authoritative two-pass
+   self-reviewed contact registration;
+6. complete the slip pilot and shared timebase calibration;
+7. acquire, safely stage, verify, self-review, and publish exactly the next
    registered source-panel execution;
-7. seal source-panel completion, actuator synchronization, support/gravity, and
+8. seal source-panel completion, actuator synchronization, support/gravity, and
    nonconfirmatory end-to-end dry-run gates;
-8. seal the exact clean method freeze;
-9. self-attest the freeze with the registered freezer;
-10. seal the deployed software environment;
-11. run the final hash-verified readiness gate; and
-12. validate the freeze and begin only the first registered confirmatory session.
+9. seal the exact clean method freeze;
+10. self-attest the freeze with the registered freezer;
+11. seal the deployed software environment;
+12. run the final hash-verified readiness gate; and
+13. validate the freeze and begin only the first registered confirmatory session.
 
 Operator-registry scaffolding is proposed only when both the sealed registry and its
 registered draft template are absent. When the sealed registry is missing but a
