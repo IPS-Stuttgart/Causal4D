@@ -442,9 +442,8 @@ def _derive_action(
                     )
             return action
 
-    if (
-        "reset_mode0_crosscheck" in readiness.get("prerequisites", {})
-        and _pending(readiness, "prerequisites", "reset_mode0_crosscheck")
+    if "reset_mode0_crosscheck" in readiness.get("prerequisites", {}) and _pending(
+        readiness, "prerequisites", "reset_mode0_crosscheck"
     ):
         input_path = str(root / RESET_MODE0_INPUT_PATH)
         output_path = str(root / RESET_MODE0_ARTIFACT_PATH)
@@ -675,9 +674,7 @@ def derive_preacquisition_next_action(
         ),
     }
     for name, value in identity.items():
-        _require(
-            isinstance(value, str) and bool(value), f"readiness {name} is missing"
-        )
+        _require(isinstance(value, str) and bool(value), f"readiness {name} is missing")
         _require(value == source_panel.get(name), f"status {name} values differ")
     _require(
         source_panel.get("target_outcomes_used") is False,

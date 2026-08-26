@@ -106,9 +106,7 @@ def _completed_manifest(
     bad_digest: bool = False,
 ) -> dict:
     execution_id = execution["execution_id"]
-    artifact_relative = (
-        f"preacquisition/source_panel/executions/{execution_id}/raw.bin"
-    )
+    artifact_relative = f"preacquisition/source_panel/executions/{execution_id}/raw.bin"
     artifact_path = root / artifact_relative
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
     artifact_path.write_bytes(f"physical-source:{execution_id}".encode())
@@ -134,9 +132,7 @@ def _completed_manifest(
 
 
 def _write_final_manifest(root: Path, execution: dict, manifest: dict) -> Path:
-    relative = SOURCE_PANEL_MANIFEST_PATH.format(
-        execution_id=execution["execution_id"]
-    )
+    relative = SOURCE_PANEL_MANIFEST_PATH.format(execution_id=execution["execution_id"])
     path = root / relative
     _write_json(path, manifest)
     return path
@@ -193,8 +189,9 @@ def test_publish_is_exactly_once_and_advances_registered_order(
 
     assert published["execution_id"] == executions[0]["execution_id"]
     assert published["source_panel_status"]["validated_executions"] == 1
-    assert published["source_panel_status"]["next_execution"]["execution_id"] == (
-        executions[1]["execution_id"]
+    assert (
+        published["source_panel_status"]["next_execution"]["execution_id"]
+        == (executions[1]["execution_id"])
     )
     with pytest.raises(ValueError, match="next registered execution"):
         source_control.publish_source_panel_manifest(tmp_path, tmp_path, source)
