@@ -1,0 +1,153 @@
+{
+  "approved_at_utc": "2026-08-26T12:48:52Z",
+  "artifact_id": "fa1b5c9425fd2d3d1a590664aac5ef146fbb3829bddacc562b4544b06b9e3885",
+  "artifact_kind": "Causal4DAnatomicalNodeSetApproval",
+  "canonical_material_graph_sha256": "5c73c1c0be79063fdfed71a6ccf25dc2461a48fb795ff45e4800bf1c0aaf0e7f",
+  "claim_boundary": {
+    "object_registration_json_created": false,
+    "physical_commands_sent": false,
+    "physical_contact_registration_approved": false,
+    "slip_reset_pilot_authorized": false,
+    "target_outcomes_used": false
+  },
+  "node_sets": {
+    "left_forepaw": {
+      "bytes": 2187,
+      "node_count": 37,
+      "node_set_id": "ce3f237cb90d90e674e5c700db1c812e8cc0798cdea9d21c386c00b4825392fd",
+      "path": "contact_node_sets/left_forepaw.json",
+      "sha256": "7c57c70b37a9ced60f18f9f394b51c266a9531db9f7d1b9c5f418d53fe67acc9"
+    },
+    "right_forepaw": {
+      "bytes": 4782,
+      "node_count": 108,
+      "node_set_id": "9a3f07f5e8a3ef847e959244c8213c0890d86fad4045565a32dfcec2579069ec",
+      "path": "contact_node_sets/right_forepaw.json",
+      "sha256": "23e44d35a5a99bbb93ce8c0167b4952a5e12fca73a1b3b7285ff4b6fdf357414"
+    },
+    "upper_torso": {
+      "bytes": 1799,
+      "node_count": 26,
+      "node_set_id": "b971a11a54131eb9aa32a4daa81dd4e1b5822a3fa693978519b04585cf604c32",
+      "path": "contact_node_sets/upper_torso.json",
+      "sha256": "2497718a0607d7d8ae9ef534a159ca1db1bd332cd5df10300045b73074a87eb2"
+    }
+  },
+  "protocol_design_sha256": "6d61f2bea96af0ba04faaf3476990b58cd87e0a9c826420c254a012dec647968",
+  "protocol_id": "causal4d-sloth-multi-action-v1",
+  "remaining_physical_requirements": [
+    "confirm_physical_instance_serial",
+    "seal_object_registration_json_with_exact_twin_model",
+    "measure_camera_controller_and_support_frame_closure",
+    "record_support_geometry_and_gravity",
+    "estimate contact_patch_covariance_normals_and_tangent_frames",
+    "measure_multiview_reprojection_error_and_registration_uncertainty",
+    "validate_and_approve_schema4_contact_registration_json"
+  ],
+  "review_passes": {
+    "left_forepaw": [
+      {
+        "candidate_id": "L1",
+        "centroid_canonical_world_m": [
+          0.21555929852498545,
+          0.01804875790116352,
+          -0.046655205053252144
+        ],
+        "reviewed_at_utc": "2026-08-26T12:27:05Z",
+        "reviewer_id": "FlorianPfaff"
+      },
+      {
+        "candidate_id": "L1",
+        "centroid_canonical_world_m": [
+          0.21555929852498545,
+          0.01804875790116352,
+          -0.046655205053252144
+        ],
+        "reviewed_at_utc": "2026-08-26T12:48:52Z",
+        "reviewer_id": "FlorianPfaff"
+      }
+    ],
+    "right_forepaw": [
+      {
+        "candidate_id": "P1",
+        "centroid_canonical_world_m": [
+          0.21068513821120619,
+          0.34415447435997154,
+          -0.030477384881426883
+        ],
+        "reviewed_at_utc": "2026-08-26T12:08:19Z",
+        "reviewer_id": "FlorianPfaff"
+      },
+      {
+        "candidate_id": "P1",
+        "centroid_canonical_world_m": [
+          0.21068513821120619,
+          0.34415447435997154,
+          -0.030477384881426883
+        ],
+        "reviewed_at_utc": "2026-08-26T12:48:52Z",
+        "reviewer_id": "FlorianPfaff"
+      }
+    ],
+    "upper_torso": [
+      {
+        "candidate_id": "M3",
+        "centroid_canonical_world_m": [
+          0.08781193704767659,
+          0.18190548907626758,
+          -0.08080603724176232
+        ],
+        "reviewed_at_utc": "2026-08-26T12:39:06Z",
+        "reviewer_id": "FlorianPfaff"
+      },
+      {
+        "candidate_id": "F2",
+        "centroid_canonical_world_m": [
+          0.07807113287540585,
+          0.1823627450145208,
+          -0.07718951025834452
+        ],
+        "reviewed_at_utc": "2026-08-26T12:48:52Z",
+        "reviewer_id": "FlorianPfaff"
+      }
+    ]
+  },
+  "review_policy": "two_pass_single_operator_review_v1",
+  "reviewer_id": "FlorianPfaff",
+  "schema_version": 8,
+  "selected_overlays": {
+    "camera_0": {
+      "bytes": 405254,
+      "path": "overlays/selected_landmarks_camera_0.png",
+      "sha256": "bdd78011260af9be3a650e6f797d6b21db3c61cd623a1a4129eb508db70491d1"
+    },
+    "camera_1": {
+      "bytes": 420666,
+      "path": "overlays/selected_landmarks_camera_1.png",
+      "sha256": "d365e0f1affcd51e6e5c5363b09c7ef095535c601244d748393b4575c3f140f5"
+    },
+    "camera_2": {
+      "bytes": 423219,
+      "path": "overlays/selected_landmarks_camera_2.png",
+      "sha256": "e931ca4ef4945f2abc85e854b328692b6126d6a2d7647eae425f17ee2f6a16fa"
+    },
+    "multiview": {
+      "bytes": 1261288,
+      "path": "overlays/selected_landmarks_multiview.png",
+      "sha256": "32ca55e4ac874a0b6a9048bc667d078111ebcbe22725c961c7caaed19e42166d"
+    }
+  },
+  "source_artifacts": {
+    "canonical_graph": {
+      "bytes": 715257,
+      "path": "canonical_material_graph.npz",
+      "sha256": "f640056bbd8ba33f5721fd924c199e0075f8ed2a1b92019a303a0be44267f515"
+    },
+    "v5_candidate_bundle_sha256": "3144452646c04089464819ac616e9ffce790c7cff907170b756500542fb446d8",
+    "v7_review_sha256": "556e5952a7338cd0c4c3ab6f39a8d454789a761eca9d24d8723461dd16f05b1d",
+    "v7_selected_preview_sha256": "db2f55a4e81cf0c1a7ae76ffad33a35bae5906709d553fa063e75ac577332898"
+  },
+  "status": "anatomical_node_sets_approved_physical_registration_pending",
+  "upper_torso_interreview_coordinate_rms_m": 0.006004765228199574,
+  "upper_torso_interreview_displacement_m": 0.010400558462764586
+}
