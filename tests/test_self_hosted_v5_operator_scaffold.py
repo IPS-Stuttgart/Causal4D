@@ -203,9 +203,10 @@ def test_bootstrap_refuses_changed_private_roster(tmp_path: Path) -> None:
 def test_bootstrap_refuses_public_private_material(tmp_path: Path) -> None:
     _run(tmp_path)
     key = _private_root(tmp_path) / bootstrap.KEY_FILENAME
-    os.chmod(key, 0o644)
+    owner_mode = stat.S_IMODE(key.stat().st_mode)
+    key.chmod(owner_mode | stat.S_IRGRP)
 
-    with pytest.raises(ValueError, match="mode is 644, expected 600"):
+    with pytest.raises(ValueError, match="mode is 640, expected 600"):
         _run(tmp_path)
 
 
