@@ -38,6 +38,7 @@ def _readiness() -> dict:
             "acquisition_schedule",
             "object_registration",
             "slip_pilot",
+            "reset_mode0_crosscheck",
             "timebase_calibration",
             "contact_registration",
             "operator_registry",
@@ -276,6 +277,24 @@ def test_contact_registration_precedes_slip_pilot() -> None:
     assert action["operator_role"] == "self_attesting_operator"
     assert action["physical_acquisition_required"] is False
     assert action["target_outcomes_permitted"] is False
+
+
+def test_mode0_crosscheck_blocks_source_panel_after_slip_pilot() -> None:
+    readiness = _readiness()
+    readiness["prerequisites"]["reset_mode0_crosscheck"] = _prerequisite(
+        present=False,
+        valid=False,
+    )
+    readiness["missing_prerequisites"] = ["reset_mode0_crosscheck"]
+
+    decision = _derive(readiness, _source_panel(complete=False))
+
+    action = decision["action"]
+    assert action["action_id"] == "run_reset_mode0_crosscheck"
+    assert action["physical_acquisition_required"] is False
+    assert action["automatable"] is False
+    assert action["blocking_items"] == ["fresh_reset_pilot_npz_missing"]
+    assert "protocol reset-mode0-crosscheck" in action["command_text"]
 
 
 def test_source_panel_action_binds_exact_registered_execution() -> None:

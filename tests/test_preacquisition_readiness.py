@@ -460,6 +460,41 @@ def test_readiness_opens_only_when_every_artifact_gate_passes(
     assert status["status_sha256"] == readiness_status_sha256(status)
 
 
+def test_v5_mode0_crosscheck_is_a_fail_closed_prerequisite(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    protocol, v2, v4 = _registered_values()
+    v4["prospective_mode0_reset_crosscheck"] = {}
+    _patch_gate_results(monkeypatch)
+
+    with pytest.raises(ValueError, match="missing the reset mode-0 prerequisite"):
+        evaluate_preacquisition_readiness(
+            protocol,
+            v2,
+            v4,
+            tmp_path,
+            _real_status(),
+            verify_file_hashes=True,
+        )
+
+    real_status = _real_status()
+    real_status["prerequisites"]["reset_mode0_crosscheck"] = {
+        "path": str(tmp_path / "preacquisition/reset-mode0-crosscheck.json"),
+        "present": False,
+        "template": False,
+        "valid": False,
+        "error": "reset-mode0-crosscheck.json is missing",
+    }
+    status = evaluate_preacquisition_readiness(
+        protocol, v2, v4, tmp_path, real_status, verify_file_hashes=True
+    )
+
+    assert "reset_mode0_crosscheck" in status["missing_prerequisites"]
+    assert status["collection_gate"]["reset_mode0_crosscheck_completed"] is False
+    assert status["ready"] is False
+
+
 def test_template_gate_is_valid_but_not_ready(monkeypatch, tmp_path: Path) -> None:
     protocol, v2, v4 = _registered_values()
     _patch_gate_results(

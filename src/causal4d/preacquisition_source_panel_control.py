@@ -28,6 +28,9 @@ from causal4d.preacquisition_readiness_contracts import (
 from causal4d.preacquisition_source_validation import (
     _validate_source_execution_manifest,
 )
+from causal4d.reset_mode0_crosscheck import (
+    load_reset_mode0_crosscheck_prerequisite,
+)
 
 SOURCE_PANEL_STATUS_SCHEMA_VERSION = 1
 SOURCE_PANEL_STATUS_ARTIFACT_KIND = "Causal4DSourcePanelStatus"
@@ -60,9 +63,11 @@ def _registered_source_executions(
 ) -> list[dict[str, Any]]:
     expected_ids, expected_sessions = _expected_source_panel(v2)
     panel = v2.get("preacquisition_signature_panel")
-    _require(isinstance(panel, Mapping), "source-panel registration is missing")
+    if not isinstance(panel, Mapping):
+        raise ValueError("source-panel registration is missing")
     raw_executions = panel.get("executions")
-    _require(isinstance(raw_executions, list), "source-panel executions are missing")
+    if not isinstance(raw_executions, list):
+        raise ValueError("source-panel executions are missing")
     executions = [dict(value) for value in raw_executions]
     _require(
         [str(value.get("execution_id")) for value in executions] == expected_ids,
@@ -77,21 +82,19 @@ def _registered_source_executions(
 
 def _registered_profiles(v2: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     panel = v2.get("preacquisition_signature_panel")
-    _require(isinstance(panel, Mapping), "source-panel registration is missing")
+    if not isinstance(panel, Mapping):
+        raise ValueError("source-panel registration is missing")
     raw_profiles = panel.get("profiles")
-    _require(isinstance(raw_profiles, list), "source-panel profiles are missing")
+    if not isinstance(raw_profiles, list):
+        raise ValueError("source-panel profiles are missing")
     profiles: dict[str, dict[str, Any]] = {}
     for index, value in enumerate(raw_profiles):
-        _require(
-            isinstance(value, Mapping),
-            f"source-panel profile {index} is invalid",
-        )
+        if not isinstance(value, Mapping):
+            raise ValueError(f"source-panel profile {index} is invalid")
         profile = dict(value)
         identifier = profile.get("id")
-        _require(
-            isinstance(identifier, str) and bool(identifier),
-            f"source-panel profile {index} lacks an id",
-        )
+        if not isinstance(identifier, str) or not identifier:
+            raise ValueError(f"source-panel profile {index} lacks an id")
         _require(
             identifier not in profiles,
             f"duplicate source-panel profile: {identifier}",
@@ -375,6 +378,18 @@ def publish_source_panel_manifest(
 
     protocol, _, _, v4 = load_registered_preacquisition_chain(repository_root)
     root = _resolved_dataset_root(dataset_root)
+    if "prospective_mode0_reset_crosscheck" in v4:
+        reset_crosscheck = load_reset_mode0_crosscheck_prerequisite(
+            protocol,
+            v4,
+            root,
+            verify_file_hashes=True,
+        )
+        _require(
+            reset_crosscheck.get("valid") is True,
+            "source-panel publication requires the valid reset mode-0 cross-check: "
+            f"{reset_crosscheck.get('error')}",
+        )
     status_before = build_source_panel_status(
         repository_root,
         root,
@@ -383,7 +398,8 @@ def publish_source_panel_manifest(
     _require(status_before["valid"] is True, "source-panel status is invalid")
     _require(status_before["complete"] is False, "source panel is already complete")
     next_execution = status_before.get("next_execution")
-    _require(isinstance(next_execution, Mapping), "source panel has no next execution")
+    if not isinstance(next_execution, Mapping):
+        raise ValueError("source panel has no next execution")
     _require(
         next_execution.get("template_present") is True
         and next_execution.get("template_valid") is True,
