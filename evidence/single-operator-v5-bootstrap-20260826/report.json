@@ -1,0 +1,42 @@
+{
+  "artifact_kind": "Causal4DSingleOperatorV5BootstrapReport",
+  "bootstrap_implementation_bytes": 22724,
+  "bootstrap_implementation_sha256": "eb3e0436abcc555cc25b5240b61d92b868d85427ec5585b337fd811adb244e9d",
+  "bootstrap_receipt_artifact_sha256": "c4c9299dc51b168e910c704efd6e25558c65f9838a4385827e491bb30de6536e",
+  "claim_boundary": "A fresh owner-only HMAC identity was initialized for v5 because the historical private identity material was unavailable. No historical identity-digest continuity or independent attestation is claimed.",
+  "created": true,
+  "dataset_modified": true,
+  "device_nodes_opened": false,
+  "historical_registry_available": false,
+  "historical_registry_reused": false,
+  "identity_digest_continuity_claimed": false,
+  "identity_initialization_mode": "fresh_owner_hmac_v1",
+  "independent_preacquisition_attestation_claimed": false,
+  "independent_verifier_available": false,
+  "next_action": {
+    "action_id": "complete_object_registration",
+    "automatable": false,
+    "operator_role": "self_attesting_operator",
+    "physical_acquisition_required": false,
+    "target_outcomes_permitted": false
+  },
+  "operator_ids": [
+    "florianpfaff"
+  ],
+  "operator_roles": [
+    "freezer",
+    "gate_approver",
+    "software_environment_approver"
+  ],
+  "physical_command_sent": false,
+  "physical_evidence_increment": 0,
+  "private_identity_material_created": true,
+  "registered_method_changed": false,
+  "report_sha256": "8cd6f2d66d954b49f2f021ea936b3485e70420defa0816b60898f22098092c1b",
+  "reviewed_main_commit": "c4abf3ebe599ba6d2c009d242cab493d95da88af",
+  "schema_version": 2,
+  "target_outcomes_used": false,
+  "target_preacquisition_amendment_sha256": "c0128865c7b527304dc7a6177d7f935d753bfdbc1e4469243f1acaeae6ce8e93",
+  "target_preacquisition_plan_id": "causal4d-sloth-preacquisition-v5-single-operator",
+  "target_registry_artifact_sha256": "4f15d24fc03502d641fc78de269dfa7ffaba75c4419e894a92b9cf24ea5100ab"
+}
