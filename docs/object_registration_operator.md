@@ -5,6 +5,13 @@ The first physical prerequisite after the v5 single-operator scaffold is
 PhysTwin model artifact, and the three preregistered canonical contact-node sets.
 It does not inspect outcomes, operate hardware, or count as an execution.
 
+The approved source-only `P1`/`L1`/`F2` anatomy bundle is preserved at
+`evidence/object-registration-anatomy-v8`. Validate it and prepare the pending
+seal packet with `scripts/ci/prepare_object_registration_seal_packet.py`. The
+committed pending packet intentionally remains blocked until the stable inventory
+serial attached to the exact physical sloth is supplied; the logical protocol
+object ID and test fixture serials are not substitutes.
+
 Place each canonical node-set file below the fresh dataset root, then seal the
 registration once:
 

@@ -1,0 +1,55 @@
+{
+  "anatomical_approval": {
+    "approved_at_utc": "2026-08-26T12:48:52Z",
+    "artifact_id": "fa1b5c9425fd2d3d1a590664aac5ef146fbb3829bddacc562b4544b06b9e3885",
+    "reviewer_id": "FlorianPfaff",
+    "sha256": "5259c81904d3dad88ad53223c862772c29940ae877816e7069b6b4ec6f83d1e6"
+  },
+  "artifact_kind": "Causal4DObjectRegistrationSealPacket",
+  "claim_boundary": {
+    "dataset_mutated": false,
+    "object_registration_json_created": false,
+    "physical_command_sent": false,
+    "physical_contact_registration_approved": false,
+    "slip_reset_pilot_authorized": false,
+    "target_outcomes_used": false
+  },
+  "contact_regions": {
+    "left_forepaw": {
+      "bytes": 2187,
+      "node_count": 37,
+      "node_set_id": "ce3f237cb90d90e674e5c700db1c812e8cc0798cdea9d21c386c00b4825392fd",
+      "path": "contact_node_sets/left_forepaw.json",
+      "selected_candidate_id": "L1",
+      "sha256": "7c57c70b37a9ced60f18f9f394b51c266a9531db9f7d1b9c5f418d53fe67acc9"
+    },
+    "right_forepaw": {
+      "bytes": 4782,
+      "node_count": 108,
+      "node_set_id": "9a3f07f5e8a3ef847e959244c8213c0890d86fad4045565a32dfcec2579069ec",
+      "path": "contact_node_sets/right_forepaw.json",
+      "selected_candidate_id": "P1",
+      "sha256": "23e44d35a5a99bbb93ce8c0167b4952a5e12fca73a1b3b7285ff4b6fdf357414"
+    },
+    "upper_torso": {
+      "bytes": 1799,
+      "node_count": 26,
+      "node_set_id": "b971a11a54131eb9aa32a4daa81dd4e1b5822a3fa693978519b04585cf604c32",
+      "path": "contact_node_sets/upper_torso.json",
+      "selected_candidate_id": "F2",
+      "sha256": "2497718a0607d7d8ae9ef534a159ca1db1bd332cd5df10300045b73074a87eb2"
+    }
+  },
+  "missing_operator_inputs": [
+    "physical_instance_serial"
+  ],
+  "object_id": "sloth_plush_instance_1",
+  "object_instance_serial": null,
+  "packet_id": "7685d393f0ab0d31342213dd44a5d453b610096c61570397fc2c71124a2cdeac",
+  "phystwin_model_id": "phystwin-single_lift_sloth-best_199",
+  "phystwin_model_sha256": "e7b853f8369ccb5b0d56dee0991fd6e95482a2baa37a913fc7f4b22db93044ad",
+  "protocol_design_sha256": "6d61f2bea96af0ba04faaf3476990b58cd87e0a9c826420c254a012dec647968",
+  "protocol_id": "causal4d-sloth-multi-action-v1",
+  "ready_to_seal_object_registration": false,
+  "schema_version": 1
+}
