@@ -266,9 +266,7 @@ def test_contact_registration_precedes_slip_pilot() -> None:
     readiness["prerequisites"]["contact_registration"] = _prerequisite(
         present=False, valid=False
     )
-    readiness["prerequisites"]["slip_pilot"] = _prerequisite(
-        present=False, valid=False
-    )
+    readiness["prerequisites"]["slip_pilot"] = _prerequisite(present=False, valid=False)
     readiness["missing_prerequisites"] = ["slip_pilot", "contact_registration"]
 
     decision = _derive(readiness, _source_panel())
