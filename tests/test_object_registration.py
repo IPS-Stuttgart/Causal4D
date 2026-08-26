@@ -61,9 +61,10 @@ def test_seal_object_registration_hashes_inputs_and_refuses_replacement(
         assert descriptor["canonical_node_set_path"] == (
             f"contact_node_sets/{region_id}.json"
         )
-        assert descriptor["canonical_node_set_sha256"] == hashlib.sha256(
-            path.read_bytes()
-        ).hexdigest()
+        assert (
+            descriptor["canonical_node_set_sha256"]
+            == hashlib.sha256(path.read_bytes()).hexdigest()
+        )
         assert descriptor["node_count"] == 2
 
     with pytest.raises(ValueError, match="already exists"):
