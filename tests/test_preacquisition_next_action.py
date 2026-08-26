@@ -260,6 +260,24 @@ def test_manual_prerequisite_names_exact_paths() -> None:
     assert "protocol real status" in action["completion_check_text"]
 
 
+def test_contact_registration_precedes_slip_pilot() -> None:
+    readiness = _readiness()
+    _enable_single_operator_v5(readiness)
+    readiness["prerequisites"]["contact_registration"] = _prerequisite(
+        present=False, valid=False
+    )
+    readiness["prerequisites"]["slip_pilot"] = _prerequisite(present=False, valid=False)
+    readiness["missing_prerequisites"] = ["slip_pilot", "contact_registration"]
+
+    decision = _derive(readiness, _source_panel())
+
+    action = decision["action"]
+    assert action["action_id"] == "complete_contact_registration"
+    assert action["operator_role"] == "self_attesting_operator"
+    assert action["physical_acquisition_required"] is False
+    assert action["target_outcomes_permitted"] is False
+
+
 def test_source_panel_action_binds_exact_registered_execution() -> None:
     readiness = _readiness()
     source = _source_panel(complete=False)

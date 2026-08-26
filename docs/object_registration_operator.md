@@ -41,3 +41,24 @@ prescribe a serialization format for canonical node sets.
 After sealing, recompute the registered next action with file-hash verification.
 Do not select or revise node sets using source-panel or confirmatory outcome
 quality.
+
+## Contact approval remains separate
+
+`object_registration.json` is the compact fixed-object and canonical-node-set
+index. It is not the authoritative physical contact approval. Before the slip
+pilot, complete `contact_registration.json` as a schema-4
+`PhysicalContactRegistration` with the registered weighted patches, multiview
+overlays, rejected alternatives, frame and support geometry, and two strictly
+chronological review passes by the registered v5 self-attesting operator.
+
+The registered next-action decision must therefore advance in this order:
+
+```text
+object_registration.json
+-> contact_registration.json
+-> slip_pilot.json
+```
+
+Under v5, this is disclosed single-operator self-review; it is not an
+independent-attestation claim. The slip pilot must not start while the
+authoritative contact registration is absent, invalid, or unapproved.
