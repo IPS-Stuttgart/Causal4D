@@ -195,7 +195,7 @@ def _single_operator_v5_issue_main_errors(
             "github.event.issue.user.id == 6773539"
         ): "missing exact maintainer-ID authorization",
         (
-            "'[self-hosted] bootstrap Causal4D v5 operator scaffold'"
+            "'[self-hosted] bootstrap Causal4D v5 owner identity scaffold v2'"
         ): "missing exact trigger-title authorization",
     }
     for fragment, message in required.items():

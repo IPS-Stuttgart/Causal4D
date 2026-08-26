@@ -1,4 +1,4 @@
-name: Bootstrap single-operator v5 scaffold
+name: Bootstrap source-independent single-operator v5 scaffold
 
 on:
   issues:
@@ -17,9 +17,9 @@ jobs:
       github.event.issue.user.login == 'FlorianPfaff' &&
       github.event.issue.user.id == 6773539 &&
       github.event.issue.title ==
-        '[self-hosted] bootstrap Causal4D v5 operator scaffold'
+        '[self-hosted] bootstrap Causal4D v5 owner identity scaffold v2'
     concurrency:
-      group: causal4d-single-operator-v5-bootstrap-${{ github.sha }}
+      group: causal4d-single-operator-v5-bootstrap-v2-${{ github.sha }}
       cancel-in-progress: false
       queue: max
     runs-on: [self-hosted, Linux, X64, nvidia-smi, data-causal4d-physical-v1]
@@ -27,6 +27,16 @@ jobs:
     outputs:
       created: ${{ steps.summary.outputs.created }}
       dataset_modified: ${{ steps.summary.outputs.dataset_modified }}
+      private_identity_material_created: >-
+        ${{ steps.summary.outputs.private_identity_material_created }}
+      identity_initialization_mode: >-
+        ${{ steps.summary.outputs.identity_initialization_mode }}
+      historical_registry_available: >-
+        ${{ steps.summary.outputs.historical_registry_available }}
+      historical_registry_reused: >-
+        ${{ steps.summary.outputs.historical_registry_reused }}
+      identity_digest_continuity_claimed: >-
+        ${{ steps.summary.outputs.identity_digest_continuity_claimed }}
       plan_id: ${{ steps.summary.outputs.plan_id }}
       registry_artifact_sha256: >-
         ${{ steps.summary.outputs.registry_artifact_sha256 }}
@@ -93,15 +103,15 @@ jobs:
               )
           PY
 
-      - name: Create or revalidate the fresh v5 scaffold
+      - name: Create or revalidate the source-independent v5 scaffold
         shell: bash
         run: |
           set -euo pipefail
           PYTHONPATH="" .single-operator-v5-bootstrap-venv/bin/python \
             scripts/ci/bootstrap_self_hosted_v5_operator_scaffold.py \
             --repository-root "${GITHUB_WORKSPACE}" \
-            --source-dataset-root \
-              /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1 \
+            --private-identity-root \
+              /mnt/lexar4tb/causal4d-physical/private/operator-registry-v5 \
             --target-dataset-root \
               /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5 \
             --output outputs/single-operator-v5-bootstrap/report.json \
@@ -126,6 +136,8 @@ jobs:
               "Causal4DSingleOperatorV5BootstrapReport"
           ):
               raise SystemExit("unexpected bootstrap report")
+          if report["schema_version"] != 2:
+              raise SystemExit("unexpected bootstrap report schema")
           if report["reviewed_main_commit"] != os.environ["GITHUB_SHA"]:
               raise SystemExit("bootstrap report commit mismatch")
           if report["target_preacquisition_plan_id"] != (
@@ -136,6 +148,19 @@ jobs:
               raise SystemExit("bootstrap report operator mismatch")
           if report["independent_verifier_available"] is not False:
               raise SystemExit("bootstrap report claims independent verification")
+          if report["independent_preacquisition_attestation_claimed"] is not False:
+              raise SystemExit("bootstrap report claims independent attestation")
+          if report["identity_initialization_mode"] != "fresh_owner_hmac_v1":
+              raise SystemExit("bootstrap identity initialization mode mismatch")
+          for field in (
+              "historical_registry_available",
+              "historical_registry_reused",
+              "identity_digest_continuity_claimed",
+          ):
+              if report[field] is not False:
+                  raise SystemExit(f"bootstrap makes a false identity claim: {field}")
+          if "person_identity_sha256" in json.dumps(report, sort_keys=True):
+              raise SystemExit("bootstrap report exposes the private person digest")
           action = report["next_action"]
           if action["action_id"] != "complete_object_registration":
               raise SystemExit("fresh v5 scaffold did not reach registration")
@@ -157,6 +182,26 @@ jobs:
           print(f"created={str(report['created']).lower()}")
           print(
               f"dataset_modified={str(report['dataset_modified']).lower()}"
+          )
+          print(
+              "private_identity_material_created="
+              f"{str(report['private_identity_material_created']).lower()}"
+          )
+          print(
+              "identity_initialization_mode="
+              f"{report['identity_initialization_mode']}"
+          )
+          print(
+              "historical_registry_available="
+              f"{str(report['historical_registry_available']).lower()}"
+          )
+          print(
+              "historical_registry_reused="
+              f"{str(report['historical_registry_reused']).lower()}"
+          )
+          print(
+              "identity_digest_continuity_claimed="
+              f"{str(report['identity_digest_continuity_claimed']).lower()}"
           )
           print(f"plan_id={report['target_preacquisition_plan_id']}")
           print(
@@ -203,7 +248,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: causal4d-single-operator-v5-bootstrap
+          name: causal4d-single-operator-v5-owner-bootstrap-v2
           path: |
             outputs/single-operator-v5-bootstrap/report.json
             outputs/single-operator-v5-bootstrap/report.txt
@@ -231,7 +276,7 @@ jobs:
       github.event.issue.user.login == 'FlorianPfaff' &&
       github.event.issue.user.id == 6773539 &&
       github.event.issue.title ==
-        '[self-hosted] bootstrap Causal4D v5 operator scaffold'
+        '[self-hosted] bootstrap Causal4D v5 owner identity scaffold v2'
     needs: bootstrap
     runs-on: ubuntu-latest
     permissions:
@@ -243,6 +288,16 @@ jobs:
       BOOTSTRAP_RESULT: ${{ needs.bootstrap.result }}
       CREATED: ${{ needs.bootstrap.outputs.created }}
       DATASET_MODIFIED: ${{ needs.bootstrap.outputs.dataset_modified }}
+      PRIVATE_IDENTITY_MATERIAL_CREATED: >-
+        ${{ needs.bootstrap.outputs.private_identity_material_created }}
+      IDENTITY_INITIALIZATION_MODE: >-
+        ${{ needs.bootstrap.outputs.identity_initialization_mode }}
+      HISTORICAL_REGISTRY_AVAILABLE: >-
+        ${{ needs.bootstrap.outputs.historical_registry_available }}
+      HISTORICAL_REGISTRY_REUSED: >-
+        ${{ needs.bootstrap.outputs.historical_registry_reused }}
+      IDENTITY_DIGEST_CONTINUITY_CLAIMED: >-
+        ${{ needs.bootstrap.outputs.identity_digest_continuity_claimed }}
       PLAN_ID: ${{ needs.bootstrap.outputs.plan_id }}
       REGISTRY_ARTIFACT_SHA256: >-
         ${{ needs.bootstrap.outputs.registry_artifact_sha256 }}
@@ -269,6 +324,11 @@ jobs:
           - Registered plan: `${PLAN_ID:-unavailable}`
           - Fresh scaffold created: `${CREATED:-unknown}`
           - Dataset modified: `${DATASET_MODIFIED:-unknown}`
+          - Fresh private owner identity created: `${PRIVATE_IDENTITY_MATERIAL_CREATED:-unknown}`
+          - Identity initialization mode: `${IDENTITY_INITIALIZATION_MODE:-unavailable}`
+          - Historical registry available: `${HISTORICAL_REGISTRY_AVAILABLE:-unknown}`
+          - Historical registry reused: `${HISTORICAL_REGISTRY_REUSED:-unknown}`
+          - Historical identity-digest continuity claimed: `${IDENTITY_DIGEST_CONTINUITY_CLAIMED:-unknown}`
           - Registered operator count: `${OPERATOR_COUNT:-unknown}`
           - Independent verifier available: `${INDEPENDENT_VERIFIER_AVAILABLE:-unknown}`
           - Registry artifact: `${REGISTRY_ARTIFACT_SHA256:-unavailable}`
@@ -277,9 +337,9 @@ jobs:
           - Physical acquisition required by next action: `${PHYSICAL_REQUIRED:-unknown}`
           - Physical evidence increment from this run: `${PHYSICAL_EVIDENCE_INCREMENT:-unknown}`
           - Workflow run: ${run_url}
-          - Artifact: `causal4d-single-operator-v5-bootstrap`
+          - Artifact: `causal4d-single-operator-v5-owner-bootstrap-v2`
 
-          This run claims no independent pre-acquisition attestation and does not authorize target access.
+          This run initializes a fresh owner-only HMAC identity. It claims neither historical identity-digest continuity nor independent pre-acquisition attestation, and it does not authorize target access.
           EOF
           )"
           gh issue comment "${ISSUE_NUMBER}" \

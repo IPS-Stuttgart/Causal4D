@@ -8,7 +8,7 @@
       "description": "Exact registered-maintainer issue trigger on reviewed refs/heads/main, exact GITHUB_SHA checkout, clean-tree verification, read-only self-hosted token, no issue text execution, and no secrets."
     },
     "single-operator-v5-issue-main": {
-      "description": "Exact registered-owner issue trigger on reviewed refs/heads/main for the nonphysical v5 scaffold bootstrap, exact GITHUB_SHA checkout, read-only self-hosted token, no issue text execution, and no secrets."
+      "description": "Exact registered-owner issue trigger on reviewed refs/heads/main for the nonphysical source-independent v5 owner-identity bootstrap, exact GITHUB_SHA checkout, read-only self-hosted token, no issue text execution, and no secrets."
     }
   },
   "jobs": [
@@ -54,7 +54,7 @@
         "data-causal4d-physical-v1"
       ],
       "purpose": "Create or revalidate the fresh v5 single-operator acquisition scaffold",
-      "dataset_access": "registered-local-preacquisition-v5-scaffold-bootstrap",
+      "dataset_access": "registered-local-preacquisition-v5-owner-identity-bootstrap",
       "secrets_allowed": false
     },
     {

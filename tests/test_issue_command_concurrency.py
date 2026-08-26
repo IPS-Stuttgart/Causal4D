@@ -18,7 +18,7 @@ ISSUE_COMMAND_JOBS = {
     ),
     "bootstrap-single-operator-v5-self-hosted.yml": (
         "bootstrap",
-        "causal4d-single-operator-v5-bootstrap-${{ github.sha }}",
+        "causal4d-single-operator-v5-bootstrap-v2-${{ github.sha }}",
     ),
     "controlled-execution-campaign.yml": (
         "dispatch",
