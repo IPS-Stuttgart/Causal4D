@@ -1,0 +1,81 @@
+name: Controlled latent-contact robustness
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/controlled-latent-contact-robustness.yml"
+      - "scripts/experiments/analyze_latent_contact_robustness.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: latent-contact-robustness-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  robustness:
+    name: Sixty-four-seed controlled robustness
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install development environment
+        run: python -m pip install -e ".[dev]"
+      - name: Materialize formatter result
+        run: |
+          mkdir -p build/latent-contact-robustness
+          python -m ruff format \
+            scripts/experiments/analyze_latent_contact_robustness.py
+          python -m ruff check \
+            scripts/experiments/analyze_latent_contact_robustness.py
+          cp scripts/experiments/analyze_latent_contact_robustness.py \
+            build/latent-contact-robustness/formatted-analysis.py
+          git diff -- \
+            scripts/experiments/analyze_latent_contact_robustness.py \
+            > build/latent-contact-robustness/format.patch
+      - name: Run controlled latent-contact replication
+        run: |
+          causal4d benchmark latent-contact \
+            --output-dir build/latent-contact-robustness/result \
+            --seeds 0:64 \
+            --frames 56 \
+            --training-repeats 2 \
+            --parameter-grid-count 5 \
+            --contact-parameter-particles 12 \
+            --require-gates
+      - name: Verify result bundle
+        run: |
+          python scripts/ci/verify_result_bundle.py \
+            build/latent-contact-robustness/result/manifest.json
+      - name: Run seed-clustered robustness audit
+        run: |
+          python scripts/experiments/analyze_latent_contact_robustness.py \
+            --interventions \
+              build/latent-contact-robustness/result/interventions.csv \
+            --output-json \
+              build/latent-contact-robustness/robustness.json \
+            --output-csv \
+              build/latent-contact-robustness/point-comparisons.csv \
+            --output-markdown \
+              build/latent-contact-robustness/robustness.md \
+            --bootstrap-replicates 100000 \
+            --bootstrap-seed 20260828
+      - name: Upload complete robustness evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: controlled-latent-contact-robustness-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/latent-contact-robustness/
+          if-no-files-found: error
+          retention-days: 30
