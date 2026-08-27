@@ -45,7 +45,7 @@ def test_readiness_trigger_and_read_only_boundary_are_unchanged() -> None:
     assert "github.event.issue.user.id == 6773539" in text
     assert "permissions:\n  contents: read" in text
     assert "scripts/ci/probe_self_hosted_acquisition.py" in text
-    assert "physical_evidence_increment: \\`0\\`" in text
+    assert "- Physical evidence increment: \\`0\\`" in text
 
 
 def test_readiness_documentation_matches_v5_root_binding() -> None:
