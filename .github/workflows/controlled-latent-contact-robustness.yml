@@ -78,19 +78,6 @@ jobs:
         run: |
           python scripts/ci/verify_result_bundle.py \
             build/latent-contact-robustness/result/manifest.json
-      - name: Run shard-local robustness audit
-        run: |
-          python scripts/experiments/analyze_latent_contact_robustness.py \
-            --interventions \
-              build/latent-contact-robustness/result/interventions.csv \
-            --output-json \
-              build/latent-contact-robustness/robustness.json \
-            --output-csv \
-              build/latent-contact-robustness/point-comparisons.csv \
-            --output-markdown \
-              build/latent-contact-robustness/robustness.md \
-            --bootstrap-replicates 100000 \
-            --bootstrap-seed 20260828
       - name: Record shard identity
         run: |
           printf '%s\n' '${{ matrix.seeds }}' \
@@ -103,5 +90,130 @@ jobs:
         with:
           name: controlled-latent-contact-robustness-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/latent-contact-robustness/
+          if-no-files-found: error
+          retention-days: 30
+
+  aggregate-robustness:
+    name: Aggregate 64-seed robustness audit
+    needs: robustness-shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install development environment
+        run: python -m pip install -e ".[dev]"
+      - name: Download exact-run shard artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: controlled-latent-contact-robustness-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/latent-contact-robustness-shards
+      - name: Combine all 64 seed rows
+        run: |
+          mkdir -p build/latent-contact-robustness-aggregate
+          python - <<'PY'
+          import csv
+          from pathlib import Path
+
+          root = Path("build/latent-contact-robustness-shards")
+          sources = sorted(root.glob("*/result/interventions.csv"))
+          if len(sources) != 8:
+              raise SystemExit(
+                  f"expected 8 shard intervention tables, found {len(sources)}"
+              )
+
+          fieldnames = None
+          rows = []
+          for source in sources:
+              with source.open(newline="", encoding="utf-8") as handle:
+                  reader = csv.DictReader(handle)
+                  current_fields = reader.fieldnames
+                  if current_fields is None:
+                      raise SystemExit(f"missing CSV header: {source}")
+                  if fieldnames is None:
+                      fieldnames = current_fields
+                  elif current_fields != fieldnames:
+                      raise SystemExit(f"CSV header drift in {source}")
+                  rows.extend(reader)
+
+          assert fieldnames is not None
+          seeds = sorted({int(row["seed"]) for row in rows})
+          if seeds != list(range(64)):
+              raise SystemExit(f"expected seeds 0..63 exactly, found {seeds}")
+
+          signatures = [tuple(row[name] for name in fieldnames) for row in rows]
+          if len(signatures) != len(set(signatures)):
+              raise SystemExit("duplicate intervention rows across shard artifacts")
+
+          rows.sort(
+              key=lambda row: (
+                  int(row["seed"]),
+                  row["object"],
+                  row["world_condition"],
+                  row["setting"],
+                  row["method"],
+              )
+          )
+          output = Path(
+              "build/latent-contact-robustness-aggregate/interventions.csv"
+          )
+          with output.open("w", newline="", encoding="utf-8") as handle:
+              writer = csv.DictWriter(handle, fieldnames=fieldnames)
+              writer.writeheader()
+              writer.writerows(rows)
+          print(f"combined {len(rows)} rows from {len(sources)} shards")
+          PY
+      - name: Run one seed-clustered 64-seed audit
+        run: |
+          python scripts/experiments/analyze_latent_contact_robustness.py \
+            --interventions \
+              build/latent-contact-robustness-aggregate/interventions.csv \
+            --output-json \
+              build/latent-contact-robustness-aggregate/robustness.json \
+            --output-csv \
+              build/latent-contact-robustness-aggregate/point-comparisons.csv \
+            --output-markdown \
+              build/latent-contact-robustness-aggregate/robustness.md \
+            --bootstrap-replicates 100000 \
+            --bootstrap-seed 20260828
+      - name: Verify aggregate audit identity
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("build/latent-contact-robustness-aggregate/robustness.json")
+          payload = json.loads(path.read_text(encoding="utf-8"))
+          if payload.get("seed_count") != 64:
+              raise SystemExit(
+                  f"aggregate audit must contain 64 seeds, got {payload.get('seed_count')}"
+              )
+          if payload.get("seeds") != list(range(64)):
+              raise SystemExit("aggregate audit seed roster is not exactly 0..63")
+          print(
+              json.dumps(
+                  {
+                      "robust_shifted_point_supported": payload.get(
+                          "robust_shifted_point_supported"
+                      ),
+                      "seed_count": payload["seed_count"],
+                  },
+                  sort_keys=True,
+              )
+          )
+          PY
+      - name: Upload aggregate 64-seed evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: controlled-latent-contact-robustness-aggregate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/latent-contact-robustness-aggregate/
           if-no-files-found: error
           retention-days: 30
