@@ -8,13 +8,9 @@ WORKFLOW = ROOT / ".github" / "workflows" / "acquisition-readiness-self-hosted.y
 DOCUMENTATION = ROOT / "docs" / "self_hosted_acquisition_readiness.md"
 
 CANONICAL_V5 = "/data/causal4d-sloth-multi-action-v1-v5"
-PERSISTENT_V5 = (
-    "/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5"
-)
+PERSISTENT_V5 = "/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5"
 CANONICAL_HISTORICAL = "/data/causal4d-sloth-multi-action-v1"
-PERSISTENT_HISTORICAL = (
-    "/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1"
-)
+PERSISTENT_HISTORICAL = "/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1"
 
 
 def _workflow_paths() -> set[str]:
