@@ -67,7 +67,9 @@ def _selected(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
-def _validate(rows: list[dict[str, Any]]) -> tuple[list[int], dict[tuple[Any, ...], dict[str, Any]]]:
+def _validate(
+    rows: list[dict[str, Any]],
+) -> tuple[list[int], dict[tuple[Any, ...], dict[str, Any]]]:
     selected = _selected(rows)
     seeds = sorted({int(row["seed"]) for row in selected})
     objects = sorted({str(row["object"]) for row in selected})
@@ -187,9 +189,7 @@ def _comparison(
         [
             np.mean(
                 [
-                    index[(seed, item, world, "latent_contact")][
-                        "trajectory_rmse_m"
-                    ]
+                    index[(seed, item, world, "latent_contact")]["trajectory_rmse_m"]
                     for item in nested_objects
                 ]
             )
@@ -201,9 +201,7 @@ def _comparison(
         [
             np.mean(
                 [
-                    index[(seed, item, world, "nominal_physics")][
-                        "trajectory_rmse_m"
-                    ]
+                    index[(seed, item, world, "nominal_physics")]["trajectory_rmse_m"]
                     for item in nested_objects
                 ]
             )
@@ -232,13 +230,22 @@ def _comparison(
             "object": object_name,
             "case_count": len(case_pairs),
             "case_win_count": int(
-                sum(latent_value < nominal_value for latent_value, nominal_value in case_pairs)
+                sum(
+                    latent_value < nominal_value
+                    for latent_value, nominal_value in case_pairs
+                )
             ),
             "worst_case_gain_m": float(
-                min(nominal_value - latent_value for latent_value, nominal_value in case_pairs)
+                min(
+                    nominal_value - latent_value
+                    for latent_value, nominal_value in case_pairs
+                )
             ),
             "worst_case_ratio": float(
-                max(latent_value / nominal_value for latent_value, nominal_value in case_pairs)
+                max(
+                    latent_value / nominal_value
+                    for latent_value, nominal_value in case_pairs
+                )
             ),
         }
     )
@@ -317,9 +324,7 @@ def _calibration_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     np.mean([row["nominal_gaussian_nll"] for row in selected])
                 ),
                 "mean_adjusted_nll_gain_over_nominal": float(
-                    np.mean(
-                        [row["adjusted_nll_gain_over_nominal"] for row in selected]
-                    )
+                    np.mean([row["adjusted_nll_gain_over_nominal"] for row in selected])
                 ),
                 "mean_variance_scale": float(
                     np.mean([row["variance_scale"] for row in selected])
@@ -328,10 +333,7 @@ def _calibration_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     np.mean([row["interval_width_multiplier"] for row in selected])
                 ),
                 "case_win_count": int(
-                    sum(
-                        row["adjusted_nll_gain_over_nominal"] > 0.0
-                        for row in selected
-                    )
+                    sum(row["adjusted_nll_gain_over_nominal"] > 0.0 for row in selected)
                 ),
             }
         )
@@ -396,9 +398,7 @@ def main() -> int:
     topology_excluded_summary = _calibration_summary(topology_excluded_rows)
 
     shifted = [
-        row
-        for row in comparisons
-        if row["world_condition"] == "shifted_contact"
+        row for row in comparisons if row["world_condition"] == "shifted_contact"
     ]
     robust_shifted = bool(
         all(row["absolute_gain_interval_m"][0] > 0.0 for row in shifted)
@@ -456,26 +456,22 @@ def main() -> int:
     shifted_all = next(
         row
         for row in comparisons
-        if row["world_condition"] == "shifted_contact"
-        and row["object"] == "ALL"
+        if row["world_condition"] == "shifted_contact" and row["object"] == "ALL"
     )
     matched_all = next(
         row
         for row in comparisons
-        if row["world_condition"] == "matched_contact"
-        and row["object"] == "ALL"
+        if row["world_condition"] == "matched_contact" and row["object"] == "ALL"
     )
     same_shifted = next(
         row
         for row in same_topology_summary
-        if row["world_condition"] == "shifted_contact"
-        and row["object"] == "ALL"
+        if row["world_condition"] == "shifted_contact" and row["object"] == "ALL"
     )
     excluded_shifted = next(
         row
         for row in topology_excluded_summary
-        if row["world_condition"] == "shifted_contact"
-        and row["object"] == "ALL"
+        if row["world_condition"] == "shifted_contact" and row["object"] == "ALL"
     )
     decision = "SUPPORTED" if robust_shifted else "NOT SUPPORTED"
     markdown = f"""# Controlled latent-contact robustness audit
@@ -490,16 +486,16 @@ def main() -> int:
 
 | World | Latent RMSE | Nominal RMSE | Relative reduction | 95% interval | Seed wins | Exact sign p |
 |---|---:|---:|---:|---:|---:|---:|
-| Shifted | {1000 * shifted_all['latent_mean_rmse_m']:.3f} mm | {1000 * shifted_all['nominal_mean_rmse_m']:.3f} mm | {100 * shifted_all['relative_reduction']:.2f}% | [{100 * shifted_all['relative_reduction_interval'][0]:.2f}%, {100 * shifted_all['relative_reduction_interval'][1]:.2f}%] | {shifted_all['positive_seed_count']}/{shifted_all['seed_count']} | {shifted_all['exact_two_sided_sign_p']:.3g} |
-| Matched | {1000 * matched_all['latent_mean_rmse_m']:.3f} mm | {1000 * matched_all['nominal_mean_rmse_m']:.3f} mm | {100 * matched_all['relative_reduction']:.2f}% | [{100 * matched_all['relative_reduction_interval'][0]:.2f}%, {100 * matched_all['relative_reduction_interval'][1]:.2f}%] | {matched_all['positive_seed_count']}/{matched_all['seed_count']} | {matched_all['exact_two_sided_sign_p']:.3g} |
+| Shifted | {1000 * shifted_all["latent_mean_rmse_m"]:.3f} mm | {1000 * shifted_all["nominal_mean_rmse_m"]:.3f} mm | {100 * shifted_all["relative_reduction"]:.2f}% | [{100 * shifted_all["relative_reduction_interval"][0]:.2f}%, {100 * shifted_all["relative_reduction_interval"][1]:.2f}%] | {shifted_all["positive_seed_count"]}/{shifted_all["seed_count"]} | {shifted_all["exact_two_sided_sign_p"]:.3g} |
+| Matched | {1000 * matched_all["latent_mean_rmse_m"]:.3f} mm | {1000 * matched_all["nominal_mean_rmse_m"]:.3f} mm | {100 * matched_all["relative_reduction"]:.2f}% | [{100 * matched_all["relative_reduction_interval"][0]:.2f}%, {100 * matched_all["relative_reduction_interval"][1]:.2f}%] | {matched_all["positive_seed_count"]}/{matched_all["seed_count"]} | {matched_all["exact_two_sided_sign_p"]:.3g} |
 
 The overall inference resamples complete seeds. Object coordinates remain nested.
 
 ## Uncertainty boundary
 
-Same-topology leave-one-seed-out scalar recalibration changes no mean. Its shifted-contact mean NLL gain over nominal is **{same_shifted['mean_adjusted_nll_gain_over_nominal']:.3f}**, with a mean width multiplier of **{same_shifted['mean_interval_width_multiplier']:.2f}x**. This is retrospective mechanism evidence.
+Same-topology leave-one-seed-out scalar recalibration changes no mean. Its shifted-contact mean NLL gain over nominal is **{same_shifted["mean_adjusted_nll_gain_over_nominal"]:.3f}**, with a mean width multiplier of **{same_shifted["mean_interval_width_multiplier"]:.2f}x**. This is retrospective mechanism evidence.
 
-The stricter topology-excluded correction gives a shifted-contact mean NLL gain over nominal of **{excluded_shifted['mean_adjusted_nll_gain_over_nominal']:.3f}**. This is the relevant unseen-topology uncertainty stress test.
+The stricter topology-excluded correction gives a shifted-contact mean NLL gain over nominal of **{excluded_shifted["mean_adjusted_nll_gain_over_nominal"]:.3f}**. This is the relevant unseen-topology uncertainty stress test.
 
 ## Claim boundary
 
@@ -513,9 +509,7 @@ The stricter topology-excluded correction gives a shifted-contact mean NLL gain 
                 "robust_shifted_point_supported": robust_shifted,
                 "seed_count": len(seeds),
                 "shifted_relative_reduction": shifted_all["relative_reduction"],
-                "shifted_relative_interval": shifted_all[
-                    "relative_reduction_interval"
-                ],
+                "shifted_relative_interval": shifted_all["relative_reduction_interval"],
                 "same_topology_shifted_nll_gain": same_shifted[
                     "mean_adjusted_nll_gain_over_nominal"
                 ],
