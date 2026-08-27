@@ -27,9 +27,7 @@ import numpy as np
 
 
 INTERVENTION_EQUIVALENCE_SCHEMA_VERSION = 1
-INTERVENTION_EQUIVALENCE_ARTIFACT_KIND = (
-    "Causal4DInterventionEquivalenceCertificateV1"
-)
+INTERVENTION_EQUIVALENCE_ARTIFACT_KIND = "Causal4DInterventionEquivalenceCertificateV1"
 
 _TOP_LEVEL_FIELDS = frozenset(
     {
@@ -225,9 +223,7 @@ def _complete_link_partition(
     clusters: list[tuple[int, ...]] = [(index,) for index in range(len(identifiers))]
     numerical_tolerance = 1e-12 * max(1.0, abs(tolerance))
     while True:
-        candidates: list[
-            tuple[float, tuple[str, ...], int, int, tuple[int, ...]]
-        ] = []
+        candidates: list[tuple[float, tuple[str, ...], int, int, tuple[int, ...]]] = []
         for first_index in range(len(clusters)):
             for second_index in range(first_index + 1, len(clusters)):
                 merged = tuple(
@@ -499,9 +495,7 @@ def _build_payload(
             query_distances,
         ),
     }
-    memberships = {
-        kind: _membership(records) for kind, records in partitions.items()
-    }
+    memberships = {kind: _membership(records) for kind, records in partitions.items()}
 
     map_index = min(
         range(count),
@@ -569,15 +563,10 @@ def _build_payload(
     weighted_radius = float(np.dot(weights, distances_to_map))
     posterior_mean = np.sum(weights[:, None] * query_values, axis=0)
     posterior_mean_distance = float(
-        np.sqrt(
-            np.mean(
-                np.square((posterior_mean - map_query) / query_scales)
-            )
-        )
+        np.sqrt(np.mean(np.square((posterior_mean - map_query) / query_scales)))
     )
     block_bound = (
-        query_block_mass * block_radius
-        + (1.0 - query_block_mass) * global_radius
+        query_block_mass * block_radius + (1.0 - query_block_mass) * global_radius
     )
     numerical_slack = 1e-12 * max(1.0, global_radius)
     query_concentration = {
@@ -762,12 +751,15 @@ def write_intervention_equivalence_certificate_v1(
 
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    payload = json.dumps(
-        certificate.to_dict(),
-        indent=2,
-        sort_keys=True,
-        allow_nan=False,
-    ) + "\n"
+    payload = (
+        json.dumps(
+            certificate.to_dict(),
+            indent=2,
+            sort_keys=True,
+            allow_nan=False,
+        )
+        + "\n"
+    )
     encoded = payload.encode("utf-8")
     try:
         descriptor = os.open(

@@ -51,10 +51,7 @@ def _certificate(*, order: tuple[int, ...] = (0, 1, 2, 3)):
 
 
 def _blocks(certificate, kind: str) -> list[list[str]]:
-    return [
-        record["members"]
-        for record in certificate.to_dict()["partitions"][kind]
-    ]
+    return [record["members"] for record in certificate.to_dict()["partitions"][kind]]
 
 
 def test_separates_exact_prefix_query_and_joint_recovery() -> None:
