@@ -17,10 +17,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  fresh-seed-envelope:
-    name: Fresh-seed physical uncertainty envelope
+  fresh-seed-envelope-shard:
+    name: Physical envelope / seeds ${{ matrix.seeds }}
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: "64-71"
+            seeds: "64:72"
+          - shard: "72-79"
+            seeds: "72:80"
+          - shard: "80-87"
+            seeds: "80:88"
+          - shard: "88-95"
+            seeds: "88:96"
+          - shard: "96-103"
+            seeds: "96:104"
+          - shard: "104-111"
+            seeds: "104:112"
+          - shard: "112-119"
+            seeds: "112:120"
+          - shard: "120-127"
+            seeds: "120:128"
     steps:
       - name: Check out exact revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -58,11 +78,11 @@ jobs:
             scripts/experiments/run_latent_contact_physical_envelope.py \
             tests/test_latent_contact_physical_envelope_experiment.py \
             > build/latent-contact-physical-envelope/format.patch
-      - name: Run fresh seed block
+      - name: Run fresh seed shard
         run: |
           python scripts/experiments/run_latent_contact_physical_envelope.py \
             --output-dir build/latent-contact-physical-envelope \
-            --seeds 64:128 \
+            --seeds "${{ matrix.seeds }}" \
             --frames 56 \
             --training-repeats 2 \
             --parameter-grid-count 5 \
@@ -75,11 +95,17 @@ jobs:
         run: |
           python scripts/ci/verify_result_bundle.py \
             build/latent-contact-physical-envelope/result/manifest.json
-      - name: Upload complete evidence
+      - name: Record shard identity
+        run: |
+          printf '%s\n' '${{ matrix.seeds }}' \
+            > build/latent-contact-physical-envelope/seed-range.txt
+          printf '%s\n' '${{ matrix.shard }}' \
+            > build/latent-contact-physical-envelope/shard.txt
+      - name: Upload complete shard evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: controlled-latent-contact-physical-envelope-${{ github.run_id }}-${{ github.run_attempt }}
+          name: controlled-latent-contact-physical-envelope-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/latent-contact-physical-envelope/
           if-no-files-found: error
           retention-days: 30
