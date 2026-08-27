@@ -16,10 +16,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  robustness:
-    name: Sixty-four-seed controlled robustness
+  robustness-shard:
+    name: Controlled robustness / seeds ${{ matrix.seeds }}
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: "00-07"
+            seeds: "0:8"
+          - shard: "08-15"
+            seeds: "8:16"
+          - shard: "16-23"
+            seeds: "16:24"
+          - shard: "24-31"
+            seeds: "24:32"
+          - shard: "32-39"
+            seeds: "32:40"
+          - shard: "40-47"
+            seeds: "40:48"
+          - shard: "48-55"
+            seeds: "48:56"
+          - shard: "56-63"
+            seeds: "56:64"
     steps:
       - name: Check out exact revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -48,7 +68,7 @@ jobs:
         run: |
           causal4d benchmark latent-contact \
             --output-dir build/latent-contact-robustness/result \
-            --seeds 0:64 \
+            --seeds "${{ matrix.seeds }}" \
             --frames 56 \
             --training-repeats 2 \
             --parameter-grid-count 5 \
@@ -58,7 +78,7 @@ jobs:
         run: |
           python scripts/ci/verify_result_bundle.py \
             build/latent-contact-robustness/result/manifest.json
-      - name: Run seed-clustered robustness audit
+      - name: Run shard-local robustness audit
         run: |
           python scripts/experiments/analyze_latent_contact_robustness.py \
             --interventions \
@@ -71,11 +91,17 @@ jobs:
               build/latent-contact-robustness/robustness.md \
             --bootstrap-replicates 100000 \
             --bootstrap-seed 20260828
-      - name: Upload complete robustness evidence
+      - name: Record shard identity
+        run: |
+          printf '%s\n' '${{ matrix.seeds }}' \
+            > build/latent-contact-robustness/seed-range.txt
+          printf '%s\n' '${{ matrix.shard }}' \
+            > build/latent-contact-robustness/shard.txt
+      - name: Upload complete shard evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: controlled-latent-contact-robustness-${{ github.run_id }}-${{ github.run_attempt }}
+          name: controlled-latent-contact-robustness-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/latent-contact-robustness/
           if-no-files-found: error
           retention-days: 30
