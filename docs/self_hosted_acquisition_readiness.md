@@ -23,13 +23,14 @@ read-only repository token and no GitHub secrets.
 
 ## Registered root-pair selection
 
-The workflow currently inspects these complete pairs rather than testing or
-combining individual paths independently:
+The workflow inspects the authoritative v5 acquisition roots created by the
+source-independent single-operator bootstrap. The historical non-v5 dataset is
+not an admissible readiness candidate for the current protocol.
 
 | Candidate | Frozen checkout | Dataset root |
 | --- | --- | --- |
-| `canonical` | `/opt/causal4d-frozen` | `/data/causal4d-sloth-multi-action-v1` |
-| `workstation2-persistent` | `/mnt/lexar4tb/causal4d-physical/causal4d-frozen` | `/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1` |
+| `canonical` | `/opt/causal4d-frozen` | `/data/causal4d-sloth-multi-action-v1-v5` |
+| `workstation2-persistent` | `/mnt/lexar4tb/causal4d-physical/causal4d-frozen` | `/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5` |
 
 Selection is fail-closed:
 
