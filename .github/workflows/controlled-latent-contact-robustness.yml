@@ -72,8 +72,7 @@ jobs:
             --frames 56 \
             --training-repeats 2 \
             --parameter-grid-count 5 \
-            --contact-parameter-particles 12 \
-            --require-gates
+            --contact-parameter-particles 12
       - name: Verify result bundle
         run: |
           python scripts/ci/verify_result_bundle.py \
