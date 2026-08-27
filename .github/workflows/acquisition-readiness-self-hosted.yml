@@ -101,11 +101,11 @@ jobs:
             --root-candidate \
               canonical \
               /opt/causal4d-frozen \
-              /data/causal4d-sloth-multi-action-v1 \
+              /data/causal4d-sloth-multi-action-v1-v5 \
             --root-candidate \
               workstation2-persistent \
               /mnt/lexar4tb/causal4d-physical/causal4d-frozen \
-              /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1 \
+              /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5 \
             --output outputs/acquisition-readiness/report.json \
             | tee outputs/acquisition-readiness/report.txt
 
