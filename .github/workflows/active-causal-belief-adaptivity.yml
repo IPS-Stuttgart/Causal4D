@@ -1,0 +1,54 @@
+name: Active-causal belief-adaptivity falsification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/active-causal-belief-adaptivity.yml"
+      - "scripts/experiments/active_causal_belief_adaptivity.py"
+      - "scripts/ci/verify_active_causal_belief_adaptivity.py"
+      - "docs/active_causal_belief_adaptivity.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: active-causal-belief-adaptivity-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  controlled-falsification:
+    name: Controlled belief-adaptivity falsification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Causal4D
+        run: python -m pip install -e .
+      - name: Run frozen all-action and belief-adaptivity experiment
+        run: |
+          python scripts/experiments/active_causal_belief_adaptivity.py \
+            --output-dir build/active-causal-belief-adaptivity
+      - name: Verify the locked negative boundary
+        run: |
+          python scripts/ci/verify_active_causal_belief_adaptivity.py \
+            build/active-causal-belief-adaptivity \
+            --output-json \
+              build/active-causal-belief-adaptivity/verification.json
+      - name: Upload controlled result bundle
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: active-causal-belief-adaptivity-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/active-causal-belief-adaptivity/
+          if-no-files-found: error
+          retention-days: 30
