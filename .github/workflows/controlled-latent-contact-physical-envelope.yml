@@ -33,8 +33,15 @@ jobs:
           cache: pip
       - name: Install development environment
         run: python -m pip install -e ".[dev]"
-      - name: Validate experiment code
+      - name: Materialize and validate formatter result
         run: |
+          mkdir -p build/latent-contact-physical-envelope
+          python -m ruff check --fix \
+            scripts/experiments/run_latent_contact_physical_envelope.py \
+            tests/test_latent_contact_physical_envelope_experiment.py
+          python -m ruff format \
+            scripts/experiments/run_latent_contact_physical_envelope.py \
+            tests/test_latent_contact_physical_envelope_experiment.py
           python -m ruff check \
             scripts/experiments/run_latent_contact_physical_envelope.py \
             tests/test_latent_contact_physical_envelope_experiment.py
@@ -43,6 +50,14 @@ jobs:
             tests/test_latent_contact_physical_envelope_experiment.py
           python -m pytest -q \
             tests/test_latent_contact_physical_envelope_experiment.py
+          cp scripts/experiments/run_latent_contact_physical_envelope.py \
+            build/latent-contact-physical-envelope/formatted-experiment.py
+          cp tests/test_latent_contact_physical_envelope_experiment.py \
+            build/latent-contact-physical-envelope/formatted-test.py
+          git diff -- \
+            scripts/experiments/run_latent_contact_physical_envelope.py \
+            tests/test_latent_contact_physical_envelope_experiment.py \
+            > build/latent-contact-physical-envelope/format.patch
       - name: Run fresh seed block
         run: |
           python scripts/experiments/run_latent_contact_physical_envelope.py \
