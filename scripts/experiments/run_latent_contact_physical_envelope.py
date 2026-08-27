@@ -174,13 +174,14 @@ def _run_with_envelope(
     return result
 
 
-def _index(rows: list[dict[str, Any]]) -> tuple[list[int], dict[tuple[Any, ...], dict[str, Any]]]:
+def _index(
+    rows: list[dict[str, Any]],
+) -> tuple[list[int], dict[tuple[Any, ...], dict[str, Any]]]:
     selected = [
         row
         for row in rows
         if row["setting"] == "online_adaptation"
-        and row["method"]
-        in {"latent_contact", "nominal_physics", ENVELOPE_METHOD}
+        and row["method"] in {"latent_contact", "nominal_physics", ENVELOPE_METHOD}
     ]
     seeds = sorted({int(row["seed"]) for row in selected})
     objects = sorted({str(row["object"]) for row in selected})
@@ -246,17 +247,14 @@ def _seed_vectors(
     method: str,
     metric: str,
 ) -> np.ndarray:
-    objects = sorted(
-        {
-            key[1]
-            for key in index
-            if key[2] == world and key[3] == method
-        }
-    )
+    objects = sorted({key[1] for key in index if key[2] == world and key[3] == method})
     return np.asarray(
         [
             np.mean(
-                [float(index[(seed, object_name, world, method)][metric]) for object_name in objects]
+                [
+                    float(index[(seed, object_name, world, method)][metric])
+                    for object_name in objects
+                ]
             )
             for seed in seeds
         ],
