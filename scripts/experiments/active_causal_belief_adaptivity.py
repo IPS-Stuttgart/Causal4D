@@ -4,6 +4,7 @@
 The experiment is deterministic controlled spring-graph evidence. It does not
 alter or increment the registered Causal4D physical protocol.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -81,7 +82,11 @@ def _objects() -> tuple[ObjectModel, ...]:
         (0, 3, 6),
     )
     cloth_positions = np.asarray(
-        [(column * 0.12 - 0.12, row * 0.12 - 0.12) for row in range(3) for column in range(3)]
+        [
+            (column * 0.12 - 0.12, row * 0.12 - 0.12)
+            for row in range(3)
+            for column in range(3)
+        ]
     )
     cloth = ObjectModel(
         "cloth",
@@ -93,7 +98,11 @@ def _objects() -> tuple[ObjectModel, ...]:
         (0, 4, 8),
     )
     block_positions = np.asarray(
-        [(column * 0.11 - 0.165, row * 0.13 - 0.065) for row in range(2) for column in range(4)]
+        [
+            (column * 0.11 - 0.165, row * 0.13 - 0.065)
+            for row in range(2)
+            for column in range(4)
+        ]
     )
     block = ObjectModel(
         "soft_block",
@@ -122,7 +131,9 @@ def _envelope(profile: str) -> np.ndarray:
     raise ValueError(profile)
 
 
-def _forces(vectors: tuple[tuple[float, float], ...], profile: str, rotation: float = 0.0) -> np.ndarray:
+def _forces(
+    vectors: tuple[tuple[float, float], ...], profile: str, rotation: float = 0.0
+) -> np.ndarray:
     result = _envelope(profile)[:, None, None] * np.asarray(vectors)[None, :, :]
     if rotation:
         phase = np.linspace(0.0, 1.0, FRAME_COUNT - 1)
@@ -231,7 +242,9 @@ def _simulate(
                 spread = hypothesis["spread"]
                 if spread and neighbours:
                     external[node] += (1.0 - spread) * applied[index]
-                    external[np.asarray(neighbours)] += spread * applied[index] / len(neighbours)
+                    external[np.asarray(neighbours)] += (
+                        spread * applied[index] / len(neighbours)
+                    )
                 else:
                     external[node] += applied[index]
         force = (
@@ -242,8 +255,12 @@ def _simulate(
             - model.support * displacement
         )
         if nonlinear_stiffening:
-            relative = displacement[cache["edge_second"]] - displacement[cache["edge_first"]]
-            edge_force = coefficient * np.sum(relative * relative, axis=1)[:, None] * relative
+            relative = (
+                displacement[cache["edge_second"]] - displacement[cache["edge_first"]]
+            )
+            edge_force = (
+                coefficient * np.sum(relative * relative, axis=1)[:, None] * relative
+            )
             nonlinear = np.zeros_like(displacement)
             np.add.at(nonlinear, cache["edge_first"], edge_force)
             np.add.at(nonlinear, cache["edge_second"], -edge_force)
@@ -263,15 +280,24 @@ def _feature(model: ObjectModel, trajectory: np.ndarray) -> np.ndarray:
 
 
 def _peak_strain(model: ObjectModel, trajectory: np.ndarray) -> float:
-    rest = np.asarray([np.linalg.norm(model.rest[i] - model.rest[j]) for i, j in model.edges])
+    rest = np.asarray(
+        [np.linalg.norm(model.rest[i] - model.rest[j]) for i, j in model.edges]
+    )
     maximum = 0.0
     for state in trajectory:
-        lengths = np.asarray([np.linalg.norm(state[i] - state[j]) for i, j in model.edges])
+        lengths = np.asarray(
+            [np.linalg.norm(state[i] - state[j]) for i, j in model.edges]
+        )
         maximum = max(maximum, float(np.max(np.abs(lengths - rest) / rest)))
     return maximum
 
 
-def _posterior(weights: np.ndarray, observation: np.ndarray, means: np.ndarray, variance: np.ndarray) -> np.ndarray:
+def _posterior(
+    weights: np.ndarray,
+    observation: np.ndarray,
+    means: np.ndarray,
+    variance: np.ndarray,
+) -> np.ndarray:
     log_weight = np.log(np.clip(weights, 1e-300, None))
     likelihood = -0.5 * (
         np.sum(np.square(observation[None] - means) / variance[None], axis=1)
@@ -286,24 +312,36 @@ def _entropy(weights: np.ndarray) -> float:
     return float(-np.sum(values * np.log(values)))
 
 
-def _information_gain(weights: np.ndarray, means: np.ndarray, variance: np.ndarray, noise: np.ndarray) -> float:
+def _information_gain(
+    weights: np.ndarray, means: np.ndarray, variance: np.ndarray, noise: np.ndarray
+) -> float:
     total = 0.0
     constant = np.sum(np.log(2.0 * np.pi * variance))
     sigma = np.sqrt(variance)
     for hypothesis in range(len(weights)):
         samples = means[hypothesis][None, :] + noise[hypothesis] * sigma[None, :]
         likelihood = -0.5 * (
-            np.sum(np.square(samples[:, None, :] - means[None, :, :]) / variance[None, None, :], axis=2)
+            np.sum(
+                np.square(samples[:, None, :] - means[None, :, :])
+                / variance[None, None, :],
+                axis=2,
+            )
             + constant
         )
-        mixture = logsumexp(np.log(np.clip(weights, 1e-300, None))[None, :] + likelihood, axis=1)
-        total += weights[hypothesis] * float(np.mean(likelihood[:, hypothesis] - mixture))
+        mixture = logsumexp(
+            np.log(np.clip(weights, 1e-300, None))[None, :] + likelihood, axis=1
+        )
+        total += weights[hypothesis] * float(
+            np.mean(likelihood[:, hypothesis] - mixture)
+        )
     return max(0.0, total)
 
 
 def _risk_probability(weights: np.ndarray, means: np.ndarray, sigma: float) -> float:
     return float(
-        np.sum(weights * (1.0 - norm.cdf((SAFETY_STRAIN_LIMIT - means) / max(sigma, 1e-6))))
+        np.sum(
+            weights * (1.0 - norm.cdf((SAFETY_STRAIN_LIMIT - means) / max(sigma, 1e-6)))
+        )
     )
 
 
@@ -318,7 +356,9 @@ def _forecast(
     means = challenge_trajectories[:, -1].reshape(len(weights), -1)
     mean = np.sum(weights[:, None] * means, axis=0)
     centred = means - mean
-    covariance = endpoint_covariance + np.einsum("h,hi,hj->ij", weights, centred, centred)
+    covariance = endpoint_covariance + np.einsum(
+        "h,hi,hj->ij", weights, centred, centred
+    )
     covariance = 0.5 * (covariance + covariance.T)
     difference = episode["endpoint"] - mean
     sign, determinant = slogdet(covariance)
@@ -368,10 +408,38 @@ def run(output: Path) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=False)
     objects = _objects()
     hypotheses = (
-        {"name": "nominal", "shift": False, "gain": 1.0, "delay": 0, "spread": 0.0, "rotation": 0.0},
-        {"name": "shifted", "shift": True, "gain": 0.72, "delay": 2, "spread": 0.0, "rotation": float(np.deg2rad(8.0))},
-        {"name": "compliant_slip", "shift": False, "gain": 0.78, "delay": 1, "spread": 0.20, "rotation": float(np.deg2rad(8.0))},
-        {"name": "shifted_slip", "shift": True, "gain": 0.88, "delay": 1, "spread": 0.20, "rotation": float(np.deg2rad(-8.0))},
+        {
+            "name": "nominal",
+            "shift": False,
+            "gain": 1.0,
+            "delay": 0,
+            "spread": 0.0,
+            "rotation": 0.0,
+        },
+        {
+            "name": "shifted",
+            "shift": True,
+            "gain": 0.72,
+            "delay": 2,
+            "spread": 0.0,
+            "rotation": float(np.deg2rad(8.0)),
+        },
+        {
+            "name": "compliant_slip",
+            "shift": False,
+            "gain": 0.78,
+            "delay": 1,
+            "spread": 0.20,
+            "rotation": float(np.deg2rad(8.0)),
+        },
+        {
+            "name": "shifted_slip",
+            "shift": True,
+            "gain": 0.88,
+            "delay": 1,
+            "spread": 0.20,
+            "rotation": float(np.deg2rad(-8.0)),
+        },
     )
     cache: dict[str, dict[str, Any]] = {}
     actions: dict[str, tuple[tuple[Action, ...], Action]] = {}
@@ -381,24 +449,89 @@ def run(output: Path) -> dict[str, Any]:
         cache[model.name] = {
             "laplacian": _laplacian(model),
             "adjacency": _adjacency(model),
-            "length": float(np.median([np.linalg.norm(model.rest[i] - model.rest[j]) for i, j in model.edges])),
+            "length": float(
+                np.median(
+                    [
+                        np.linalg.norm(model.rest[i] - model.rest[j])
+                        for i, j in model.edges
+                    ]
+                )
+            ),
             "edge_first": edge_array[:, 0],
             "edge_second": edge_array[:, 1],
         }
         candidates, challenge = _actions(model)
         actions[model.name] = candidates, challenge
         feature_means = np.stack(
-            [[_feature(model, _simulate(model, action, model.parameters, hypothesis, cache[model.name], 0.0)) for hypothesis in hypotheses] for action in candidates]
+            [
+                [
+                    _feature(
+                        model,
+                        _simulate(
+                            model,
+                            action,
+                            model.parameters,
+                            hypothesis,
+                            cache[model.name],
+                            0.0,
+                        ),
+                    )
+                    for hypothesis in hypotheses
+                ]
+                for action in candidates
+            ]
         )
         risk_means = np.stack(
-            [[_peak_strain(model, _simulate(model, action, model.parameters, hypothesis, cache[model.name], 0.0)) for hypothesis in hypotheses] for action in candidates]
+            [
+                [
+                    _peak_strain(
+                        model,
+                        _simulate(
+                            model,
+                            action,
+                            model.parameters,
+                            hypothesis,
+                            cache[model.name],
+                            0.0,
+                        ),
+                    )
+                    for hypothesis in hypotheses
+                ]
+                for action in candidates
+            ]
         )
         challenge_trajectories = np.stack(
-            [_simulate(model, challenge, model.parameters, hypothesis, cache[model.name], 0.0)[:, model.sensors, :] - model.rest[np.asarray(model.sensors)][None, :, :] for hypothesis in hypotheses]
+            [
+                _simulate(
+                    model,
+                    challenge,
+                    model.parameters,
+                    hypothesis,
+                    cache[model.name],
+                    0.0,
+                )[:, model.sensors, :]
+                - model.rest[np.asarray(model.sensors)][None, :, :]
+                for hypothesis in hypotheses
+            ]
         )
-        screen = Action("screen", candidates[3].nodes, 0.35 * candidates[3].forces, 0.05)
+        screen = Action(
+            "screen", candidates[3].nodes, 0.35 * candidates[3].forces, 0.05
+        )
         screen_means = np.stack(
-            [_feature(model, _simulate(model, screen, model.parameters, hypothesis, cache[model.name], 0.0)) for hypothesis in hypotheses]
+            [
+                _feature(
+                    model,
+                    _simulate(
+                        model,
+                        screen,
+                        model.parameters,
+                        hypothesis,
+                        cache[model.name],
+                        0.0,
+                    ),
+                )
+                for hypothesis in hypotheses
+            ]
         )
         banks[model.name] = {
             "features": feature_means,
@@ -416,7 +549,9 @@ def run(output: Path) -> dict[str, Any]:
     def generate(model: ObjectModel, count: int, seed: int) -> list[dict[str, Any]]:
         rng = np.random.default_rng(seed)
         candidates, challenge = actions[model.name]
-        screen = Action("screen", candidates[3].nodes, 0.35 * candidates[3].forces, 0.05)
+        screen = Action(
+            "screen", candidates[3].nodes, 0.35 * candidates[3].forces, 0.05
+        )
         result: list[dict[str, Any]] = []
         for _ in range(count):
             true_index = int(rng.choice(len(hypotheses), p=TRUE_HYPOTHESIS_PRIOR))
@@ -424,16 +559,45 @@ def run(output: Path) -> dict[str, Any]:
             nonlinear = max(0.0, float(rng.normal(0.18, 0.025)))
             screen_feature = _feature(
                 model,
-                _simulate(model, screen, parameters, hypotheses[true_index], cache[model.name], nonlinear),
+                _simulate(
+                    model,
+                    screen,
+                    parameters,
+                    hypotheses[true_index],
+                    cache[model.name],
+                    nonlinear,
+                ),
             ) + rng.normal(0.0, OBSERVATION_NOISE_M, size=len(FEATURE_FRAMES) * 3 * 2)
             features, risks = [], []
             for action in candidates:
-                trajectory = _simulate(model, action, parameters, hypotheses[true_index], cache[model.name], nonlinear)
-                features.append(_feature(model, trajectory) + rng.normal(0.0, OBSERVATION_NOISE_M, size=len(screen_feature)))
+                trajectory = _simulate(
+                    model,
+                    action,
+                    parameters,
+                    hypotheses[true_index],
+                    cache[model.name],
+                    nonlinear,
+                )
+                features.append(
+                    _feature(model, trajectory)
+                    + rng.normal(0.0, OBSERVATION_NOISE_M, size=len(screen_feature))
+                )
                 risks.append(_peak_strain(model, trajectory))
-            trajectory = _simulate(model, challenge, parameters, hypotheses[true_index], cache[model.name], nonlinear)
-            challenge_observation = trajectory[:, model.sensors, :] - model.rest[np.asarray(model.sensors)][None, :, :]
-            challenge_observation += rng.normal(0.0, OBSERVATION_NOISE_M, size=challenge_observation.shape)
+            trajectory = _simulate(
+                model,
+                challenge,
+                parameters,
+                hypotheses[true_index],
+                cache[model.name],
+                nonlinear,
+            )
+            challenge_observation = (
+                trajectory[:, model.sensors, :]
+                - model.rest[np.asarray(model.sensors)][None, :, :]
+            )
+            challenge_observation += rng.normal(
+                0.0, OBSERVATION_NOISE_M, size=challenge_observation.shape
+            )
             result.append(
                 {
                     "true": true_index,
@@ -446,11 +610,15 @@ def run(output: Path) -> dict[str, Any]:
             )
         return result
 
-    data: dict[str, dict[str, list[dict[str, Any]]]] = {kind: {} for kind in EPISODES_PER_OBJECT}
+    data: dict[str, dict[str, list[dict[str, Any]]]] = {
+        kind: {} for kind in EPISODES_PER_OBJECT
+    }
     seed_starts = {"calibration": 202608100, "tuning": 202608200, "test": 202608300}
     for object_index, model in enumerate(objects):
         for kind, count in EPISODES_PER_OBJECT.items():
-            data[kind][model.name] = generate(model, count, seed_starts[kind] + object_index)
+            data[kind][model.name] = generate(
+                model, count, seed_starts[kind] + object_index
+            )
 
     def calibrate(source_names: list[str]) -> dict[str, Any]:
         counts = np.ones(len(hypotheses))
@@ -461,30 +629,53 @@ def run(output: Path) -> dict[str, Any]:
             for episode in data["calibration"][name]:
                 true_index = episode["true"]
                 counts[true_index] += 1.0
-                screen_residuals.append(episode["screen"] - banks[name]["screen"][true_index])
-                endpoint_residuals.append(episode["endpoint"] - banks[name]["challenge"][true_index, -1].ravel())
+                screen_residuals.append(
+                    episode["screen"] - banks[name]["screen"][true_index]
+                )
+                endpoint_residuals.append(
+                    episode["endpoint"]
+                    - banks[name]["challenge"][true_index, -1].ravel()
+                )
                 for action_index in range(len(action_names)):
                     feature_residuals[action_index].append(
-                        episode["features"][action_index] - banks[name]["features"][action_index, true_index]
+                        episode["features"][action_index]
+                        - banks[name]["features"][action_index, true_index]
                     )
                     risk_residuals[action_index].append(
-                        episode["risks"][action_index] - banks[name]["risk"][action_index, true_index]
+                        episode["risks"][action_index]
+                        - banks[name]["risk"][action_index, true_index]
                     )
         feature_variance = np.stack(
-            [np.maximum(np.var(np.stack(values), axis=0, ddof=1), OBSERVATION_NOISE_M**2) for values in feature_residuals]
+            [
+                np.maximum(
+                    np.var(np.stack(values), axis=0, ddof=1), OBSERVATION_NOISE_M**2
+                )
+                for values in feature_residuals
+            ]
         )
         endpoint = np.stack(endpoint_residuals)
         covariance = np.cov(endpoint, rowvar=False)
-        covariance = 0.75 * covariance + 0.25 * np.diag(np.diag(covariance)) + np.eye(covariance.shape[0]) * 1e-7
+        covariance = (
+            0.75 * covariance
+            + 0.25 * np.diag(np.diag(covariance))
+            + np.eye(covariance.shape[0]) * 1e-7
+        )
         return {
             "prior": counts / counts.sum(),
             "feature_variance": feature_variance,
-            "risk_sigma": np.asarray([max(np.std(values, ddof=1), 0.005) for values in risk_residuals]),
-            "screen_variance": np.maximum(np.var(np.stack(screen_residuals), axis=0, ddof=1), OBSERVATION_NOISE_M**2),
+            "risk_sigma": np.asarray(
+                [max(np.std(values, ddof=1), 0.005) for values in risk_residuals]
+            ),
+            "screen_variance": np.maximum(
+                np.var(np.stack(screen_residuals), axis=0, ddof=1),
+                OBSERVATION_NOISE_M**2,
+            ),
             "endpoint_covariance": covariance,
         }
 
-    def scores(name: str, calibration: dict[str, Any], weights: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def scores(
+        name: str, calibration: dict[str, Any], weights: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
         information, risk = np.empty(len(action_names)), np.empty(len(action_names))
         for action_index in range(len(action_names)):
             information[action_index] = _information_gain(
@@ -500,15 +691,24 @@ def run(output: Path) -> dict[str, Any]:
             )
         return information, risk
 
-    def choose(information: np.ndarray, risk: np.ndarray, delta: float, weight: float) -> int:
+    def choose(
+        information: np.ndarray, risk: np.ndarray, delta: float, weight: float
+    ) -> int:
         feasible = np.flatnonzero(risk <= delta)
         if not len(feasible):
             return 0
         objective = information - weight * costs
         return int(feasible[np.argmax(objective[feasible])])
 
-    def precompute(name: str, calibration: dict[str, Any], episode: dict[str, Any]) -> dict[str, Any]:
-        initial = _posterior(calibration["prior"], episode["screen"], banks[name]["screen"], calibration["screen_variance"])
+    def precompute(
+        name: str, calibration: dict[str, Any], episode: dict[str, Any]
+    ) -> dict[str, Any]:
+        initial = _posterior(
+            calibration["prior"],
+            episode["screen"],
+            banks[name]["screen"],
+            calibration["screen_variance"],
+        )
         information, risk = scores(name, calibration, initial)
         after, entropy_reduction, true_mass, forecasts = [], [], [], []
         initial_entropy = _entropy(initial)
@@ -523,7 +723,12 @@ def run(output: Path) -> dict[str, Any]:
             entropy_reduction.append(initial_entropy - _entropy(posterior))
             true_mass.append(posterior[episode["true"]])
             forecasts.append(
-                _forecast(episode, posterior, banks[name]["challenge"], calibration["endpoint_covariance"])
+                _forecast(
+                    episode,
+                    posterior,
+                    banks[name]["challenge"],
+                    calibration["endpoint_covariance"],
+                )
             )
         return {
             "initial": initial,
@@ -553,25 +758,52 @@ def run(output: Path) -> dict[str, Any]:
         candidates = []
         for delta in (0.05, 0.10, 0.20):
             for cost_weight in (0.0, 0.05, 0.10, 0.20, 0.40):
-                choices = [choose(item["information"], item["risk"], delta, cost_weight) for item in tuning_precomputed]
-                reductions = np.asarray([item["entropy_reduction"][action] for item, action in zip(tuning_precomputed, choices, strict=True)])
-                violations = np.asarray([not item["safe"][action] for item, action in zip(tuning_precomputed, choices, strict=True)])
+                choices = [
+                    choose(item["information"], item["risk"], delta, cost_weight)
+                    for item in tuning_precomputed
+                ]
+                reductions = np.asarray(
+                    [
+                        item["entropy_reduction"][action]
+                        for item, action in zip(
+                            tuning_precomputed, choices, strict=True
+                        )
+                    ]
+                )
+                violations = np.asarray(
+                    [
+                        not item["safe"][action]
+                        for item, action in zip(
+                            tuning_precomputed, choices, strict=True
+                        )
+                    ]
+                )
                 mean_cost = float(np.mean(costs[np.asarray(choices)]))
-                objective = float(np.mean(reductions) - 2.0 * np.mean(violations) - 0.10 * mean_cost)
+                objective = float(
+                    np.mean(reductions) - 2.0 * np.mean(violations) - 0.10 * mean_cost
+                )
                 candidates.append((objective, delta, cost_weight))
         _, delta, cost_weight = max(candidates)
 
-        fixed_information, fixed_risk = scores(target, calibration, calibration["prior"])
+        fixed_information, fixed_risk = scores(
+            target, calibration, calibration["prior"]
+        )
         fixed_action = choose(fixed_information, fixed_risk, delta, cost_weight)
-        test = [precompute(target, calibration, episode) for episode in data["test"][target]]
-        offset = int(np.random.default_rng(202611000 + fold_index).integers(1, len(test)))
+        test = [
+            precompute(target, calibration, episode) for episode in data["test"][target]
+        ]
+        offset = int(
+            np.random.default_rng(202611000 + fold_index).integers(1, len(test))
+        )
         proposed_indices[target] = []
 
         for episode_index, item in enumerate(test):
             proposed = choose(item["information"], item["risk"], delta, cost_weight)
             proposed_indices[target].append(proposed)
             shuffled_weights = test[(episode_index + offset) % len(test)]["initial"]
-            shuffled_information, shuffled_risk = scores(target, calibration, shuffled_weights)
+            shuffled_information, shuffled_risk = scores(
+                target, calibration, shuffled_weights
+            )
             shuffled = choose(shuffled_information, shuffled_risk, delta, cost_weight)
             unconstrained = int(np.argmax(item["information"]))
             selections = {
@@ -590,10 +822,14 @@ def run(output: Path) -> dict[str, Any]:
                         "policy": policy,
                         "action": action_names[action_index],
                         "action_index": action_index,
-                        "realized_entropy_reduction": float(item["entropy_reduction"][action_index]),
+                        "realized_entropy_reduction": float(
+                            item["entropy_reduction"][action_index]
+                        ),
                         "posterior_true_mass": float(item["true_mass"][action_index]),
                         "safety_violation": int(not item["safe"][action_index]),
-                        "actual_peak_edge_strain": float(item["actual_risk"][action_index]),
+                        "actual_peak_edge_strain": float(
+                            item["actual_risk"][action_index]
+                        ),
                         "challenge_rmse_m": float(forecast[0]),
                         "challenge_nll": float(forecast[1]),
                     }
@@ -631,49 +867,91 @@ def run(output: Path) -> dict[str, Any]:
         selected = [row for row in rows if row["policy"] == policy]
         aggregate[policy] = {
             "episode_count": len(selected),
-            "mean_realized_entropy_reduction_nats": float(np.mean([row["realized_entropy_reduction"] for row in selected])),
-            "mean_posterior_true_hypothesis_mass": float(np.mean([row["posterior_true_mass"] for row in selected])),
-            "safety_violation_count": int(sum(row["safety_violation"] for row in selected)),
-            "mean_challenge_rmse_m": float(np.mean([row["challenge_rmse_m"] for row in selected])),
-            "mean_challenge_gaussian_nll": float(np.mean([row["challenge_nll"] for row in selected])),
+            "mean_realized_entropy_reduction_nats": float(
+                np.mean([row["realized_entropy_reduction"] for row in selected])
+            ),
+            "mean_posterior_true_hypothesis_mass": float(
+                np.mean([row["posterior_true_mass"] for row in selected])
+            ),
+            "safety_violation_count": int(
+                sum(row["safety_violation"] for row in selected)
+            ),
+            "mean_challenge_rmse_m": float(
+                np.mean([row["challenge_rmse_m"] for row in selected])
+            ),
+            "mean_challenge_gaussian_nll": float(
+                np.mean([row["challenge_nll"] for row in selected])
+            ),
         }
 
     def vector(policy: str, metric: str) -> np.ndarray:
-        return np.asarray([row[metric] for row in rows if row["policy"] == policy], dtype=float)
+        return np.asarray(
+            [row[metric] for row in rows if row["policy"] == policy], dtype=float
+        )
 
     proposed = "risk_constrained_information_gain"
     fixed = "fixed_safe_source_prior"
     shuffled = "shuffled_belief_risk_constrained"
     comparisons = {
-        "entropy_proposed_minus_fixed_safe": _bootstrap(vector(proposed, "realized_entropy_reduction") - vector(fixed, "realized_entropy_reduction"), 20261201),
-        "rmse_m_proposed_minus_fixed_safe": _bootstrap(vector(proposed, "challenge_rmse_m") - vector(fixed, "challenge_rmse_m"), 20261202),
-        "nll_proposed_minus_fixed_safe": _bootstrap(vector(proposed, "challenge_nll") - vector(fixed, "challenge_nll"), 20261203),
-        "entropy_proposed_minus_shuffled": _bootstrap(vector(proposed, "realized_entropy_reduction") - vector(shuffled, "realized_entropy_reduction"), 20261204),
+        "entropy_proposed_minus_fixed_safe": _bootstrap(
+            vector(proposed, "realized_entropy_reduction")
+            - vector(fixed, "realized_entropy_reduction"),
+            20261201,
+        ),
+        "rmse_m_proposed_minus_fixed_safe": _bootstrap(
+            vector(proposed, "challenge_rmse_m") - vector(fixed, "challenge_rmse_m"),
+            20261202,
+        ),
+        "nll_proposed_minus_fixed_safe": _bootstrap(
+            vector(proposed, "challenge_nll") - vector(fixed, "challenge_nll"), 20261203
+        ),
+        "entropy_proposed_minus_shuffled": _bootstrap(
+            vector(proposed, "realized_entropy_reduction")
+            - vector(shuffled, "realized_entropy_reduction"),
+            20261204,
+        ),
     }
     diversity = {name: len(set(indices)) for name, indices in proposed_indices.items()}
     switch_diversity = {
-        name: len({row["selected_action"] for row in switch_rows if row["fold"] == name})
+        name: len(
+            {row["selected_action"] for row in switch_rows if row["fold"] == name}
+        )
         for name in proposed_indices
     }
     proposed_actions = vector(proposed, "action_index")
     shuffled_actions = vector(shuffled, "action_index")
     disagreement = float(np.mean(proposed_actions != shuffled_actions))
     gates = {
-        "more_than_one_selected_action_in_every_heldout_topology": all(value > 1 for value in diversity.values()),
-        "entropy_advantage_over_fixed_safe_ci_excludes_zero": comparisons["entropy_proposed_minus_fixed_safe"]["ci95_lower"] > 0.0,
+        "more_than_one_selected_action_in_every_heldout_topology": all(
+            value > 1 for value in diversity.values()
+        ),
+        "entropy_advantage_over_fixed_safe_ci_excludes_zero": comparisons[
+            "entropy_proposed_minus_fixed_safe"
+        ]["ci95_lower"]
+        > 0.0,
         "downstream_advantage_over_fixed_safe": (
             comparisons["rmse_m_proposed_minus_fixed_safe"]["ci95_upper"] < 0.0
             or comparisons["nll_proposed_minus_fixed_safe"]["ci95_upper"] < 0.0
         ),
-        "entropy_degrades_under_belief_shuffle_ci_excludes_zero": comparisons["entropy_proposed_minus_shuffled"]["ci95_lower"] > 0.0,
+        "entropy_degrades_under_belief_shuffle_ci_excludes_zero": comparisons[
+            "entropy_proposed_minus_shuffled"
+        ]["ci95_lower"]
+        > 0.0,
         "belief_shuffle_changes_at_least_one_action": disagreement > 0.0,
-        "belief_switch_panel_has_multiple_actions_in_every_topology": all(value > 1 for value in switch_diversity.values()),
-        "proposed_zero_safety_violations": aggregate[proposed]["safety_violation_count"] == 0,
-        "proposed_no_more_violations_than_fixed_safe": aggregate[proposed]["safety_violation_count"] <= aggregate[fixed]["safety_violation_count"],
+        "belief_switch_panel_has_multiple_actions_in_every_topology": all(
+            value > 1 for value in switch_diversity.values()
+        ),
+        "proposed_zero_safety_violations": aggregate[proposed]["safety_violation_count"]
+        == 0,
+        "proposed_no_more_violations_than_fixed_safe": aggregate[proposed][
+            "safety_violation_count"
+        ]
+        <= aggregate[fixed]["safety_violation_count"],
     }
     base_pass = (
         aggregate[proposed]["mean_realized_entropy_reduction_nats"] > 0.0
-        and aggregate[proposed]["mean_challenge_rmse_m"] < aggregate["passive"]["mean_challenge_rmse_m"]
+        and aggregate[proposed]["mean_challenge_rmse_m"]
+        < aggregate["passive"]["mean_challenge_rmse_m"]
         and aggregate[proposed]["safety_violation_count"] == 0
     )
     decision = (
@@ -692,7 +970,10 @@ def run(output: Path) -> dict[str, Any]:
         "subsequent_challenge_action": "diagonal_hook",
         "all_candidate_outcomes_simulated_before_policy_scoring": True,
         "episode_counts_per_object": EPISODES_PER_OBJECT,
-        "seeds": {kind: [start + index for index in range(3)] for kind, start in seed_starts.items()},
+        "seeds": {
+            kind: [start + index for index in range(3)]
+            for kind, start in seed_starts.items()
+        },
         "bootstrap_replicates": BOOTSTRAP_REPLICATES,
         "claim_boundary": CLAIM_BOUNDARY,
     }
@@ -719,18 +1000,31 @@ def run(output: Path) -> dict[str, Any]:
         "claim_boundary": CLAIM_BOUNDARY,
     }
     for name, value in (("protocol.json", protocol), ("results.json", results)):
-        (output / name).write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    members = ("protocol.json", "results.json", "episode_metrics.csv", "belief_switch_panel.csv")
+        (output / name).write_text(
+            json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+    members = (
+        "protocol.json",
+        "results.json",
+        "episode_metrics.csv",
+        "belief_switch_panel.csv",
+    )
     manifest = {
         "schema": f"{SCHEMA}.manifest",
         "schema_version": 1,
         "members": [
-            {"path": name, "byte_count": (output / name).stat().st_size, "sha256": _sha256(output / name)}
+            {
+                "path": name,
+                "byte_count": (output / name).stat().st_size,
+                "sha256": _sha256(output / name),
+            }
             for name in members
         ],
         "claim_boundary": CLAIM_BOUNDARY,
     }
-    (output / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    (output / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return results
 
 
@@ -739,7 +1033,16 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
     result = run(args.output_dir)
-    print(json.dumps({"decision": result["decision"], "results": str((args.output_dir / "results.json").resolve())}, indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "decision": result["decision"],
+                "results": str((args.output_dir / "results.json").resolve()),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
     return 0
 
 

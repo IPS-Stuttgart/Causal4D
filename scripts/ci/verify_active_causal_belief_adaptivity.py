@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Verify the locked controlled belief-adaptivity result bundle."""
+
 from __future__ import annotations
 
 import argparse
@@ -28,12 +29,27 @@ EXPECTED_FIXED_ACTIONS = {
     "soft_block": "right_drag",
 }
 EXPECTED_METRICS = {
-    ("fixed_safe_source_prior", "mean_realized_entropy_reduction_nats"): 0.3738059780838206,
-    ("risk_constrained_information_gain", "mean_realized_entropy_reduction_nats"): 0.3693644152367383,
-    ("shuffled_belief_risk_constrained", "mean_realized_entropy_reduction_nats"): 0.36935395016936945,
+    (
+        "fixed_safe_source_prior",
+        "mean_realized_entropy_reduction_nats",
+    ): 0.3738059780838206,
+    (
+        "risk_constrained_information_gain",
+        "mean_realized_entropy_reduction_nats",
+    ): 0.3693644152367383,
+    (
+        "shuffled_belief_risk_constrained",
+        "mean_realized_entropy_reduction_nats",
+    ): 0.36935395016936945,
     ("fixed_safe_source_prior", "mean_challenge_rmse_m"): 0.0025941913036340936,
-    ("risk_constrained_information_gain", "mean_challenge_rmse_m"): 0.002606705642377289,
-    ("shuffled_belief_risk_constrained", "mean_challenge_rmse_m"): 0.0026020163793050405,
+    (
+        "risk_constrained_information_gain",
+        "mean_challenge_rmse_m",
+    ): 0.002606705642377289,
+    (
+        "shuffled_belief_risk_constrained",
+        "mean_challenge_rmse_m",
+    ): 0.0026020163793050405,
 }
 
 
@@ -126,13 +142,11 @@ def verify(root: Path) -> dict[str, Any]:
 
     comparisons = results["paired_comparisons"]
     _require(
-        float(comparisons["entropy_proposed_minus_fixed_safe"]["ci95_upper"])
-        < 0.0,
+        float(comparisons["entropy_proposed_minus_fixed_safe"]["ci95_upper"]) < 0.0,
         "fixed-safe entropy advantage no longer excludes zero",
     )
     _require(
-        float(comparisons["rmse_m_proposed_minus_fixed_safe"]["ci95_lower"])
-        > 0.0,
+        float(comparisons["rmse_m_proposed_minus_fixed_safe"]["ci95_lower"]) > 0.0,
         "proposed-vs-fixed RMSE direction changed",
     )
     shuffled = comparisons["entropy_proposed_minus_shuffled"]
@@ -142,8 +156,7 @@ def verify(root: Path) -> dict[str, Any]:
     )
 
     _require(
-        protocol.get("all_candidate_outcomes_simulated_before_policy_scoring")
-        is True,
+        protocol.get("all_candidate_outcomes_simulated_before_policy_scoring") is True,
         "all-action outcome boundary changed",
     )
     claim = str(results.get("claim_boundary", ""))
@@ -162,8 +175,7 @@ def verify(root: Path) -> dict[str, Any]:
 
     manifest = _read_json(root / "manifest.json")
     _require(
-        manifest.get("schema")
-        == "causal4d.active-causal-belief-adaptivity.manifest",
+        manifest.get("schema") == "causal4d.active-causal-belief-adaptivity.manifest",
         "manifest schema changed",
     )
     for member in manifest["members"]:
