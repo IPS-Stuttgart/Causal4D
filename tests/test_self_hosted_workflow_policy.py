@@ -146,43 +146,11 @@ def _main_only_errors(workflow_text: str, block: str) -> list[str]:
     return errors
 
 
-def _maintainer_issue_main_errors(workflow_text: str, block: str) -> list[str]:
-    errors = _common_self_hosted_errors(block)
-    required = {
-        "github.event_name == 'issues'": "missing issue-event authorization",
-        "github.event.action == 'opened'": "missing issue-open authorization",
-        (
-            "github.event.issue.user.login == 'FlorianPfaff'"
-        ): "missing exact maintainer-login authorization",
-        (
-            "github.event.issue.user.id == 6773539"
-        ): "missing exact maintainer-ID authorization",
-        (
-            "'[self-hosted] validate prepared joint observation'"
-        ): "missing exact trigger-title authorization",
-    }
-    for fragment, message in required.items():
-        if fragment not in block:
-            errors.append(message)
-    if block.count("github.event.issue.title") != 1:
-        errors.append("issue title must be used only by the exact guard")
-    for forbidden in (
-        "github.event.issue.body",
-        "github.event.issue.labels",
-        "github.event.comment",
-    ):
-        if forbidden in block:
-            errors.append(
-                f"untrusted issue payload reaches self-hosted job: {forbidden}"
-            )
-    if not _issue_only_workflow(workflow_text):
-        errors.append("workflow is not issue-only")
-    return errors
-
-
-def _single_operator_v5_issue_main_errors(
+def _exact_maintainer_issue_errors(
     workflow_text: str,
     block: str,
+    *,
+    trigger_title: str,
 ) -> list[str]:
     errors = _common_self_hosted_errors(block)
     required = {
@@ -194,9 +162,7 @@ def _single_operator_v5_issue_main_errors(
         (
             "github.event.issue.user.id == 6773539"
         ): "missing exact maintainer-ID authorization",
-        (
-            "'[self-hosted] bootstrap Causal4D v5 owner identity scaffold v2'"
-        ): "missing exact trigger-title authorization",
+        repr(trigger_title): "missing exact trigger-title authorization",
     }
     for fragment, message in required.items():
         if fragment not in block:
@@ -215,6 +181,38 @@ def _single_operator_v5_issue_main_errors(
     if not _issue_only_workflow(workflow_text):
         errors.append("workflow is not issue-only")
     return errors
+
+
+def _maintainer_issue_main_errors(workflow_text: str, block: str) -> list[str]:
+    return _exact_maintainer_issue_errors(
+        workflow_text,
+        block,
+        trigger_title="[self-hosted] validate prepared joint observation",
+    )
+
+
+def _single_operator_v5_issue_main_errors(
+    workflow_text: str,
+    block: str,
+) -> list[str]:
+    return _exact_maintainer_issue_errors(
+        workflow_text,
+        block,
+        trigger_title=(
+            "[self-hosted] bootstrap Causal4D v5 owner identity scaffold v2"
+        ),
+    )
+
+
+def _v5_checkout_reprovision_issue_main_errors(
+    workflow_text: str,
+    block: str,
+) -> list[str]:
+    return _exact_maintainer_issue_errors(
+        workflow_text,
+        block,
+        trigger_title="[self-hosted] reprovision Causal4D v5 acquisition checkout",
+    )
 
 
 def _authorization_errors(
@@ -228,6 +226,8 @@ def _authorization_errors(
         return _maintainer_issue_main_errors(workflow_text, block)
     if authorization_model == "single-operator-v5-issue-main":
         return _single_operator_v5_issue_main_errors(workflow_text, block)
+    if authorization_model == "v5-checkout-reprovision-issue-main":
+        return _v5_checkout_reprovision_issue_main_errors(workflow_text, block)
     return [f"unsupported authorization model: {authorization_model}"]
 
 
@@ -238,6 +238,7 @@ def test_self_hosted_job_registry_is_complete_and_unique() -> None:
         "main-only",
         "maintainer-issue-main",
         "single-operator-v5-issue-main",
+        "v5-checkout-reprovision-issue-main",
     }
 
     entries = payload["jobs"]
@@ -331,6 +332,35 @@ permissions:
           test -z "$(git status --porcelain=v1)"
 """
     assert _maintainer_issue_main_errors(workflow, block) == []
+
+
+def test_v5_checkout_reprovision_validator_accepts_exact_trigger() -> None:
+    workflow = """on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+"""
+    block = """  reprovision:
+    if: >-
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.issue.user.login == 'FlorianPfaff' &&
+      github.event.issue.user.id == 6773539 &&
+      github.event.issue.title ==
+        '[self-hosted] reprovision Causal4D v5 acquisition checkout'
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - run: |
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+"""
+    assert _v5_checkout_reprovision_issue_main_errors(workflow, block) == []
 
 
 def test_main_only_validator_rejects_an_unauthorized_or_stale_fixture() -> None:

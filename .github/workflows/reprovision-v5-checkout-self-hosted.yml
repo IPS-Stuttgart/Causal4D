@@ -1,0 +1,273 @@
+name: Reprovision v5 acquisition checkout on workstation2
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  reprovision:
+    name: Reprovision the pre-freeze v5 checkout
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.event.issue.user.login == 'FlorianPfaff' &&
+      github.event.issue.user.id == 6773539 &&
+      github.event.issue.title ==
+        '[self-hosted] reprovision Causal4D v5 acquisition checkout'
+    concurrency:
+      group: causal4d-v5-checkout-reprovision-${{ github.sha }}
+      cancel-in-progress: false
+      queue: max
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, data-causal4d-physical-v1]
+    timeout-minutes: 45
+    env:
+      EVIDENCE_DIR: >-
+        ${{ runner.temp }}/causal4d-v5-checkout-reprovision-${{ github.run_id }}
+      VENV_DIR: >-
+        ${{ runner.temp }}/causal4d-v5-checkout-reprovision-venv-${{ github.run_id }}
+    outputs:
+      previous_commit: ${{ steps.summary.outputs.previous_commit }}
+      deployed_commit: ${{ steps.summary.outputs.deployed_commit }}
+      backup_repository: ${{ steps.summary.outputs.backup_repository }}
+      next_action: ${{ steps.summary.outputs.next_action }}
+      readiness_conclusion: ${{ steps.summary.outputs.readiness_conclusion }}
+      dataset_modified: ${{ steps.summary.outputs.dataset_modified }}
+      target_outcomes_used: ${{ steps.summary.outputs.target_outcomes_used }}
+      physical_evidence_increment: >-
+        ${{ steps.summary.outputs.physical_evidence_increment }}
+    steps:
+      - name: Check out exact reviewed main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          clean: true
+
+      - name: Verify reviewed main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Build and install the exact Causal4D wheel outside the checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e "${EVIDENCE_DIR}"
+          test ! -e "${VENV_DIR}"
+          mkdir -p "${EVIDENCE_DIR}/wheels"
+          python -m venv "${VENV_DIR}"
+          "${VENV_DIR}/bin/python" -m pip install \
+            --upgrade pip "build>=1.2"
+          "${VENV_DIR}/bin/python" -m build --wheel \
+            --outdir "${EVIDENCE_DIR}/wheels" .
+          wheel="$(
+            find "${EVIDENCE_DIR}/wheels" -maxdepth 1 \
+              -name 'causal4d-*.whl' -print -quit
+          )"
+          test -n "${wheel}"
+          sha256sum "${wheel}" \
+            | tee "${EVIDENCE_DIR}/wheel-sha256.txt"
+          "${VENV_DIR}/bin/python" -m pip install "${wheel}"
+          "${VENV_DIR}/bin/python" -m pip check
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Atomically reprovision the registered checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="" "${VENV_DIR}/bin/python" \
+            scripts/ci/reprovision_self_hosted_v5_checkout.py \
+            --source-repository "${GITHUB_WORKSPACE}" \
+            --target-repository \
+              /mnt/lexar4tb/causal4d-physical/causal4d-frozen \
+            --dataset-root \
+              /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5 \
+            --expected-source-commit "${GITHUB_SHA}" \
+            --output "${EVIDENCE_DIR}/report.json" \
+            | tee "${EVIDENCE_DIR}/report.txt"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Recompute hash-verified readiness from the deployed checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="" "${VENV_DIR}/bin/python" \
+            scripts/ci/probe_self_hosted_acquisition.py \
+            --root-candidate \
+              canonical \
+              /opt/causal4d-frozen \
+              /data/causal4d-sloth-multi-action-v1-v5 \
+            --root-candidate \
+              workstation2-persistent \
+              /mnt/lexar4tb/causal4d-physical/causal4d-frozen \
+              /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5 \
+            --output "${EVIDENCE_DIR}/readiness.json" \
+            | tee "${EVIDENCE_DIR}/readiness.txt"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Verify and export sanitized result fields
+        id: summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${VENV_DIR}/bin/python" - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+          from pathlib import Path
+
+          evidence = Path(os.environ["EVIDENCE_DIR"])
+          report = json.loads(
+              (evidence / "report.json").read_text(encoding="utf-8")
+          )
+          readiness = json.loads(
+              (evidence / "readiness.json").read_text(encoding="utf-8")
+          )
+          if report["artifact_kind"] != "Causal4DV5CheckoutReprovisionReport":
+              raise SystemExit("unexpected checkout reprovision report")
+          if report["reviewed_source_commit"] != os.environ["GITHUB_SHA"]:
+              raise SystemExit("reprovisioned commit differs from the issue event")
+          if report["deployed_target_commit"] != os.environ["GITHUB_SHA"]:
+              raise SystemExit("deployed checkout commit differs from reviewed main")
+          if report["dataset_modified"] is not False:
+              raise SystemExit("reprovision modified the registered dataset")
+          if report["target_outcomes_used"] is not False:
+              raise SystemExit("reprovision used target outcomes")
+          if report["physical_evidence_increment"] != 0:
+              raise SystemExit("reprovision changed physical evidence")
+          action = readiness.get("next_action") or {}
+          if action.get("action_id") != "complete_object_registration":
+              raise SystemExit("deployed checkout did not recover object registration")
+          if action.get("physical_acquisition_required") is not False:
+              raise SystemExit("recovered next action unexpectedly requires acquisition")
+          if action.get("target_outcomes_permitted") is not False:
+              raise SystemExit("recovered next action permits target outcomes")
+          if readiness["dataset_modified"] is not False:
+              raise SystemExit("readiness probe modified the registered dataset")
+          if readiness["physical_evidence_increment"] != 0:
+              raise SystemExit("readiness probe changed physical evidence")
+
+          print(f"previous_commit={report['previous_target_commit']}")
+          print(f"deployed_commit={report['deployed_target_commit']}")
+          print(f"backup_repository={report['retained_backup_repository']}")
+          print(f"next_action={action['action_id']}")
+          print(f"readiness_conclusion={readiness['conclusion']}")
+          print(f"dataset_modified={str(report['dataset_modified']).lower()}")
+          print(
+              f"target_outcomes_used={str(report['target_outcomes_used']).lower()}"
+          )
+          print(
+              "physical_evidence_increment="
+              f"{report['physical_evidence_increment']}"
+          )
+          PY
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Record runner and GPU identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "commit=${GITHUB_SHA}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            uname -a
+          } | tee "${EVIDENCE_DIR}/runner.txt"
+          nvidia-smi -L \
+            | tee "${EVIDENCE_DIR}/nvidia-smi-L.txt"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Upload sanitized checkout-reprovision evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: causal4d-v5-checkout-reprovision-self-hosted
+          path: |
+            ${{ env.EVIDENCE_DIR }}/report.json
+            ${{ env.EVIDENCE_DIR }}/report.txt
+            ${{ env.EVIDENCE_DIR }}/readiness.json
+            ${{ env.EVIDENCE_DIR }}/readiness.txt
+            ${{ env.EVIDENCE_DIR }}/runner.txt
+            ${{ env.EVIDENCE_DIR }}/nvidia-smi-L.txt
+            ${{ env.EVIDENCE_DIR }}/wheel-sha256.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove isolated environment and local evidence copy
+        if: always()
+        shell: bash
+        run: rm -rf "${VENV_DIR}" "${EVIDENCE_DIR}"
+
+  report:
+    name: Report the checkout reprovision to the trigger issue
+    if: >-
+      always() &&
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.issue.user.login == 'FlorianPfaff' &&
+      github.event.issue.user.id == 6773539 &&
+      github.event.issue.title ==
+        '[self-hosted] reprovision Causal4D v5 acquisition checkout'
+    needs: reprovision
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      REPROVISION_RESULT: ${{ needs.reprovision.result }}
+      PREVIOUS_COMMIT: ${{ needs.reprovision.outputs.previous_commit }}
+      DEPLOYED_COMMIT: ${{ needs.reprovision.outputs.deployed_commit }}
+      BACKUP_REPOSITORY: ${{ needs.reprovision.outputs.backup_repository }}
+      NEXT_ACTION: ${{ needs.reprovision.outputs.next_action }}
+      READINESS_CONCLUSION: ${{ needs.reprovision.outputs.readiness_conclusion }}
+      DATASET_MODIFIED: ${{ needs.reprovision.outputs.dataset_modified }}
+      TARGET_OUTCOMES_USED: ${{ needs.reprovision.outputs.target_outcomes_used }}
+      PHYSICAL_EVIDENCE_INCREMENT: >-
+        ${{ needs.reprovision.outputs.physical_evidence_increment }}
+    steps:
+      - name: Comment with the sanitized reprovision result
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/"
+          run_url+="${GITHUB_RUN_ID}"
+          body="$(cat <<EOF
+          Causal4D v5 acquisition-checkout reprovision: **${REPROVISION_RESULT}**
+
+          - Exact reviewed main commit: `${GITHUB_SHA}`
+          - Previous checkout commit: `${PREVIOUS_COMMIT:-unavailable}`
+          - Deployed checkout commit: `${DEPLOYED_COMMIT:-unavailable}`
+          - Retained rollback checkout: `${BACKUP_REPOSITORY:-unavailable}`
+          - Recovered next action: `${NEXT_ACTION:-unavailable}`
+          - Readiness conclusion: `${READINESS_CONCLUSION:-unavailable}`
+          - Registered dataset modified: `${DATASET_MODIFIED:-unknown}`
+          - Target outcomes used: `${TARGET_OUTCOMES_USED:-unknown}`
+          - Physical evidence increment: `${PHYSICAL_EVIDENCE_INCREMENT:-unknown}`
+          - Workflow run: ${run_url}
+          - Artifact: `causal4d-v5-checkout-reprovision-self-hosted`
+
+          This operation replaces only a clean pre-freeze software checkout. It
+          retains the previous checkout for rollback, byte-preserves the registered
+          dataset, sends no physical command, and does not authorize target access.
+          EOF
+          )"
+          gh issue comment "${ISSUE_NUMBER}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --body "${body}"

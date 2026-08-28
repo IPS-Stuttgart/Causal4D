@@ -9,6 +9,9 @@
     },
     "single-operator-v5-issue-main": {
       "description": "Exact registered-owner issue trigger on reviewed refs/heads/main for the nonphysical source-independent v5 owner-identity bootstrap, exact GITHUB_SHA checkout, read-only self-hosted token, no issue text execution, and no secrets."
+    },
+    "v5-checkout-reprovision-issue-main": {
+      "description": "Exact registered-maintainer issue trigger on reviewed refs/heads/main for the pre-freeze atomic v5 checkout replacement, exact GITHUB_SHA checkout, clean-tree verification, byte-verified dataset noninterference, read-only self-hosted token, no issue text execution, and no secrets."
     }
   },
   "jobs": [
@@ -214,6 +217,21 @@
       ],
       "purpose": "Installed-wheel prepared joint-observation parity and scale validation",
       "dataset_access": "none",
+      "secrets_allowed": false
+    },
+    {
+      "workflow": "reprovision-v5-checkout-self-hosted.yml",
+      "job": "reprovision",
+      "authorization_model": "v5-checkout-reprovision-issue-main",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi",
+        "data-causal4d-physical-v1"
+      ],
+      "purpose": "Atomically replace a stale clean pre-freeze v5 acquisition checkout",
+      "dataset_access": "registered-local-preacquisition-v5-checkout-replacement-with-byte-verification",
       "secrets_allowed": false
     },
     {
