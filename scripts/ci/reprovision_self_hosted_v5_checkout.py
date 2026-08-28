@@ -215,12 +215,8 @@ def _decision_summary(decision: Mapping[str, Any]) -> dict[str, Any]:
     physical_acquisition_required = (
         action_mapping.get("physical_acquisition_required") is True
     )
-    target_outcomes_permitted = (
-        action_mapping.get("target_outcomes_permitted") is True
-    )
-    changes_registered_method = (
-        action_mapping.get("changes_registered_method") is True
-    )
+    target_outcomes_permitted = action_mapping.get("target_outcomes_permitted") is True
+    changes_registered_method = action_mapping.get("changes_registered_method") is True
 
     _require(valid, "registered next-action decision is invalid")
     _require(
