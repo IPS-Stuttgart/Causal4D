@@ -58,7 +58,6 @@ def _decision(*, action_id: str = "complete_object_registration"):
             "protocol_id": "fixture-protocol",
             "valid": True,
             "ready": False,
-            "verify_file_hashes": True,
             "evidence_sha256": "a" * 64,
             "status_sha256": "b" * 64,
             "action": {
@@ -108,6 +107,7 @@ def test_reprovision_replaces_only_checkout_and_retains_backup(tmp_path: Path) -
     assert report["deployed_target_commit"] == source_commit
     assert report["dataset_modified"] is False
     assert report["target_outcomes_used"] is False
+    assert report["source_next_action"]["verify_file_hashes"] is True
     assert report["physical_evidence_increment"] == 0
     assert protocol.read_bytes() == before
     assert (target / "configs/causal4d/sloth_preacquisition_v5.json").is_file()
