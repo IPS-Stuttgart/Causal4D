@@ -9,6 +9,9 @@
     },
     "single-operator-v5-issue-main": {
       "description": "Exact registered-owner issue trigger on reviewed refs/heads/main for the nonphysical source-independent v5 owner-identity bootstrap, exact GITHUB_SHA checkout, read-only self-hosted token, no issue text execution, and no secrets."
+    },
+    "v5-checkout-reprovision-issue-main": {
+      "description": "Exact registered-maintainer issue trigger on reviewed refs/heads/main for the pre-freeze atomic v5 checkout replacement, exact GITHUB_SHA checkout, clean-tree verification, byte-verified dataset noninterference, read-only self-hosted token, no issue text execution, and no secrets."
     }
   },
   "jobs": [
@@ -219,7 +222,7 @@
     {
       "workflow": "reprovision-v5-checkout-self-hosted.yml",
       "job": "reprovision",
-      "authorization_model": "maintainer-issue-main",
+      "authorization_model": "v5-checkout-reprovision-issue-main",
       "runner_labels": [
         "self-hosted",
         "Linux",
