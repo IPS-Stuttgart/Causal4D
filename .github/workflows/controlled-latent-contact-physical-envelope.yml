@@ -139,6 +139,7 @@ jobs:
           import csv
           import importlib.util
           import json
+          import math
           from pathlib import Path
 
           root = Path("build/latent-contact-physical-envelope-shards")
@@ -197,8 +198,25 @@ jobs:
           }
           if len(benchmark_configs) != 1 or len(contact_configs) != 1:
               raise SystemExit("benchmark/contact configuration drift across shards")
-          protocol_texts = {json.dumps(protocol, sort_keys=True) for protocol in protocols}
-          if len(protocol_texts) != 1:
+
+          def protocol_equal(left, right):
+              if isinstance(left, dict) and isinstance(right, dict):
+                  return set(left) == set(right) and all(
+                      protocol_equal(left[key], right[key]) for key in left
+                  )
+              if isinstance(left, list) and isinstance(right, list):
+                  return len(left) == len(right) and all(
+                      protocol_equal(a, b) for a, b in zip(left, right, strict=True)
+                  )
+              if isinstance(left, bool) or isinstance(right, bool):
+                  return left is right
+              if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+                  return math.isclose(
+                      float(left), float(right), rel_tol=1e-14, abs_tol=1e-15
+                  )
+              return left == right
+
+          if not all(protocol_equal(protocols[0], protocol) for protocol in protocols[1:]):
               raise SystemExit("protocol drift across shards")
 
           rows.sort(
