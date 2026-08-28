@@ -1,0 +1,88 @@
+name: Temporary update reprovision registry description
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/temporary-update-reprovision-registry.yml"
+      - ".github/self-hosted-jobs.json"
+      - ".github/workflows/reprovision-v5-checkout-self-hosted.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Update the existing registered job description
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path(".github/self-hosted-jobs.json")
+          payload = json.loads(path.read_text(encoding="utf-8"))
+          matches = [
+              job
+              for job in payload["jobs"]
+              if job["workflow"] == "reprovision-v5-checkout-self-hosted.yml"
+              and job["job"] == "reprovision"
+          ]
+          if len(matches) != 1:
+              raise SystemExit("reprovision registry entry is not unique")
+          entry = matches[0]
+          if entry["authorization_model"] != (
+              "v5-checkout-reprovision-issue-main"
+          ):
+              raise SystemExit("reprovision authorization model changed")
+          if entry["secrets_allowed"] is not False:
+              raise SystemExit("reprovision registry unexpectedly permits secrets")
+          entry["purpose"] = (
+              "Atomically replace a stale clean pre-freeze v5 acquisition "
+              "checkout and stage exact approved source-only object-registration "
+              "node sets"
+          )
+          entry["dataset_access"] = (
+              "registered-local-preacquisition-v5-checkout-replacement-and-"
+              "object-registration-node-set-stage-with-byte-verification"
+          )
+          path.write_text(
+              json.dumps(payload, indent=2, sort_keys=False) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Verify registry and workflow policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -e ".[dev]"
+          python -m ruff check tests/test_self_hosted_workflow_policy.py
+          pytest -q \
+            tests/test_self_hosted_workflow_policy.py \
+            tests/test_issue_command_concurrency.py \
+            tests/test_self_hosted_object_registration_input_stage.py
+
+      - name: Upload the verified registry
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: updated-reprovision-self-hosted-registry-${{ github.run_id }}
+          path: .github/self-hosted-jobs.json
+          if-no-files-found: error
+          retention-days: 1
