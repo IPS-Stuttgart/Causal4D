@@ -183,6 +183,11 @@ def test_workflow_is_narrowly_issue_authorized_and_nonphysical() -> None:
     assert "scripts/ci/reprovision_self_hosted_v5_checkout.py" in text
     assert "/mnt/lexar4tb/causal4d-physical/causal4d-frozen" in text
     assert "/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5" in text
+    assert "${{ runner.temp }}" in text
+    assert "EVIDENCE_DIR" in text
+    assert "VENV_DIR" in text
+    assert "outputs/v5-checkout-reprovision" not in text
+    assert text.count('test -z "$(git status --porcelain=v1)"') >= 5
     assert "physical_evidence_increment" in text
     assert "target_outcomes_used" in text
     assert "secrets." not in text
