@@ -1,0 +1,273 @@
+name: Stage object-registration inputs on workstation2
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  stage:
+    name: Stage approved node sets for object registration
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.event.issue.user.login == 'FlorianPfaff' &&
+      github.event.issue.user.id == 6773539 &&
+      github.event.issue.title ==
+        '[self-hosted] stage Causal4D object-registration inputs'
+    concurrency:
+      group: causal4d-object-registration-input-stage-${{ github.sha }}
+      cancel-in-progress: false
+      queue: max
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, data-causal4d-physical-v1]
+    timeout-minutes: 45
+    outputs:
+      added_count: ${{ steps.summary.outputs.added_count }}
+      next_action: ${{ steps.summary.outputs.next_action }}
+      ready_except_serial: ${{ steps.summary.outputs.ready_except_serial }}
+      dataset_modified: ${{ steps.summary.outputs.dataset_modified }}
+      report_sha256: ${{ steps.summary.outputs.report_sha256 }}
+      physical_evidence_increment: >-
+        ${{ steps.summary.outputs.physical_evidence_increment }}
+    steps:
+      - name: Check out exact reviewed main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          clean: true
+
+      - name: Verify reviewed main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Prepare isolated runtime paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="${RUNNER_TEMP}/causal4d-object-inputs-${GITHUB_RUN_ID}"
+          venv_dir="${RUNNER_TEMP}/causal4d-object-inputs-venv-${GITHUB_RUN_ID}"
+          test ! -e "${evidence_dir}"
+          test ! -e "${venv_dir}"
+          {
+            echo "EVIDENCE_DIR=${evidence_dir}"
+            echo "VENV_DIR=${venv_dir}"
+          } >> "${GITHUB_ENV}"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Build and install the exact Causal4D wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${EVIDENCE_DIR}/wheels"
+          python -m venv "${VENV_DIR}"
+          "${VENV_DIR}/bin/python" -m pip install \
+            --upgrade pip "build>=1.2"
+          "${VENV_DIR}/bin/python" -m build --wheel \
+            --outdir "${EVIDENCE_DIR}/wheels" .
+          wheel="$(
+            find "${EVIDENCE_DIR}/wheels" -maxdepth 1 \
+              -name 'causal4d-*.whl' -print -quit
+          )"
+          test -n "${wheel}"
+          sha256sum "${wheel}" | tee "${EVIDENCE_DIR}/wheel-sha256.txt"
+          "${VENV_DIR}/bin/python" -m pip install "${wheel}"
+          "${VENV_DIR}/bin/python" -m pip check
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Stage exact approved node sets
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="" "${VENV_DIR}/bin/python" \
+            scripts/ci/stage_self_hosted_object_registration_inputs.py \
+            --repository-root \
+              /mnt/lexar4tb/causal4d-physical/causal4d-frozen \
+            --dataset-root \
+              /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5 \
+            --expected-commit "${GITHUB_SHA}" \
+            --output "${EVIDENCE_DIR}/report.json" \
+            | tee "${EVIDENCE_DIR}/report.txt"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Recompute read-only readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="" "${VENV_DIR}/bin/python" \
+            scripts/ci/probe_self_hosted_acquisition.py \
+            --root-candidate \
+              canonical \
+              /opt/causal4d-frozen \
+              /data/causal4d-sloth-multi-action-v1-v5 \
+            --root-candidate \
+              workstation2-persistent \
+              /mnt/lexar4tb/causal4d-physical/causal4d-frozen \
+              /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5 \
+            --output "${EVIDENCE_DIR}/readiness.json" \
+            | tee "${EVIDENCE_DIR}/readiness.txt"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Verify and export sanitized result fields
+        id: summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${VENV_DIR}/bin/python" - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+          from pathlib import Path
+
+          evidence = Path(os.environ["EVIDENCE_DIR"])
+          report = json.loads(
+              (evidence / "report.json").read_text(encoding="utf-8")
+          )
+          readiness = json.loads(
+              (evidence / "readiness.json").read_text(encoding="utf-8")
+          )
+          if report["artifact_kind"] != (
+              "Causal4DObjectRegistrationInputStageReport"
+          ):
+              raise SystemExit("unexpected input-stage report")
+          if report["reviewed_commit"] != os.environ["GITHUB_SHA"]:
+              raise SystemExit("input-stage revision mismatch")
+          if report["ready_except_physical_serial"] is not True:
+              raise SystemExit("input stage did not isolate the physical serial")
+          if report["missing_operator_inputs"] != ["physical_instance_serial"]:
+              raise SystemExit("unexpected remaining object-registration inputs")
+          if report["object_registration_json_created"] is not False:
+              raise SystemExit("input stage created object registration")
+          if report["target_outcomes_used"] is not False:
+              raise SystemExit("input stage used target outcomes")
+          if report["physical_command_sent"] is not False:
+              raise SystemExit("input stage sent a physical command")
+          if report["physical_evidence_increment"] != 0:
+              raise SystemExit("input stage changed physical evidence")
+          action = readiness.get("next_action") or {}
+          if action.get("action_id") != "complete_object_registration":
+              raise SystemExit("readiness did not remain at object registration")
+          if action.get("physical_acquisition_required") is not False:
+              raise SystemExit("object registration unexpectedly requires acquisition")
+          if action.get("target_outcomes_permitted") is not False:
+              raise SystemExit("object registration permits target outcomes")
+          if readiness["physical_evidence_increment"] != 0:
+              raise SystemExit("readiness probe changed physical evidence")
+
+          print(f"added_count={len(report['added_paths'])}")
+          print(f"next_action={action['action_id']}")
+          print(
+              "ready_except_serial="
+              f"{str(report['ready_except_physical_serial']).lower()}"
+          )
+          print(f"dataset_modified={str(report['dataset_modified']).lower()}")
+          print(f"report_sha256={report['report_sha256']}")
+          print(
+              "physical_evidence_increment="
+              f"{report['physical_evidence_increment']}"
+          )
+          PY
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Record runner identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "commit=${GITHUB_SHA}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            uname -a
+          } | tee "${EVIDENCE_DIR}/runner.txt"
+          nvidia-smi -L | tee "${EVIDENCE_DIR}/nvidia-smi-L.txt"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Upload sanitized input-stage evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: causal4d-object-registration-inputs-self-hosted
+          path: |
+            ${{ runner.temp }}/causal4d-object-inputs-${{ github.run_id }}/report.json
+            ${{ runner.temp }}/causal4d-object-inputs-${{ github.run_id }}/report.txt
+            ${{ runner.temp }}/causal4d-object-inputs-${{ github.run_id }}/readiness.json
+            ${{ runner.temp }}/causal4d-object-inputs-${{ github.run_id }}/readiness.txt
+            ${{ runner.temp }}/causal4d-object-inputs-${{ github.run_id }}/runner.txt
+            ${{ runner.temp }}/causal4d-object-inputs-${{ github.run_id }}/nvidia-smi-L.txt
+            ${{ runner.temp }}/causal4d-object-inputs-${{ github.run_id }}/wheel-sha256.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove isolated runtime and local evidence
+        if: always()
+        shell: bash
+        run: rm -rf "${VENV_DIR}" "${EVIDENCE_DIR}"
+
+  report:
+    name: Report object-registration input staging
+    if: >-
+      always() &&
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.issue.user.login == 'FlorianPfaff' &&
+      github.event.issue.user.id == 6773539 &&
+      github.event.issue.title ==
+        '[self-hosted] stage Causal4D object-registration inputs'
+    needs: stage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      STAGE_RESULT: ${{ needs.stage.result }}
+      ADDED_COUNT: ${{ needs.stage.outputs.added_count }}
+      NEXT_ACTION: ${{ needs.stage.outputs.next_action }}
+      READY_EXCEPT_SERIAL: ${{ needs.stage.outputs.ready_except_serial }}
+      DATASET_MODIFIED: ${{ needs.stage.outputs.dataset_modified }}
+      REPORT_SHA256: ${{ needs.stage.outputs.report_sha256 }}
+      PHYSICAL_EVIDENCE_INCREMENT: >-
+        ${{ needs.stage.outputs.physical_evidence_increment }}
+    steps:
+      - name: Comment with the sanitized staging result
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/"
+          run_url+="${GITHUB_RUN_ID}"
+          body="$(cat <<EOF
+          Causal4D object-registration input staging: **${STAGE_RESULT}**
+
+          - Exact reviewed main commit: `${GITHUB_SHA}`
+          - Approved node-set files added: `${ADDED_COUNT:-unknown}`
+          - Remaining next action: `${NEXT_ACTION:-unavailable}`
+          - Ready except stable physical serial: `${READY_EXCEPT_SERIAL:-unknown}`
+          - Registered dataset modified: `${DATASET_MODIFIED:-unknown}`
+          - Report SHA-256: `${REPORT_SHA256:-unavailable}`
+          - Physical evidence increment: `${PHYSICAL_EVIDENCE_INCREMENT:-unknown}`
+          - Workflow run: ${run_url}
+          - Artifact: `causal4d-object-registration-inputs-self-hosted`
+
+          The approved L1/P1/F2 node-set bytes are now staged. The workflow does
+          not create `object_registration.json`; the registered operator must still
+          observe and supply the stable inventory serial attached to the exact sloth.
+          EOF
+          )"
+          gh issue comment "${ISSUE_NUMBER}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --body "${body}"
