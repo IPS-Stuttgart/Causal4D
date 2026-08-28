@@ -38,34 +38,18 @@ jobs:
               "scripts/ci/stage_self_hosted_object_registration_inputs.py"
           )
           source = path.read_text(encoding="utf-8")
-          old = '''def _decision_summary(decision: Mapping[str, Any]) -> dict[str, Any]:
-              action = decision.get("action")
-              _require(isinstance(action, Mapping), "next-action decision has no action object")
-              action_map = dict(action)
-              summary = {
-                  "valid": decision.get("valid") is True,
-                  "ready": decision.get("ready") is True,
-                  "verify_file_hashes": decision.get("verify_file_hashes") is True,
-                  "evidence_sha256": decision.get("evidence_sha256"),
-                  "status_sha256": decision.get("status_sha256"),
-                  "action_id": action_map.get("action_id"),
-                  "operator_role": action_map.get("operator_role"),
-                  "automatable": action_map.get("automatable") is True,
-                  "physical_acquisition_required": (
-                      action_map.get("physical_acquisition_required") is True
-                  ),
-                  "target_outcomes_permitted": (
-                      action_map.get("target_outcomes_permitted") is True
-                  ),
-                  "changes_registered_method": (
-                      action_map.get("changes_registered_method") is True
-                  ),
-              }
-              _require(summary["valid"], "registered next-action decision is invalid")
-              _require(summary["verify_file_hashes"], "file hashes were not verified")
-          '''
-          old = "\n".join(line[12:] if line.startswith("            ") else line for line in old.splitlines())
-          new = '''def _decision_summary(decision: Mapping[str, Any]) -> dict[str, Any]:
+
+          def replace_function(
+              text: str,
+              start_marker: str,
+              end_marker: str,
+              replacement: str,
+          ) -> str:
+              start = text.index(start_marker)
+              end = text.index(end_marker, start)
+              return text[:start] + replacement.rstrip() + "\n\n" + text[end:]
+
+          decision_summary = '''def _decision_summary(decision: Mapping[str, Any]) -> dict[str, Any]:
               action = decision.get("action")
               if not isinstance(action, Mapping):
                   raise ValueError("next-action decision has no action object")
@@ -98,33 +82,99 @@ jobs:
               }
               _require(valid, "registered next-action decision is invalid")
               _require(verify_file_hashes, "file hashes were not verified")
+              _require(
+                  summary["action_id"] == EXPECTED_NEXT_ACTION,
+                  "input staging is allowed only at complete_object_registration",
+              )
+              _require(
+                  not automatable,
+                  "object registration unexpectedly automatable",
+              )
+              _require(
+                  not physical_acquisition_required,
+                  "object registration unexpectedly requires acquisition",
+              )
+              _require(
+                  not target_outcomes_permitted,
+                  "object registration unexpectedly permits target outcomes",
+              )
+              _require(
+                  not changes_registered_method,
+                  "object registration unexpectedly changes the registered method",
+              )
+              return summary
           '''
-          new = "\n".join(line[12:] if line.startswith("            ") else line for line in new.splitlines())
-          if source.count(old) != 1:
-              raise SystemExit("decision-summary patch target changed")
-          source = source.replace(old, new)
+          decision_summary = "\n".join(
+              line[12:] if line.startswith("            ") else line
+              for line in decision_summary.splitlines()
+          )
+          source = replace_function(
+              source,
+              "def _decision_summary(",
+              "def _default_packet_builder(",
+              decision_summary,
+          )
 
-          old = '''    regions = packet.get("contact_regions")
-              _require(isinstance(regions, Mapping), "pending packet has no contact regions")
-              _require(set(regions) == set(requirements), "pending packet region set changed")
-              for region_id, required in requirements.items():
-                  descriptor = regions.get(region_id)
-                  _require(isinstance(descriptor, Mapping), f"{region_id} descriptor is missing")
-          '''
-          old = "\n".join(line[12:] if line.startswith("            ") else line for line in old.splitlines())
-          new = '''    regions = packet.get("contact_regions")
+          validate_packet = '''def _validate_packet(
+              packet: Mapping[str, Any],
+              requirements: Mapping[str, Mapping[str, Any]],
+          ) -> dict[str, Any]:
+              _require(
+                  packet.get("artifact_kind")
+                  == "Causal4DObjectRegistrationSealPacket",
+                  "unexpected object-registration seal packet",
+              )
+              _require(
+                  packet.get("phystwin_model_id") == MODEL_ID,
+                  "PhysTwin model ID changed",
+              )
+              _require(
+                  packet.get("phystwin_model_sha256") == MODEL_SHA256,
+                  "PhysTwin model SHA-256 changed",
+              )
+              _require(
+                  packet.get("missing_operator_inputs")
+                  == ["physical_instance_serial"],
+                  "pending packet is not blocked only by the physical serial",
+              )
+              _require(
+                  packet.get("ready_to_seal_object_registration") is False,
+                  "pending packet unexpectedly claims readiness",
+              )
+              regions = packet.get("contact_regions")
               if not isinstance(regions, Mapping):
                   raise ValueError("pending packet has no contact regions")
-              _require(set(regions) == set(requirements), "pending packet region set changed")
+              _require(
+                  set(regions) == set(requirements),
+                  "pending packet region set changed",
+              )
               for region_id, required in requirements.items():
                   descriptor = regions.get(region_id)
                   if not isinstance(descriptor, Mapping):
                       raise ValueError(f"{region_id} descriptor is missing")
+                  for field in (
+                      "path",
+                      "node_count",
+                      "sha256",
+                      "bytes",
+                      "selected_candidate_id",
+                  ):
+                      _require(
+                          descriptor.get(field) == required[field],
+                          f"{region_id} {field} changed",
+                      )
+              return dict(packet)
           '''
-          new = "\n".join(line[12:] if line.startswith("            ") else line for line in new.splitlines())
-          if source.count(old) != 1:
-              raise SystemExit("packet-narrowing patch target changed")
-          source = source.replace(old, new)
+          validate_packet = "\n".join(
+              line[12:] if line.startswith("            ") else line
+              for line in validate_packet.splitlines()
+          )
+          source = replace_function(
+              source,
+              "def _validate_packet(",
+              "def _fsync_directory(",
+              validate_packet,
+          )
 
           replacements = {
               '            relative = Path(str(required["path"]))\n': (
@@ -137,13 +187,15 @@ jobs:
                   '            destination = dataset / relative_path\n'
               ),
               '        for relative, descriptor in before_members.items():\n': (
-                  '        for existing_relative, descriptor in before_members.items():\n'
+                  '        for existing_relative, descriptor in '
+                  'before_members.items():\n'
               ),
               '                after_members[relative] == descriptor,\n': (
                   '                after_members[existing_relative] == descriptor,\n'
               ),
               '                f"existing dataset file changed: {relative}",\n': (
-                  '                f"existing dataset file changed: {existing_relative}",\n'
+                  '                f"existing dataset file changed: '
+                  '{existing_relative}",\n'
               ),
           }
           for before, after in replacements.items():
