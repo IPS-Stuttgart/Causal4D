@@ -58,7 +58,8 @@ hashed before and after. Existing files may not change or disappear, and no
 unexpected file may appear.
 
 A failure removes every file added by the current run and verifies the original
-dataset tree before returning an error. A successful rerun is idempotent.
+dataset tree before returning an error. A successful rerun is idempotent and
+must reproduce the same approved file descriptors.
 
 ## Remaining manual boundary
 
