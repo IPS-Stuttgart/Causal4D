@@ -21,7 +21,7 @@ The software makes the causal sequence explicit:
    response prefix;
 3. branch at the prefix endpoint under a held-out action;
 4. propagate physical, intervention, and unresolved-discrepancy uncertainty;
-5. optionally reweight safe rollouts through a separately gated semantic prior.
+5. return exact fallback when the registered support or evidence is inadequate.
 
 This repository is the canonical home of Causal4D. It was extracted with
 history from
@@ -44,13 +44,12 @@ The demonstration writes non-pickled, content-addressed contracts for a
 and projected posterior. It reloads every artifact and verifies that replacing
 the held-out suffix cannot change factual abduction.
 
-The output is a controlled software demonstration, not physical evidence or a
-scientific result. See
+The output is a controlled software demonstration, not an empirical result. See
 [the end-to-end AIP guide](docs/aip_end_to_end_demo.md).
 
 ### Recommended public imports
 
-New artifact consumers should use the artifact-only namespace:
+Artifact consumers should use:
 
 ```python
 from causal4d.artifacts.v1 import TwinBelief, load_contract, save_contract
@@ -67,10 +66,8 @@ from causal4d.inference.v1 import (
 ```
 
 `causal4d.api.v1` remains supported for the existing controlled-benchmark API,
-and historical package-root exports remain available for compatibility. New AIP
-integrations should prefer the split namespaces so artifact-only code does not
-implicitly depend on estimator implementations. The stability policy is
-specified in [docs/public_api.md](docs/public_api.md).
+and historical package-root exports remain available for compatibility. See
+[docs/public_api.md](docs/public_api.md).
 
 ## Installation
 
@@ -93,56 +90,23 @@ python -m pip install -e ".[phystwin]"
 ```
 
 The `phystwin` extra accepts BayesianPhysTwin `>=0.4,<0.5` and validates the
-provider manifest at runtime. Frozen experiments instead lock both repositories
-through the corresponding frozen requirements file. Visual, Warp-runtime, and
-actuator-calibration dependencies remain separate so the controlled benchmark
-stays lightweight.
+provider manifest at runtime. Frozen studies instead lock exact repository and
+wheel identities.
 
 ## Command-line interface
 
-Causal4D 0.5 installs one executable with typed grouped routes:
+Causal4D installs one executable with typed grouped routes:
 
 ```bash
 causal4d --help
 causal4d commands list
 causal4d commands describe protocol/real
-causal4d commands migrate causal4d-real-protocol
 causal4d commands validate --require-installed
 ```
 
-The 67 historical `causal4d-*` console scripts are no longer installed. Their
-successor routes remain available, while frozen tags and milestone environments
-retain the original executables. See
-[the command-line guide](docs/command_line.md) and
-[the 0.5 migration table](docs/command_migration_0_5.md).
+See [the command-line guide](docs/command_line.md).
 
-### Controlled benchmark construction
-
-The aggregate compatibility API remains useful for controlled protocol
-construction:
-
-```python
-from causal4d.api.v1 import CounterfactualBenchmarkConfig, build_protocol
-
-config = CounterfactualBenchmarkConfig(
-    frame_count=18,
-    training_repeats=1,
-    parameter_grid_count=3,
-)
-protocol = build_protocol(config)
-
-for object_protocol in protocol:
-    print(
-        object_protocol.graph_object.name,
-        object_protocol.validation_action.action_id,
-        object_protocol.test_action.action_id,
-    )
-```
-
-The runnable example is
-[`examples/python_api_quickstart.py`](examples/python_api_quickstart.py).
-
-Run the controlled benchmarks with:
+### Controlled benchmarks
 
 ```bash
 causal4d benchmark counterfactual \
@@ -159,94 +123,105 @@ causal4d benchmark latent-contact \
 `src/causal4d/` owns typed posterior contracts, intervention abduction,
 counterfactual operators, discrepancy transfer, semantic trust gates, physical
 validation, and prospective mechanism gates. The structural model, causal
-timing, transport assumptions, and real-data identification boundary are
-formalized in
+timing, transport assumptions, and identification boundary are formalized in
 [docs/causal_model_and_identification.md](docs/causal_model_and_identification.md).
 
 Analysis-only action comparisons use the typed, content-addressed
 `InterventionalContrastPosteriorV1` contract documented in
-[docs/interventional_contrast.md](docs/interventional_contrast.md). They do not
-change a source posterior or the frozen physical protocol.
+[docs/interventional_contrast.md](docs/interventional_contrast.md).
 
 ### BayesianPhysTwin integration
 
 [BayesianPhysTwin](https://github.com/IPS-Stuttgart/BayesianPhysTwin) supplies
 the uncertain deformable-object twin: state and parameter particles, graph
-geometry, PhysTwin/Warp replay, and perception/discrepancy artifacts. Causal4D
-consumes those artifacts and owns intervention and counterfactual inference.
-Production source uses versioned provider facades rather than importing
-BayesianPhysTwin internals. See
+geometry, physical replay, and perception/discrepancy artifacts. Causal4D
+consumes those artifacts and owns intervention and interventional inference. See
 [docs/bayesian_phystwin_provider.md](docs/bayesian_phystwin_provider.md).
 
 ### Public-data studies
 
 `src/causal4d_public/` contains source-locked Deform360 and PokeFlex adapters,
 preflight checks, technical-failure accounting, shared-physics controls, and
-frozen public-data protocols. These studies are evidence about specific model
-classes and information boundaries; they are not all positive confirmations.
+frozen public-data protocols. Positive and negative public-data results are both
+part of the evidence program.
 
 ### Prob4D
 
-[Prob4D](https://github.com/IPS-Stuttgart/Prob4D) is a separate probabilistic 4D
-observation and calibration feeder. It is not assumed prior literature and is
-not part of Causal4D's core causal claim. Causal4D consumes versioned Prob4D
-observation artifacts only through narrow, source-calibrated gates with exact
-fallback.
+[Prob4D](https://github.com/IPS-Stuttgart/Prob4D) is a separate probabilistic 4-D
+observation and calibration feeder. It is optional and is not required for the
+first Causal4D paper.
+
+## Public-data-only paper program
+
+The first Causal4D paper no longer requires a new hardware acquisition. Its
+bounded empirical spine is:
+
+1. **Controlled causal validation.** Joint latent-contact abduction changes
+   shifted-contact RMSE from `4.132 mm` to `0.805 mm` and nominal 90% coverage
+   from `77.9%` to `90.8%` under shared simulator exogenous conditions.
+2. **Topology and identifiability boundary.** On an independent controlled
+   panel, exact contact-node recovery is `75%`, one-hop recovery is `100%`, and
+   every exact-node miss still improves trajectory prediction. This supports
+   predictive intervention equivalence, not physical contact equivalence.
+3. **Public Deform360 held-out action.** A source-fitted physical forward model
+   is sealed before opening the public target future. On the held-out
+   `move both edges` action, visual-only prediction reaches `47.58 mm` Chamfer
+   distance versus `71.84 mm` for persistence. The six-frame tactile state is
+   worse (`59.74 mm`), while the full-tactile oracle reaches `46.70 mm`.
+4. **Public PokeFlex negative control.** The first sparse official-Warp backend
+   fails its source gate: pooled leave-one-take-out selection wins `0/5` takes
+   and obtains `23.771 mm` mean Chamfer versus `10.093 mm` for persistence. The
+   sealed target remains unopened for that rejected backend.
+5. **Released real diagnostic.** The already released single-interaction audit
+   localizes undercoverage and model-discrepancy headroom without being promoted
+   to independent confirmation.
+
+Together these studies support a paper about causal formulation, Bayesian
+intervention abduction, held-out public-data prediction, and explicit
+identification/failure boundaries. They do **not** establish individual-level
+real counterfactual ground truth, physical contact recovery, calibrated real
+uncertainty, arbitrary-object generalization, or robot-control safety.
+
+The detailed claim hierarchy is in
+[docs/causal4d_paper_scope.md](docs/causal4d_paper_scope.md). Additional public
+benchmarks may strengthen the paper, but they are improvements rather than
+submission blockers.
+
+## Optional future hardware validation
+
+The previously registered 18-session/36-execution same-object protocol is
+retained for provenance and for a possible future collaborator-led validation.
+It is not required for the public-data-only first paper, and its `0/36` evidence
+state must not be described as a missing result in that paper. The archived
+operational boundary is summarized in
+[docs/causal4d_real_experiment_milestone.md](docs/causal4d_real_experiment_milestone.md).
 
 ## Reproduction and diagnostics
 
-Create and independently verify an immutable, target-free paper reproduction
-bundle with the `causal4d paper reproduce` route. It regenerates the registered
-report shell, source-verifies supplied tables and gate decisions, and records
-exact hashes without copying raw sensor data. See
-[docs/paper_reproduction.md](docs/paper_reproduction.md).
-
-Query-space uncertainty attribution is available through
-`causal4d diagnostic uncertainty decompose-query`. It uses exact Shapley
-attribution over declared finite factors and verifies numerical additivity and
-content identity. It is diagnostic-only and cannot select or change the frozen
-physical method. See
+Create and independently verify immutable paper bundles with the
+`causal4d paper reproduce` route. Query-space uncertainty attribution is
+available through `causal4d diagnostic uncertainty decompose-query`. See
+[docs/paper_reproduction.md](docs/paper_reproduction.md) and
 [docs/query_variance_decomposition.md](docs/query_variance_decomposition.md).
-
-## Next scientific milestone
-
-The controlled result has passed. The decisive first-paper milestone is the
-locked same-object physical experiment: 18 grasp sessions, 36 command
-executions, and independent-execution calibration. Primary-method development
-is frozen for this result; another discrepancy mechanism, semantic component,
-planner, or public-data branch cannot replace it.
-
-The experiment must report either successful transfer/calibration or a
-well-powered negative result without target-informed method selection. Operator
-instructions and exact evidence boundaries live in:
-
-- [source-panel acquisition](docs/causal4d_source_panel_acquisition.md);
-- [pre-acquisition readiness](docs/causal4d_preacquisition_readiness.md);
-- [real-evidence accounting](docs/causal4d_real_evidence_status.md); and
-- [the physical-experiment milestone](docs/causal4d_real_experiment_milestone.md).
-
-Keeping the operational command sequence in those versioned runbooks avoids
-turning the repository landing page into a second, potentially divergent copy
-of the registered protocol.
 
 ## Evidence boundary
 
-- `milestones/v0.3.0-causal4d-aip/` is the frozen controlled and first real AIP
-  milestone.
-- Released PhysTwin interactions are diagnostic-only after their recorded
-  audits and must not be reused for further model selection.
+- `milestones/v0.3.0-causal4d-aip/` is the frozen controlled and first released
+  AIP milestone.
 - Deform360 and PokeFlex preserve source/target access boundaries, retained
-  technical failures, and unsealable cases separately.
+  technical failures, exclusions, and rejected methods separately.
+- Public held-out actions support interventional prediction for the exact
+  released records; they do not provide both potential outcomes for one
+  physical execution.
 - Graph persistence remains the unresolved-discrepancy fallback unless a
-  physical mechanism passes prospective held-out gates.
+  mechanism passes its declared source and held-out gates.
 - A semantic prior has zero influence unless its locked trust gate passes;
   rejection gives exact physical-posterior fallback.
-- The 36-execution same-object protocol is the decisive pending milestone;
-  optional branches cannot alter or rescue its primary result.
+- The historical 36-execution protocol is optional future validation and cannot
+  block or rescue the public-data-only paper.
 
-See [docs/causal4d_paper_scope.md](docs/causal4d_paper_scope.md) for the narrow
-paper claim and [the documentation map](docs/README.md) for the full set of
-conceptual, integration, diagnostic, and operator guides.
+See [the documentation map](docs/README.md) for conceptual, integration,
+public-data, diagnostic, and historical acquisition documents.
 
 ## Repository layout
 
