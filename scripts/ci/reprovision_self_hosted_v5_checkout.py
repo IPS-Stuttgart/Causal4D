@@ -199,56 +199,67 @@ def _default_decision_builder(
 
 
 def _decision_summary(decision: Mapping[str, Any]) -> dict[str, Any]:
-    action = decision.get("action")
-    _require(isinstance(action, Mapping), "next-action decision has no action object")
-    action_mapping = dict(action)
-    summary = {
-        "protocol_id": decision.get("protocol_id"),
-        "valid": decision.get("valid") is True,
-        "ready": decision.get("ready") is True,
-        "verify_file_hashes": decision.get("verify_file_hashes") is True,
-        "evidence_sha256": decision.get("evidence_sha256"),
-        "status_sha256": decision.get("status_sha256"),
-        "action_id": action_mapping.get("action_id"),
-        "category": action_mapping.get("category"),
-        "operator_role": action_mapping.get("operator_role"),
-        "automatable": action_mapping.get("automatable") is True,
-        "physical_acquisition_required": (
-            action_mapping.get("physical_acquisition_required") is True
-        ),
-        "target_outcomes_permitted": (
-            action_mapping.get("target_outcomes_permitted") is True
-        ),
-        "changes_registered_method": (
-            action_mapping.get("changes_registered_method") is True
-        ),
-    }
-    _require(summary["valid"], "registered next-action decision is invalid")
+    action_value = decision.get("action")
+    if not isinstance(action_value, Mapping):
+        raise ValueError("next-action decision has no action object")
+    action_mapping: Mapping[str, Any] = action_value
+
+    valid = decision.get("valid") is True
+    ready = decision.get("ready") is True
+    verify_file_hashes = decision.get("verify_file_hashes") is True
+    action_id = action_mapping.get("action_id")
+    automatable = action_mapping.get("automatable") is True
+    physical_acquisition_required = (
+        action_mapping.get("physical_acquisition_required") is True
+    )
+    target_outcomes_permitted = (
+        action_mapping.get("target_outcomes_permitted") is True
+    )
+    changes_registered_method = (
+        action_mapping.get("changes_registered_method") is True
+    )
+
+    _require(valid, "registered next-action decision is invalid")
     _require(
-        summary["verify_file_hashes"],
+        verify_file_hashes,
         "registered next-action decision did not verify file hashes",
     )
     _require(
-        summary["action_id"] == EXPECTED_NEXT_ACTION,
+        action_id == EXPECTED_NEXT_ACTION,
         "checkout reprovision is allowed only at complete_object_registration",
     )
     _require(
-        not summary["automatable"],
+        not automatable,
         "complete_object_registration unexpectedly became automatable",
     )
     _require(
-        not summary["physical_acquisition_required"],
+        not physical_acquisition_required,
         "checkout reprovision cannot precede a physical action",
     )
     _require(
-        not summary["target_outcomes_permitted"],
+        not target_outcomes_permitted,
         "checkout reprovision cannot permit target outcomes",
     )
     _require(
-        not summary["changes_registered_method"],
+        not changes_registered_method,
         "checkout reprovision cannot change the registered method",
     )
-    return summary
+
+    return {
+        "protocol_id": decision.get("protocol_id"),
+        "valid": valid,
+        "ready": ready,
+        "verify_file_hashes": verify_file_hashes,
+        "evidence_sha256": decision.get("evidence_sha256"),
+        "status_sha256": decision.get("status_sha256"),
+        "action_id": action_id,
+        "category": action_mapping.get("category"),
+        "operator_role": action_mapping.get("operator_role"),
+        "automatable": automatable,
+        "physical_acquisition_required": physical_acquisition_required,
+        "target_outcomes_permitted": target_outcomes_permitted,
+        "changes_registered_method": changes_registered_method,
+    }
 
 
 def _require_source_paths(repository: Path) -> None:
