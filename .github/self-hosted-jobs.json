@@ -7,6 +7,9 @@
     "maintainer-issue-main": {
       "description": "Exact registered-maintainer issue trigger on reviewed refs/heads/main, exact GITHUB_SHA checkout, clean-tree verification, read-only self-hosted token, no issue text execution, and no secrets."
     },
+    "object-registration-input-stage-issue-main": {
+      "description": "Exact registered-maintainer issue trigger on reviewed refs/heads/main for source-only object-registration node-set staging, exact GITHUB_SHA checkout, clean-tree verification, byte-audited pre-freeze dataset additions, read-only self-hosted token, no issue text execution, and no secrets."
+    },
     "single-operator-v5-issue-main": {
       "description": "Exact registered-owner issue trigger on reviewed refs/heads/main for the nonphysical source-independent v5 owner-identity bootstrap, exact GITHUB_SHA checkout, read-only self-hosted token, no issue text execution, and no secrets."
     },
@@ -173,7 +176,7 @@
         "data-deform360-v1"
       ],
       "purpose": "Locked Deform360 source prefix-kinematics diagnostic",
-      "dataset_access": "approved-source-only-deform360",
+      "dataset_acess": "approved-source-only-deform360",
       "secrets_allowed": false
     },
     {
@@ -188,7 +191,7 @@
         "data-deform360-v1"
       ],
       "purpose": "Locked Deform360 source reset-mechanics diagnostic",
-      "dataset_access": "approved-source-only-deform360",
+      "dataset_acess": "approved-source-only-deform360",
       "secrets_allowed": false
     },
     {
@@ -246,6 +249,21 @@
       ],
       "purpose": "Higher-powered controlled and GPU diagnostics",
       "dataset_access": "none",
+      "secrets_allowed": false
+    },
+    {
+      "workflow": "stage-object-registration-inputs-self-hosted.yml",
+      "job": "stage",
+      "authorization_model": "object-registration-input-stage-issue-main",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi",
+        "data-causal4d-physical-v1"
+      ],
+      "purpose": "Stage exact approved source-only node sets before manual object registration",
+      "dataset_access": "registered-local-preacquisition-object-registration-node-set-stage",
       "secrets_allowed": false
     },
     {

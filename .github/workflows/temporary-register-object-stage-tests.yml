@@ -1,0 +1,157 @@
+name: Temporary prepare object-stage policy test files
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/temporary-register-object-stage-tests.yml"
+      - ".github/self-hosted-jobs.json"
+      - "tests/test_self_hosted_workflow_policy.py"
+      - "tests/test_issue_command_concurrency.py"
+
+permissions:
+  contents: read
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Insert exact authorization and concurrency expectations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          policy_path = Path("tests/test_self_hosted_workflow_policy.py")
+          policy_lines = policy_path.read_text(encoding="utf-8").splitlines()
+
+          helper_name = "def _object_registration_input_stage_issue_main_errors("
+          if not any(line.startswith(helper_name) for line in policy_lines):
+              insert_at = next(
+                  index
+                  for index, line in enumerate(policy_lines)
+                  if line.startswith("def _authorization_errors(")
+              )
+              helper = [
+                  "def _object_registration_input_stage_issue_main_errors(",
+                  "    workflow_text: str,",
+                  "    block: str,",
+                  ") -> list[str]:",
+                  "    return _exact_maintainer_issue_errors(",
+                  "        workflow_text,",
+                  "        block,",
+                  "        trigger_title=(",
+                  '            "[self-hosted] stage Causal4D object-registration inputs"',
+                  "        ),",
+                  "    )",
+                  "",
+                  "",
+              ]
+              policy_lines[insert_at:insert_at] = helper
+
+          model_branch = (
+              '    if authorization_model == '
+              '"object-registration-input-stage-issue-main":'
+          )
+          if model_branch not in policy_lines:
+              unsupported = (
+                  '    return [f"unsupported authorization model: '
+                  '{authorization_model}"]'
+              )
+              insert_at = next(
+                  index
+                  for index, line in enumerate(policy_lines)
+                  if line == unsupported
+              )
+              branch = [
+                  model_branch,
+                  "        return _object_registration_input_stage_issue_main_errors(",
+                  "            workflow_text,",
+                  "            block,",
+                  "        )",
+              ]
+              policy_lines[insert_at:insert_at] = branch
+
+          model_literal = '        "object-registration-input-stage-issue-main",'
+          if model_literal not in policy_lines:
+              insert_at = next(
+                  index + 1
+                  for index, line in enumerate(policy_lines)
+                  if line == '        "maintainer-issue-main",'
+              )
+              policy_lines.insert(insert_at, model_literal)
+
+          policy_path.write_text(
+              "\n".join(policy_lines) + "\n",
+              encoding="utf-8",
+          )
+
+          concurrency_path = Path("tests/test_issue_command_concurrency.py")
+          concurrency_lines = concurrency_path.read_text(
+              encoding="utf-8"
+          ).splitlines()
+          workflow_line = (
+              '    "stage-object-registration-inputs-self-hosted.yml": ('
+          )
+          if workflow_line not in concurrency_lines:
+              anchor = next(
+                  index
+                  for index, line in enumerate(concurrency_lines)
+                  if line
+                  == '    "reprovision-v5-checkout-self-hosted.yml": ('
+              )
+              end = anchor + 1
+              while concurrency_lines[end] != "    ),":
+                  end += 1
+              entry = [
+                  workflow_line,
+                  '        "stage",',
+                  '        "causal4d-object-registration-input-stage-${{ github.sha }}",',
+                  "    ),",
+              ]
+              concurrency_lines[end + 1 : end + 1] = entry
+          concurrency_path.write_text(
+              "\n".join(concurrency_lines) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Format and verify policy tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -e ".[dev]"
+          python -m ruff format \
+            tests/test_self_hosted_workflow_policy.py \
+            tests/test_issue_command_concurrency.py
+          python -m ruff check \
+            tests/test_self_hosted_workflow_policy.py \
+            tests/test_issue_command_concurrency.py
+          pytest -q \
+            tests/test_self_hosted_workflow_policy.py \
+            tests/test_issue_command_concurrency.py \
+            tests/test_self_hosted_object_registration_input_stage.py
+
+      - name: Upload the verified policy test files
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: object-stage-policy-test-files-${{ github.run_id }}
+          path: |
+            tests/test_self_hosted_workflow_policy.py
+            tests/test_issue_command_concurrency.py
+          if-no-files-found: error
+          retention-days: 1
