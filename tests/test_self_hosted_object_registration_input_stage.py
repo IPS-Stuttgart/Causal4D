@@ -209,8 +209,7 @@ def test_workflow_is_narrowly_authorized_and_keeps_the_serial_manual() -> None:
     assert "permissions:\n  contents: read" in text
     assert (
         "runs-on: [self-hosted, Linux, X64, nvidia-smi, "
-        "data-causal4d-physical-v1]"
-        in text
+        "data-causal4d-physical-v1]" in text
     )
     assert "stage_self_hosted_object_registration_inputs.py" in text
     assert "ready_except_physical_serial" in text
