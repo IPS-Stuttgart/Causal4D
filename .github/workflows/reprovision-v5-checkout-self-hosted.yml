@@ -24,6 +24,11 @@ jobs:
       queue: max
     runs-on: [self-hosted, Linux, X64, nvidia-smi, data-causal4d-physical-v1]
     timeout-minutes: 45
+    env:
+      EVIDENCE_DIR: >-
+        ${{ runner.temp }}/causal4d-v5-checkout-reprovision-${{ github.run_id }}
+      VENV_DIR: >-
+        ${{ runner.temp }}/causal4d-v5-checkout-reprovision-venv-${{ github.run_id }}
     outputs:
       previous_commit: ${{ steps.summary.outputs.previous_commit }}
       deployed_commit: ${{ steps.summary.outputs.deployed_commit }}
@@ -55,31 +60,34 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Build and install the exact Causal4D wheel
+      - name: Build and install the exact Causal4D wheel outside the checkout
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p outputs/v5-checkout-reprovision/wheels
-          python -m venv .v5-checkout-reprovision-venv
-          .v5-checkout-reprovision-venv/bin/python -m pip install \
+          test ! -e "${EVIDENCE_DIR}"
+          test ! -e "${VENV_DIR}"
+          mkdir -p "${EVIDENCE_DIR}/wheels"
+          python -m venv "${VENV_DIR}"
+          "${VENV_DIR}/bin/python" -m pip install \
             --upgrade pip "build>=1.2"
-          .v5-checkout-reprovision-venv/bin/python -m build --wheel \
-            --outdir outputs/v5-checkout-reprovision/wheels .
+          "${VENV_DIR}/bin/python" -m build --wheel \
+            --outdir "${EVIDENCE_DIR}/wheels" .
           wheel="$(
-            find outputs/v5-checkout-reprovision/wheels -maxdepth 1 \
+            find "${EVIDENCE_DIR}/wheels" -maxdepth 1 \
               -name 'causal4d-*.whl' -print -quit
           )"
           test -n "${wheel}"
           sha256sum "${wheel}" \
-            | tee outputs/v5-checkout-reprovision/wheel-sha256.txt
-          .v5-checkout-reprovision-venv/bin/python -m pip install "${wheel}"
-          .v5-checkout-reprovision-venv/bin/python -m pip check
+            | tee "${EVIDENCE_DIR}/wheel-sha256.txt"
+          "${VENV_DIR}/bin/python" -m pip install "${wheel}"
+          "${VENV_DIR}/bin/python" -m pip check
+          test -z "$(git status --porcelain=v1)"
 
       - name: Atomically reprovision the registered checkout
         shell: bash
         run: |
           set -euo pipefail
-          PYTHONPATH="" .v5-checkout-reprovision-venv/bin/python \
+          PYTHONPATH="" "${VENV_DIR}/bin/python" \
             scripts/ci/reprovision_self_hosted_v5_checkout.py \
             --source-repository "${GITHUB_WORKSPACE}" \
             --target-repository \
@@ -87,14 +95,15 @@ jobs:
             --dataset-root \
               /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5 \
             --expected-source-commit "${GITHUB_SHA}" \
-            --output outputs/v5-checkout-reprovision/report.json \
-            | tee outputs/v5-checkout-reprovision/report.txt
+            --output "${EVIDENCE_DIR}/report.json" \
+            | tee "${EVIDENCE_DIR}/report.txt"
+          test -z "$(git status --porcelain=v1)"
 
       - name: Recompute hash-verified readiness from the deployed checkout
         shell: bash
         run: |
           set -euo pipefail
-          PYTHONPATH="" .v5-checkout-reprovision-venv/bin/python \
+          PYTHONPATH="" "${VENV_DIR}/bin/python" \
             scripts/ci/probe_self_hosted_acquisition.py \
             --root-candidate \
               canonical \
@@ -104,28 +113,26 @@ jobs:
               workstation2-persistent \
               /mnt/lexar4tb/causal4d-physical/causal4d-frozen \
               /mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5 \
-            --output outputs/v5-checkout-reprovision/readiness.json \
-            | tee outputs/v5-checkout-reprovision/readiness.txt
+            --output "${EVIDENCE_DIR}/readiness.json" \
+            | tee "${EVIDENCE_DIR}/readiness.txt"
+          test -z "$(git status --porcelain=v1)"
 
       - name: Verify and export sanitized result fields
         id: summary
         shell: bash
         run: |
           set -euo pipefail
-          .v5-checkout-reprovision-venv/bin/python - <<'PY' >> "$GITHUB_OUTPUT"
+          "${VENV_DIR}/bin/python" - <<'PY' >> "$GITHUB_OUTPUT"
           import json
           import os
           from pathlib import Path
 
+          evidence = Path(os.environ["EVIDENCE_DIR"])
           report = json.loads(
-              Path("outputs/v5-checkout-reprovision/report.json").read_text(
-                  encoding="utf-8"
-              )
+              (evidence / "report.json").read_text(encoding="utf-8")
           )
           readiness = json.loads(
-              Path("outputs/v5-checkout-reprovision/readiness.json").read_text(
-                  encoding="utf-8"
-              )
+              (evidence / "readiness.json").read_text(encoding="utf-8")
           )
           if report["artifact_kind"] != "Causal4DV5CheckoutReprovisionReport":
               raise SystemExit("unexpected checkout reprovision report")
@@ -165,6 +172,7 @@ jobs:
               f"{report['physical_evidence_increment']}"
           )
           PY
+          test -z "$(git status --porcelain=v1)"
 
       - name: Record runner and GPU identity
         shell: bash
@@ -178,9 +186,10 @@ jobs:
             echo "commit=${GITHUB_SHA}"
             echo "workflow_run_id=${GITHUB_RUN_ID}"
             uname -a
-          } | tee outputs/v5-checkout-reprovision/runner.txt
+          } | tee "${EVIDENCE_DIR}/runner.txt"
           nvidia-smi -L \
-            | tee outputs/v5-checkout-reprovision/nvidia-smi-L.txt
+            | tee "${EVIDENCE_DIR}/nvidia-smi-L.txt"
+          test -z "$(git status --porcelain=v1)"
 
       - name: Upload sanitized checkout-reprovision evidence
         if: always()
@@ -188,23 +197,20 @@ jobs:
         with:
           name: causal4d-v5-checkout-reprovision-self-hosted
           path: |
-            outputs/v5-checkout-reprovision/report.json
-            outputs/v5-checkout-reprovision/report.txt
-            outputs/v5-checkout-reprovision/readiness.json
-            outputs/v5-checkout-reprovision/readiness.txt
-            outputs/v5-checkout-reprovision/runner.txt
-            outputs/v5-checkout-reprovision/nvidia-smi-L.txt
-            outputs/v5-checkout-reprovision/wheel-sha256.txt
+            ${{ env.EVIDENCE_DIR }}/report.json
+            ${{ env.EVIDENCE_DIR }}/report.txt
+            ${{ env.EVIDENCE_DIR }}/readiness.json
+            ${{ env.EVIDENCE_DIR }}/readiness.txt
+            ${{ env.EVIDENCE_DIR }}/runner.txt
+            ${{ env.EVIDENCE_DIR }}/nvidia-smi-L.txt
+            ${{ env.EVIDENCE_DIR }}/wheel-sha256.txt
           if-no-files-found: error
           retention-days: 30
 
-      - name: Remove isolated environment and wheel
+      - name: Remove isolated environment and local evidence copy
         if: always()
         shell: bash
-        run: |
-          rm -rf \
-            .v5-checkout-reprovision-venv \
-            outputs/v5-checkout-reprovision/wheels
+        run: rm -rf "${VENV_DIR}" "${EVIDENCE_DIR}"
 
   report:
     name: Report the checkout reprovision to the trigger issue
