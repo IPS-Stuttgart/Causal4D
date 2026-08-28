@@ -183,6 +183,9 @@ def test_workflow_is_narrowly_issue_authorized_and_nonphysical() -> None:
     assert "/mnt/lexar4tb/causal4d-physical/causal4d-frozen" in text
     assert "/mnt/lexar4tb/causal4d-physical/causal4d-sloth-multi-action-v1-v5" in text
     assert "${{ runner.temp }}" in text
+    assert "- name: Prepare isolated runtime paths" in text
+    assert '>> "${GITHUB_ENV}"' in text
+    assert "    env:\n      EVIDENCE_DIR: >-\n        ${{ runner.temp }}" not in text
     assert "EVIDENCE_DIR" in text
     assert "VENV_DIR" in text
     assert "outputs/v5-checkout-reprovision" not in text
