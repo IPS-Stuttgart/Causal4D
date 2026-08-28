@@ -40,6 +40,10 @@ ISSUE_COMMAND_JOBS = {
         "validate",
         "prepared-joint-observation-${{ github.sha }}",
     ),
+    "reprovision-v5-checkout-self-hosted.yml": (
+        "reprovision",
+        "causal4d-v5-checkout-reprovision-${{ github.sha }}",
+    ),
 }
 
 
