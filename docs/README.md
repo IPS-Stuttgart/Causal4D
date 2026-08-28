@@ -1,8 +1,8 @@
 # Causal4D documentation map
 
 This directory contains conceptual references, integration contracts,
-diagnostics, registered protocols, and operator runbooks. The shortest path for
-a new software user is:
+diagnostics, public-data protocols, and retained operator runbooks. The shortest
+path for a new software user is:
 
 1. [End-to-end AIP demonstration](aip_end_to_end_demo.md)
 2. [Public API and compatibility policy](public_api.md)
@@ -12,10 +12,8 @@ a new software user is:
 
 Operational document status is declared in the machine-readable
 [lifecycle registry](lifecycle_registry.json) and checked in CI. `current`
-documents are the mutable operator references, `frozen` documents are
-byte-locked protocol records, and `superseded` documents remain available only
-for provenance and identify their successor. Do not infer operational status
-from a filename or search result alone.
+documents are mutable references, `frozen` documents are byte-locked protocol
+records, and `superseded` documents remain available for provenance.
 
 ## Concepts and contracts
 
@@ -25,6 +23,7 @@ from a filename or search result alone.
 - [Action-conditioned discrepancy](action_conditioned_discrepancy.md)
 - [Interventional contrasts](interventional_contrast.md)
 - [Query-space variance decomposition](query_variance_decomposition.md)
+- [Paper scope](causal4d_paper_scope.md)
 
 ## Integration
 
@@ -35,25 +34,39 @@ from a filename or search result alone.
 - [Camera geometry contract](camera_geometry_contract.md)
 - [Migration from BayesianPhysTwin](migration_from_bayesian_phystwin.md)
 
+## Public-data evidence
+
+The first paper is public-data-only. These documents define the active empirical
+program:
+
+- [Deform360 `001-rope` held-out-action protocol](causal4d_deform360_public_protocol.md)
+- [PokeFlex public readiness and retained source-gate negative](causal4d_pokeflex_public_readiness.md)
+- [Paper reproduction](paper_reproduction.md)
+- [Controlled collaborator demonstration](controlled_collaborator_demo.md)
+- [Core causal and numerical invariant certificate](core_invariant_certificate.md)
+
+Positive and negative public-data results are both evidence. A rejected source
+backend must remain rejected and does not create an obligation to collect a new
+physical dataset.
+
 ## Reproduction and diagnostics
 
-- [Paper reproduction](paper_reproduction.md)
 - [Target-free real design sensitivity](causal4d_real_design_sensitivity.md)
-- [Core causal and numerical invariant certificate](core_invariant_certificate.md)
-- [Controlled collaborator demonstration](controlled_collaborator_demo.md)
+- [Query-space variance decomposition](query_variance_decomposition.md)
 - [Automation integrity](automation_integrity.md)
 - [Branch hygiene](branch_hygiene.md)
 - [Exact-head validation](exact_head_validation.md)
 
-## Registered physical experiment
+## Optional future physical validation
 
-The files in this section are operational and evidence-bearing. Use the exact
-version associated with the frozen experiment rather than copying commands into
-another document.
+The files in this section preserve the previously registered 18-session,
+36-execution hardware protocol. They are **not required for the public-data-only
+first paper**. Their `0/36` state is retained as provenance, not as a missing
+submission result.
 
-### Active operator references
+### Retained operator references
 
-- [Physical-experiment milestone](causal4d_real_experiment_milestone.md)
+- [Optional physical-validation protocol](causal4d_real_experiment_milestone.md)
 - [Source-panel acquisition](causal4d_source_panel_acquisition.md)
 - [Pre-acquisition readiness](causal4d_preacquisition_readiness.md)
 - [Real-evidence status and accounting](causal4d_real_evidence_status.md)
@@ -68,8 +81,8 @@ another document.
 ### Frozen amendment lineage
 
 - [Pre-acquisition governance amendment v5](causal4d_preacquisition_v5.md)
-  is the active, byte-locked amendment. It permits disclosed single-operator
-  self-attestation and makes no independent-attestation claim.
+  permits disclosed single-operator self-attestation and makes no independent
+  attestation claim.
 - [Pre-acquisition amendment v4](causal4d_preacquisition_v4.md) is superseded by
   v5 and retained unchanged for provenance.
 - [Pre-acquisition amendment v3](causal4d_preacquisition_v3.md) is superseded by
@@ -77,10 +90,9 @@ another document.
 - [Pre-acquisition amendment v2](causal4d_preacquisition_v2.md) is superseded by
   v3 and retained unchanged for provenance.
 
-The lifecycle validator requires every active operational role to be unique and
-linked here. It also verifies the Git blob identities of frozen and superseded
-amendments and rejects an unregistered future `causal4d_preacquisition_v*.md`
-document.
+If a future collaborator elects to run the hardware study, the lifecycle
+validator and exact frozen protocol still apply. No such execution is needed to
+submit or interpret the public-data paper.
 
 ## Governance and scope
 
@@ -89,7 +101,7 @@ document.
 - [Automation integrity](automation_integrity.md)
 - [Branch hygiene](branch_hygiene.md)
 
-The documentation distinguishes controlled software evidence, diagnostic public
-data, and registered physical evidence. A successful software demonstration or
-workflow run never increments the physical evidence count unless the registered
-protocol explicitly admits it.
+The documentation distinguishes controlled evidence, public-data held-out
+evidence, released diagnostics, and optional physical acquisition. A software
+workflow never creates physical evidence, and absence of optional physical
+evidence does not invalidate the bounded public-data claims.
