@@ -1,0 +1,181 @@
+name: Temporary fix object-stage typing
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/temporary-fix-object-stage-mypy.yml"
+      - "scripts/ci/stage_self_hosted_object_registration_inputs.py"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Apply exact type-narrowing patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path(
+              "scripts/ci/stage_self_hosted_object_registration_inputs.py"
+          )
+          source = path.read_text(encoding="utf-8")
+          old = '''def _decision_summary(decision: Mapping[str, Any]) -> dict[str, Any]:
+              action = decision.get("action")
+              _require(isinstance(action, Mapping), "next-action decision has no action object")
+              action_map = dict(action)
+              summary = {
+                  "valid": decision.get("valid") is True,
+                  "ready": decision.get("ready") is True,
+                  "verify_file_hashes": decision.get("verify_file_hashes") is True,
+                  "evidence_sha256": decision.get("evidence_sha256"),
+                  "status_sha256": decision.get("status_sha256"),
+                  "action_id": action_map.get("action_id"),
+                  "operator_role": action_map.get("operator_role"),
+                  "automatable": action_map.get("automatable") is True,
+                  "physical_acquisition_required": (
+                      action_map.get("physical_acquisition_required") is True
+                  ),
+                  "target_outcomes_permitted": (
+                      action_map.get("target_outcomes_permitted") is True
+                  ),
+                  "changes_registered_method": (
+                      action_map.get("changes_registered_method") is True
+                  ),
+              }
+              _require(summary["valid"], "registered next-action decision is invalid")
+              _require(summary["verify_file_hashes"], "file hashes were not verified")
+          '''
+          old = "\n".join(line[12:] if line.startswith("            ") else line for line in old.splitlines())
+          new = '''def _decision_summary(decision: Mapping[str, Any]) -> dict[str, Any]:
+              action = decision.get("action")
+              if not isinstance(action, Mapping):
+                  raise ValueError("next-action decision has no action object")
+              action_map = dict(action)
+              valid = decision.get("valid") is True
+              ready = decision.get("ready") is True
+              verify_file_hashes = decision.get("verify_file_hashes") is True
+              automatable = action_map.get("automatable") is True
+              physical_acquisition_required = (
+                  action_map.get("physical_acquisition_required") is True
+              )
+              target_outcomes_permitted = (
+                  action_map.get("target_outcomes_permitted") is True
+              )
+              changes_registered_method = (
+                  action_map.get("changes_registered_method") is True
+              )
+              summary: dict[str, Any] = {
+                  "valid": valid,
+                  "ready": ready,
+                  "verify_file_hashes": verify_file_hashes,
+                  "evidence_sha256": decision.get("evidence_sha256"),
+                  "status_sha256": decision.get("status_sha256"),
+                  "action_id": action_map.get("action_id"),
+                  "operator_role": action_map.get("operator_role"),
+                  "automatable": automatable,
+                  "physical_acquisition_required": physical_acquisition_required,
+                  "target_outcomes_permitted": target_outcomes_permitted,
+                  "changes_registered_method": changes_registered_method,
+              }
+              _require(valid, "registered next-action decision is invalid")
+              _require(verify_file_hashes, "file hashes were not verified")
+          '''
+          new = "\n".join(line[12:] if line.startswith("            ") else line for line in new.splitlines())
+          if source.count(old) != 1:
+              raise SystemExit("decision-summary patch target changed")
+          source = source.replace(old, new)
+
+          old = '''    regions = packet.get("contact_regions")
+              _require(isinstance(regions, Mapping), "pending packet has no contact regions")
+              _require(set(regions) == set(requirements), "pending packet region set changed")
+              for region_id, required in requirements.items():
+                  descriptor = regions.get(region_id)
+                  _require(isinstance(descriptor, Mapping), f"{region_id} descriptor is missing")
+          '''
+          old = "\n".join(line[12:] if line.startswith("            ") else line for line in old.splitlines())
+          new = '''    regions = packet.get("contact_regions")
+              if not isinstance(regions, Mapping):
+                  raise ValueError("pending packet has no contact regions")
+              _require(set(regions) == set(requirements), "pending packet region set changed")
+              for region_id, required in requirements.items():
+                  descriptor = regions.get(region_id)
+                  if not isinstance(descriptor, Mapping):
+                      raise ValueError(f"{region_id} descriptor is missing")
+          '''
+          new = "\n".join(line[12:] if line.startswith("            ") else line for line in new.splitlines())
+          if source.count(old) != 1:
+              raise SystemExit("packet-narrowing patch target changed")
+          source = source.replace(old, new)
+
+          replacements = {
+              '            relative = Path(str(required["path"]))\n': (
+                  '            relative_path = Path(str(required["path"]))\n'
+              ),
+              '                evidence_root / relative,\n': (
+                  '                evidence_root / relative_path,\n'
+              ),
+              '            destination = dataset / relative\n': (
+                  '            destination = dataset / relative_path\n'
+              ),
+              '        for relative, descriptor in before_members.items():\n': (
+                  '        for existing_relative, descriptor in before_members.items():\n'
+              ),
+              '                after_members[relative] == descriptor,\n': (
+                  '                after_members[existing_relative] == descriptor,\n'
+              ),
+              '                f"existing dataset file changed: {relative}",\n': (
+                  '                f"existing dataset file changed: {existing_relative}",\n'
+              ),
+          }
+          for before, after in replacements.items():
+              if source.count(before) != 1:
+                  raise SystemExit(f"rename patch target changed: {before!r}")
+              source = source.replace(before, after)
+          path.write_text(source, encoding="utf-8")
+          PY
+
+      - name: Format and type-check the patched script
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -e ".[dev]"
+          python -m ruff format \
+            scripts/ci/stage_self_hosted_object_registration_inputs.py
+          python -m ruff check \
+            scripts/ci/stage_self_hosted_object_registration_inputs.py
+          python -m mypy --python-version 3.12 \
+            scripts/ci/stage_self_hosted_object_registration_inputs.py
+          pytest -q tests/test_self_hosted_object_registration_input_stage.py
+
+      - name: Commit the patch and remove this temporary workflow
+        shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/temporary-fix-object-stage-mypy.yml
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/ci/stage_self_hosted_object_registration_inputs.py
+          git commit -m "Fix object-stage typing"
+          git push origin "HEAD:${HEAD_BRANCH}"
