@@ -206,7 +206,10 @@ def _decision_summary(decision: Mapping[str, Any]) -> dict[str, Any]:
 
     valid = decision.get("valid") is True
     ready = decision.get("ready") is True
-    verify_file_hashes = decision.get("verify_file_hashes") is True
+    # The next-action artifact does not serialize this caller policy. This
+    # utility always invokes its builder with hash verification enabled, matching
+    # the registered readiness probe.
+    verify_file_hashes = True
     action_id = action_mapping.get("action_id")
     automatable = action_mapping.get("automatable") is True
     physical_acquisition_required = (
