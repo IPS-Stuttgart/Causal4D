@@ -68,22 +68,15 @@ jobs:
               '"object-registration-input-stage-issue-main":'
           )
           if model_branch not in policy_lines:
-              anchor = next(
+              unsupported = (
+                  '    return [f"unsupported authorization model: '
+                  '{authorization_model}"]'
+              )
+              insert_at = next(
                   index
                   for index, line in enumerate(policy_lines)
-                  if line
-                  == '    if authorization_model == '
-                  '"v5-checkout-reprovision-issue-main":'
+                  if line == unsupported
               )
-              return_index = anchor + 1
-              while not policy_lines[return_index].lstrip().startswith("return "):
-                  return_index += 1
-              if policy_lines[return_index].strip().endswith("("):
-                  depth = 1
-                  while depth:
-                      return_index += 1
-                      depth += policy_lines[return_index].count("(")
-                      depth -= policy_lines[return_index].count(")")
               branch = [
                   model_branch,
                   "        return _object_registration_input_stage_issue_main_errors(",
@@ -91,7 +84,7 @@ jobs:
                   "            block,",
                   "        )",
               ]
-              policy_lines[return_index + 1 : return_index + 1] = branch
+              policy_lines[insert_at:insert_at] = branch
 
           model_literal = '        "object-registration-input-stage-issue-main",'
           if model_literal not in policy_lines:
