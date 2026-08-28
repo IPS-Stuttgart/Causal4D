@@ -177,8 +177,7 @@ def test_workflow_is_narrowly_issue_authorized_and_nonphysical() -> None:
     assert "permissions:\n  contents: read" in text
     assert (
         "runs-on: [self-hosted, Linux, X64, nvidia-smi, "
-        "data-causal4d-physical-v1]"
-        in text
+        "data-causal4d-physical-v1]" in text
     )
     assert "scripts/ci/reprovision_self_hosted_v5_checkout.py" in text
     assert "/mnt/lexar4tb/causal4d-physical/causal4d-frozen" in text
