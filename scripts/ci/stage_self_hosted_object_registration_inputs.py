@@ -204,44 +204,51 @@ def _default_decision_builder(repository: Path, dataset: Path) -> Mapping[str, A
 
 def _decision_summary(decision: Mapping[str, Any]) -> dict[str, Any]:
     action = decision.get("action")
-    _require(isinstance(action, Mapping), "next-action decision has no action object")
+    if not isinstance(action, Mapping):
+        raise ValueError("next-action decision has no action object")
     action_map = dict(action)
-    summary = {
-        "valid": decision.get("valid") is True,
-        "ready": decision.get("ready") is True,
-        "verify_file_hashes": decision.get("verify_file_hashes") is True,
+    valid = decision.get("valid") is True
+    ready = decision.get("ready") is True
+    verify_file_hashes = decision.get("verify_file_hashes") is True
+    automatable = action_map.get("automatable") is True
+    physical_acquisition_required = (
+        action_map.get("physical_acquisition_required") is True
+    )
+    target_outcomes_permitted = action_map.get("target_outcomes_permitted") is True
+    changes_registered_method = action_map.get("changes_registered_method") is True
+    summary: dict[str, Any] = {
+        "valid": valid,
+        "ready": ready,
+        "verify_file_hashes": verify_file_hashes,
         "evidence_sha256": decision.get("evidence_sha256"),
         "status_sha256": decision.get("status_sha256"),
         "action_id": action_map.get("action_id"),
         "operator_role": action_map.get("operator_role"),
-        "automatable": action_map.get("automatable") is True,
-        "physical_acquisition_required": (
-            action_map.get("physical_acquisition_required") is True
-        ),
-        "target_outcomes_permitted": (
-            action_map.get("target_outcomes_permitted") is True
-        ),
-        "changes_registered_method": (
-            action_map.get("changes_registered_method") is True
-        ),
+        "automatable": automatable,
+        "physical_acquisition_required": physical_acquisition_required,
+        "target_outcomes_permitted": target_outcomes_permitted,
+        "changes_registered_method": changes_registered_method,
     }
-    _require(summary["valid"], "registered next-action decision is invalid")
-    _require(summary["verify_file_hashes"], "file hashes were not verified")
+    _require(valid, "registered next-action decision is invalid")
+    _require(verify_file_hashes, "file hashes were not verified")
     _require(
         summary["action_id"] == EXPECTED_NEXT_ACTION,
         "input staging is allowed only at complete_object_registration",
     )
-    _require(not summary["automatable"], "object registration unexpectedly automatable")
     _require(
-        not summary["physical_acquisition_required"],
+        not automatable,
+        "object registration unexpectedly automatable",
+    )
+    _require(
+        not physical_acquisition_required,
         "object registration unexpectedly requires acquisition",
     )
     _require(
-        not summary["target_outcomes_permitted"],
+        not target_outcomes_permitted,
         "object registration unexpectedly permits target outcomes",
     )
     _require(
-        not summary["changes_registered_method"],
+        not changes_registered_method,
         "object registration unexpectedly changes the registered method",
     )
     return summary
@@ -278,7 +285,10 @@ def _validate_packet(
         packet.get("artifact_kind") == "Causal4DObjectRegistrationSealPacket",
         "unexpected object-registration seal packet",
     )
-    _require(packet.get("phystwin_model_id") == MODEL_ID, "PhysTwin model ID changed")
+    _require(
+        packet.get("phystwin_model_id") == MODEL_ID,
+        "PhysTwin model ID changed",
+    )
     _require(
         packet.get("phystwin_model_sha256") == MODEL_SHA256,
         "PhysTwin model SHA-256 changed",
@@ -292,11 +302,16 @@ def _validate_packet(
         "pending packet unexpectedly claims readiness",
     )
     regions = packet.get("contact_regions")
-    _require(isinstance(regions, Mapping), "pending packet has no contact regions")
-    _require(set(regions) == set(requirements), "pending packet region set changed")
+    if not isinstance(regions, Mapping):
+        raise ValueError("pending packet has no contact regions")
+    _require(
+        set(regions) == set(requirements),
+        "pending packet region set changed",
+    )
     for region_id, required in requirements.items():
         descriptor = regions.get(region_id)
-        _require(isinstance(descriptor, Mapping), f"{region_id} descriptor is missing")
+        if not isinstance(descriptor, Mapping):
+            raise ValueError(f"{region_id} descriptor is missing")
         for field in (
             "path",
             "node_count",
@@ -408,9 +423,9 @@ def stage_object_registration_inputs(
     created_parent = not (dataset / "contact_node_sets").exists()
     try:
         for region_id, required in requirements.items():
-            relative = Path(str(required["path"]))
+            relative_path = Path(str(required["path"]))
             source = _ordinary_file(
-                evidence_root / relative,
+                evidence_root / relative_path,
                 name=f"approved {region_id} node set",
             )
             sha256, byte_count = _sha256_file(source)
@@ -419,7 +434,7 @@ def stage_object_registration_inputs(
                 byte_count == required["bytes"],
                 f"{region_id} source size changed",
             )
-            destination = dataset / relative
+            destination = dataset / relative_path
             status = _stage_exact_file(source, destination)
             if status == "added":
                 added.append(destination)
@@ -437,10 +452,10 @@ def stage_object_registration_inputs(
             not (set(before_members) - set(after_members)),
             "dataset files were removed during input staging",
         )
-        for relative, descriptor in before_members.items():
+        for existing_relative, descriptor in before_members.items():
             _require(
-                after_members[relative] == descriptor,
-                f"existing dataset file changed: {relative}",
+                after_members[existing_relative] == descriptor,
+                f"existing dataset file changed: {existing_relative}",
             )
 
         after_decision = _decision_summary(decision_builder(repository, dataset))
@@ -528,8 +543,7 @@ def _atomic_json_write(path: Path, payload: Mapping[str, Any]) -> None:
     try:
         with temporary.open("xb") as handle:
             encoded = (
-                json.dumps(payload, indent=2, sort_keys=True, allow_nan=False)
-                + "\n"
+                json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n"
             ).encode("utf-8")
             handle.write(encoded)
             handle.flush()
