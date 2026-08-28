@@ -1,13 +1,18 @@
 # Causal4D Paper Scope
 
-## Core claim
+## Submission decision
 
-The first Causal4D paper is about:
+The first Causal4D paper is a **public-data-only, evidence-bounded paper**. It
+does not require a new hardware experiment.
 
-> **Bayesian abduction of realized interventions for counterfactual prediction
-> of deformable-object dynamics.**
+Its central claim is:
 
-The paper studies the causal distinction
+> **Bayesian abduction of realized interventions improves held-out
+> interventional prediction in controlled deformable-object systems and enables
+> auditable prediction, abstention, and failure analysis on public
+> deformable-object data.**
+
+The paper studies the distinction
 
 ```text
 command u != realized intervention z = (phi, kappa)
@@ -19,20 +24,21 @@ An uncertain physical twin supplies state, parameter, and discrepancy beliefs.
 
 ## Contribution chain
 
-The main paper must establish this chain, in order:
+The paper must establish the following chain without relying on newly collected
+data:
 
 1. define commanded and realized interventions as distinct variables;
-2. infer `z` jointly with uncertainty over the physical twin;
+2. infer a posterior over `z` jointly with uncertainty over the physical twin;
 3. implement explicit abduction, `do(u_cf)`, and posterior prediction;
-4. demonstrate held-out contact/action gains in controlled experiments;
-5. validate factual and held-out interventional prediction on a same-object,
-   multi-action real protocol;
-6. report calibrated uncertainty, or state a precise empirical calibration
-   boundary when nominal coverage is not attained.
+4. demonstrate held-out contact/action gains under controlled shared-exogenous
+   conditions;
+5. demonstrate target-closed held-out action prediction on public data;
+6. retain negative public-data source gates and uncertainty failures rather than
+   hiding them; and
+7. state exact identification, calibration, and generalization boundaries.
 
-No later component can substitute for a missing earlier link. In particular,
-language ranking and software planning cannot compensate for weak real
-intervention-abduction evidence.
+No paper claim requires the previously registered 18-session/36-execution
+hardware protocol.
 
 ## Claim hierarchy
 
@@ -40,122 +46,118 @@ intervention-abduction evidence.
 | --- | --- | --- |
 | Core | `u` versus realized `z=(phi,kappa)` | central problem and contribution |
 | Core | joint twin/intervention posterior | central method |
-| Core | abduction-intervention-prediction | central causal operator |
+| Core | abduction--intervention--prediction | central causal operator |
 | Core | controlled held-out contacts/actions | causal validation |
-| Required real evidence | same-object multi-action protocol | external validation |
-| Required boundary | independent-execution calibration | probabilistic claim or explicit limitation |
-| Supporting backend | Bayesian-PhysTwin and PhysTwin/Warp | uncertain physical model, not a new reconstruction claim |
-| Optional experiment | MolmoMotion task posterior | appendix only after its independent acceptance gate passes |
-| Application | constrained closed-loop planning | application/software demonstration without robot execution |
-| Out of scope | MotionCrafter association and dense perception assimilation | separate Bayesian-PhysTwin/Hao work |
+| Public evidence | Deform360 held-out action | target-closed public-data validation |
+| Public failure control | PokeFlex rejected source backend | model-class and support boundary |
+| Diagnostic | released PhysTwin interaction | undercoverage and discrepancy localization |
+| Formal boundary | query-specific intervention equivalence | predictive versus physical identity |
+| Supporting backend | BayesianPhysTwin / physical simulators | uncertain physical model |
+| Optional feeder | Prob4D | not required for the paper |
+| Optional future work | 18-session/36-execution hardware protocol | nonblocking future validation |
 
 ## Evidence status
 
-As of 2026-07-26:
-
-| Required link | Status | Evidence |
+| Link | Status | Evidence |
 | --- | --- | --- |
 | command/realization decomposition | implemented | typed `u_obs`, `phi`, `kappa_obs`, and `u_cf` artifacts |
 | joint abduction | implemented | prefix-only posterior over twin and realized intervention |
 | explicit causal operator | implemented | separate abduction, action, and prediction stages |
-| controlled held-out gains | passed | shifted-contact RMSE `4.132 -> 0.805 mm`; coverage `77.9% -> 90.8%` |
-| same-object multi-action real validation | pending acquisition | locked 36-execution protocol exists; no physical collection claimed |
-| cross-action calibration boundary | pending real protocol | graph persistence reaches `67.78%` on one target; rejected transfer reaches `43.03%` |
+| controlled held-out gains | confirmed | shifted-contact RMSE `4.132 -> 0.805 mm`; coverage `77.9% -> 90.8%` |
+| topology-aware identification boundary | confirmed diagnostic | exact node `75%`, one hop `100%`; all misses improve trajectory RMSE |
+| public held-out action | confirmed for one Deform360 action | visual-only CD `47.58 mm` vs persistence `71.84 mm` |
+| public short-prefix tactile state | rejected for that target | six-frame tactile CD `59.74 mm`, worse than visual-only |
+| public source-backend transfer | rejected for first PokeFlex backend | `0/5` leave-one-take-out wins; `23.771` vs `10.093 mm` persistence |
+| released physical uncertainty | diagnostic only | undercoverage and model-discrepancy-dominated headroom |
 
-**Current decision:** the method and controlled result justify continuing the
-paper, but the complete first-paper claim is not yet ready. The next decisive
-evidence is the same-object multi-action real protocol, including either
-successful held-out calibration or a well-powered cross-action bound on its
-failure, not another architecture component.
+**Current decision:** these results are sufficient for a bounded first paper.
+Additional public-data studies may improve breadth, but no uncollected physical
+execution is a submission prerequisite.
 
-## Physical-acquisition candidate
+## Empirical spine
 
-The source panel and 36-execution milestone use the machine-readable candidate
-in `configs/causal4d/sloth_acquisition_candidate_v1.json`. It selects the
-six-frame Causal4D realized-intervention posterior over BayesianPhysTwin commit
-`573ecd9b09a8145b680738c5e5f36415feefbfe3`, with graph persistence retained as
-the unresolved discrepancy fallback and MolmoMotion fixed at `beta=0`. The exact
-clean Causal4D revision is bound later by `method_freeze.json`, after the source
-panel and operational gates pass.
+### 1. Controlled latent-contact benchmark
 
-Prob4D is **unused** in this primary physical acquisition. The installed-wheel
-compatibility path remains a software contract, but it is not method admission:
-the Prob4D observation path has not passed an independent source competence and
-transfer gate for this protocol. Prob4D may not supply source fitting,
-calibration, target observations, method selection, or a rescue analysis for the
-36-execution claim.
+Use the frozen shifted-contact result to establish the mechanism under shared
+simulator exogenous conditions. Report RMSE, coverage, oracle-gap closure, and
+held-out topology results. Do not describe this as real external validation.
 
-The selected primary comparison remains nominal PhysTwin, BayesianPhysTwin with
-the nominal realized intervention, Causal4D with inferred realized intervention,
-and the intervention oracle as a diagnostic only. A source-panel mechanism can
-replace graph persistence only by passing the already registered cross-fitted
-promotion gate; this candidate record does not pre-promote one.
+### 2. Intervention identity versus predictive equivalence
 
-## Next scientific milestone and method freeze
+Use the independent topology diagnostic to show that exact latent-label recovery
+and future-query usefulness are different endpoints. The unchanged exact-node
+gate fails; one-hop recovery and trajectory improvement are secondary. The
+query-equivalence certificate formalizes this distinction prospectively but does
+not imply physical equivalence.
 
-The primary method is frozen for the 36-execution confirmatory milestone. Until
-that result is reported, no new discrepancy mechanism, semantic component,
-reconstruction branch, planner, or public-data result may enter or rescue the
-primary real-experiment comparison.
+### 3. Deform360 public held-out action
 
-Before the first confirmatory execution, the acquisition team must seal:
+Use the frozen `001-rope` source/calibration/target split. Predictions are sealed
+before target future masks and full target tactile are opened. The main public
+comparison is:
 
-- the exact clean Causal4D commit;
-- the exact Bayesian-PhysTwin commit pin;
-- the protocol and acquisition-schedule checksums;
-- the six-frame observation boundary and registered analysis entrypoints;
-- the rule that target outcomes cannot select methods or hyperparameters; and
-- the obligation to report either successful transfer/calibration or a
-  well-powered negative result.
-
-The machine-readable seal is produced and validated with
-`causal4d protocol freeze`. A method-affecting change requires collection
-to stop and a new protocol/version before target outcomes are inspected. After
-target inspection, defects and failed gates are reported as limitations rather
-than repaired under the same registration.
-
-The operational checklist is in
-`docs/causal4d_real_experiment_milestone.md`.
-
-## Main-paper experiment matrix
-
-The minimum comparison is:
-
-| Method | Twin uncertainty | Realized intervention inference |
+| Method | Future CD [mm] | Future track [mm] |
 | --- | ---: | ---: |
-| nominal PhysTwin | no | no |
-| Bayesian-PhysTwin | yes | no |
-| Causal4D | yes | yes |
-| intervention oracle | fixed diagnostic only | oracle |
+| Constant persistence | 71.84 | 78.87 |
+| Visual-only contact | 47.58 | 60.16 |
+| Six-frame tactile-conditioned `z` | 59.74 | 69.67 |
+| Full-tactile oracle | 46.70 | 59.80 |
 
-The main metrics are factual continuation error, held-out interventional
-prediction error, contact/gain/delay/slip recovery where ground truth exists,
-coverage, interval width, NLL or energy score, NEES, and worst-group coverage.
-Oracle results diagnose inference, proposal, and model gaps; they are not
-deployable baselines.
+This supports one held-out public action for the exact reduced centerline model.
+It does not establish pooling benefit, arbitrary-object transfer, material-point
+tracking, commanded-versus-realized actuation recovery, or general tactile
+benefit.
 
-MolmoMotion is excluded from this matrix. The current corrected checkpoint does
-not beat zero or constant velocity and ranks the true action fifth of five, so
-`beta=0` remains the only admitted setting. Closed-loop planning may illustrate
-use of the posterior, but it is not a robotics contribution without genuine
-hardware execution.
+### 4. PokeFlex public negative control
+
+Report the first sparse official-Warp backend as a retained negative source
+gate. The method loses to persistence even under per-take source oracles, so the
+sealed target is not opened. This is evidence that Causal4D's causal layer does
+not rescue an incompetent physical backend.
+
+### 5. Released single-interaction diagnostic
+
+Use the existing released interaction only to localize limitations: modest
+marginalization gain, severe undercoverage, failed transferred calibration, and
+model-discrepancy-dominated oracle headroom. It is not an independent
+confirmation cohort.
+
+## Main comparison structure
+
+The paper should keep comparison arms conceptually aligned where each dataset
+supports them:
+
+| Arm | Purpose |
+| --- | --- |
+| persistence or nominal physical baseline | unchanged predictive reference |
+| nominal intervention | command treated as realization |
+| Causal4D posterior prediction | realized-intervention marginalization |
+| contact/action oracle | diagnostic upper bound only |
+| rejected or unsupported backend | fail-closed negative control |
+
+Primary endpoints are held-out trajectory error or a declared proper score at
+the independent episode/take/seed level. Coverage, width, contact recovery,
+fallback rate, and oracle attribution are supporting endpoints.
 
 ## Language discipline
 
 Use the following terms precisely:
 
-- **Controlled counterfactual prediction:** valid when simulator exogenous
-  conditions are shared across factual and alternative interventions.
-- **Held-out interventional prediction from matched initial conditions:** the
-  correct description for repeated real executions.
-- **Realized-intervention posterior:** appropriate on real data even when the
-  true contact node is not directly observed.
-- **Calibrated:** reserved for held-out independent-execution coverage that
-  passes the locked protocol.
+- **Controlled counterfactual prediction:** simulator exogenous conditions are
+  shared across factual and alternative interventions.
+- **Held-out interventional prediction on public records:** a future or action
+  episode is withheld under a frozen public-data split.
+- **Realized-intervention posterior:** a predictive latent intervention belief;
+  it is not automatically verified physical contact or actuation.
+- **Calibrated:** reserved for a declared held-out independent-unit calibration
+  result. The released physical diagnostic is not calibrated.
+- **Negative source gate:** a model class failed before target evaluation; this
+  is evidence, not a missing result.
 
 Do not claim individual-level real counterfactual ground truth, real contact
-recovery without instrumentation, a calibrated real posterior at current
-coverage, language-conditioned world modeling, or robot control.
+recovery without independent instrumentation, arbitrary-object generalization,
+validated robot control, real Prob4D provider competence, or overall state of
+the art.
 
 ## Paper structure
 
@@ -164,10 +166,29 @@ coverage, language-conditioned world modeling, or robot control.
    intervention variables.
 3. Inference: factual abduction followed by explicit intervention and
    prediction.
-4. Controlled evaluation: recovery and held-out counterfactual prediction.
-5. Real evaluation: same-object factual, same-grasp, and new-contact protocols.
-6. Calibration and limitations: independent executions, discrepancy, replay
-   variance, and bounded claims.
+4. Controlled evaluation: shifted contact, topology, and query-equivalence
+   boundaries.
+5. Public-data evaluation: Deform360 held-out action and PokeFlex negative source
+   gate.
+6. Released diagnostic and limitations: undercoverage, discrepancy, support,
+   and generalization boundaries.
 
-MolmoMotion and the closed-loop runner belong in an appendix or application
-section only if they clarify robustness without enlarging the headline claim.
+## Optional future hardware protocol
+
+The registered same-object 18-session/36-execution protocol remains an immutable
+future-validation design. Its current `0/36` state is neither a failed result nor
+a submission blocker. It may be executed later by a collaborator with suitable
+hardware, but it cannot be used to delay, rescue, or retroactively redefine the
+public-data-only first paper.
+
+## Submission criterion
+
+The public-data-only manuscript is claim-complete when:
+
+1. every numerical statement is bound to the checked controlled, Deform360,
+   PokeFlex, or released-diagnostic artifact;
+2. positive and negative public-data results are reported together;
+3. no hardware-acquisition result is implied;
+4. the exact-node, calibration, physical-equivalence, and generalization
+   limitations remain explicit; and
+5. the generated manuscript and evidence record reproduce in CI.
