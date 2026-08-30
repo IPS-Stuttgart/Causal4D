@@ -1,0 +1,278 @@
+name: Deform360 public holdings on gpuserver6000
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/deform360-public-holdings-gpuserver6000.yml"
+      - ".github/workflows/deform360-public-holdings-file-dispatch.yml"
+      - ".github/self-hosted-jobs.json"
+      - "configs/causal4d_public/deform360_gpuserver6000_holdings_v1.json"
+      - "scripts/remote/audit_deform360_gpuserver6000_holdings.py"
+      - "scripts/remote/run_deform360_gpuserver6000_holdings.py"
+      - "tests/test_deform360_gpuserver6000_holdings.py"
+      - "tests/test_deform360_gpuserver6000_workflow_policy.py"
+      - "docs/causal4d_deform360_gpuserver6000_holdings.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deform360-public-holdings-gpuserver6000.yml"
+      - ".github/workflows/deform360-public-holdings-file-dispatch.yml"
+      - ".github/self-hosted-jobs.json"
+      - "configs/causal4d_public/deform360_gpuserver6000_holdings_v1.json"
+      - "scripts/remote/audit_deform360_gpuserver6000_holdings.py"
+      - "scripts/remote/run_deform360_gpuserver6000_holdings.py"
+      - "tests/test_deform360_gpuserver6000_holdings.py"
+      - "tests/test_deform360_gpuserver6000_workflow_policy.py"
+      - "docs/causal4d_deform360_gpuserver6000_holdings.md"
+  workflow_dispatch:
+    inputs:
+      process_candidates:
+        description: Preprocess qualified public objects into the isolated derived root
+        required: true
+        default: false
+        type: boolean
+      max_objects:
+        description: Maximum qualified objects to preprocess in fixed order
+        required: true
+        default: "1"
+        type: string
+      hash_001_media:
+        description: Hash every 001-rope raw media file during exact preflight
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deform360-public-holdings-gpuserver6000-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Inventory, execution boundary, formatting, and tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install development environment
+        run: |
+          python -m pip install -e ".[dev]"
+          python -m pip check
+
+      - name: Validate the public-holdings surface
+        run: |
+          files=(
+            scripts/remote/audit_deform360_gpuserver6000_holdings.py
+            scripts/remote/run_deform360_gpuserver6000_holdings.py
+            tests/test_deform360_gpuserver6000_holdings.py
+            tests/test_deform360_gpuserver6000_workflow_policy.py
+          )
+          python -m ruff check "${files[@]}"
+          python -m ruff format --check "${files[@]}"
+          python -m py_compile \
+            scripts/remote/audit_deform360_gpuserver6000_holdings.py \
+            scripts/remote/run_deform360_gpuserver6000_holdings.py
+          python -m pytest -q \
+            tests/test_deform360_gpuserver6000_holdings.py \
+            tests/test_deform360_gpuserver6000_workflow_policy.py
+
+  evaluate:
+    name: Qualify and preprocess mounted public holdings
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main'
+    needs: contract
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver6000]
+    timeout-minutes: 600
+    env:
+      HOLDINGS_CONFIG: configs/causal4d_public/deform360_gpuserver6000_holdings_v1.json
+      EVIDENCE_DIR: deform360-gpuserver6000-holdings
+      DERIVED_ROOT: /mnt/lexar4tb/datasets/deform360/causal4d-public-expansion-v1
+    steps:
+      - name: Check out exact reviewed Causal4D revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Verify reviewed main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Check out pinned official Deform360 code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: lhy0807/deform360
+          ref: 0fe36f0b7a7a917ba62b5f8cee707299a9a4a317
+          path: _deform360
+          persist-credentials: false
+          clean: true
+
+      - name: Select an installed Python 3.10 or newer runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          selected=""
+          for candidate in python3.12 python3.11 python3.10 /usr/bin/python3 python3; do
+            command -v "${candidate}" >/dev/null 2>&1 || continue
+            if "${candidate}" - <<'PY'
+          import sys
+          if sys.version_info < (3, 10):
+              raise SystemExit(1)
+          import numpy
+          PY
+            then
+              selected="$(command -v "${candidate}")"
+              break
+            fi
+          done
+          test -n "${selected}"
+          echo "HOLDINGS_PYTHON=${selected}" >> "${GITHUB_ENV}"
+          "${selected}" --version
+
+      - name: Prepare isolated public-data runtime and output lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${EVIDENCE_DIR}" "${DERIVED_ROOT}"
+          "${HOLDINGS_PYTHON}" -m venv --system-site-packages .holdings-runtime
+          runtime="$PWD/.holdings-runtime/bin/python"
+          echo "RUN_PYTHON=${runtime}" >> "${GITHUB_ENV}"
+          export PYTHONPATH="$PWD/src:$PWD/_deform360"
+          echo "PYTHONPATH=${PYTHONPATH}" >> "${GITHUB_ENV}"
+          "${runtime}" - <<'PY'
+          import numpy
+          print("numpy", numpy.__version__)
+          try:
+              import cv2
+          except ImportError as error:
+              print("opencv unavailable; preprocessing will be recorded as blocked:", error)
+          else:
+              print("opencv", cv2.__version__)
+          try:
+              import deform360
+          except ImportError as error:
+              print("deform360 unavailable; preprocessing will be recorded as blocked:", error)
+          else:
+              print("deform360", getattr(deform360, "__version__", "source-checkout"))
+          PY
+
+      - name: Audit, preflight, and optionally preprocess public data
+        shell: bash
+        env:
+          PROCESS_CANDIDATES: ${{ inputs.process_candidates }}
+          MAX_OBJECTS: ${{ inputs.max_objects }}
+          HASH_001_MEDIA: ${{ inputs.hash_001_media }}
+        run: |
+          set -euo pipefail
+          case "${MAX_OBJECTS}" in
+            0|1|2|3|4) ;;
+            *) echo "max_objects must be one of 0,1,2,3,4" >&2; exit 2 ;;
+          esac
+          exec 9>"${DERIVED_ROOT}/.causal4d-public-holdings.lock"
+          flock -n 9
+          printf '%s\n' "lock acquired by ${GITHUB_RUN_ID}" \
+            > "${EVIDENCE_DIR}/output-lock.txt"
+          flags=()
+          if [[ "${PROCESS_CANDIDATES}" == "true" ]]; then
+            flags+=(--process-candidates)
+          fi
+          if [[ "${HASH_001_MEDIA}" == "true" ]]; then
+            flags+=(--hash-001-media)
+          fi
+          "${RUN_PYTHON}" scripts/remote/run_deform360_gpuserver6000_holdings.py \
+            --repository-root "$PWD" \
+            --config "${HOLDINGS_CONFIG}" \
+            --output-dir "${EVIDENCE_DIR}" \
+            --max-objects "${MAX_OBJECTS}" \
+            --per-object-timeout-minutes 240 \
+            "${flags[@]}" \
+            2>&1 | tee "${EVIDENCE_DIR}/run.log"
+
+      - name: Record runner and filesystem provenance
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "commit=${GITHUB_SHA}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            uname -a
+            nvidia-smi -L || true
+            df -h /mnt/lexar4tb
+          } > "${EVIDENCE_DIR}/runner.txt"
+
+      - name: Publish qualification summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Deform360 public holdings on gpuserver6000"
+            echo
+            echo "- Reviewed head: \`${GITHUB_SHA}\`"
+            echo "- Public data only; no new physical data are collected."
+            if [[ -f "${EVIDENCE_DIR}/summary.json" ]]; then
+              "${HOLDINGS_PYTHON:-/usr/bin/python3}" - <<'PY'
+          import json
+          from pathlib import Path
+
+          summary = json.loads(
+              Path("deform360-gpuserver6000-holdings/summary.json").read_text()
+          )
+          audit = summary["audit_summary"]
+          decision = summary["decision"]
+          print(
+              "- Objects found: "
+              f"`{audit['discovered_unique_object_count']}` / "
+              f"`{audit['expected_gpuserver6000_object_count']}` expected locally"
+          )
+          print(
+              "- Ten-episode raw candidates: `"
+              + ", ".join(audit["ten_episode_raw_candidate_ids"])
+              + "`"
+          )
+          print(
+              "- Exact 001-rope raw preflight: "
+              f"`{decision['exact_001_raw_prerequisites_verified']}`"
+          )
+          print(
+              "- Requested preprocessing complete: "
+              f"`{decision['multi_object_preprocessing_completed']}`"
+          )
+          print("- A uniform 26-object benchmark is not claimed.")
+          print("- Qualification/preprocessing alone authorizes no new paper claim.")
+          PY
+            else
+              echo "- Summary was not produced; inspect the uploaded run log."
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload public-data qualification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: deform360-gpuserver6000-holdings-${{ github.sha }}
+          path: deform360-gpuserver6000-holdings/
+          if-no-files-found: error
+          retention-days: 30
