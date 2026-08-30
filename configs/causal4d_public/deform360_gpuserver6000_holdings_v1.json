@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "protocol_id": "causal4d-deform360-gpuserver6000-holdings-v1",
+  "status": "public-data-operational-qualification",
+  "dataset_repository": "brownu/deform360",
+  "dataset_revision": "7fea8e20231a47641d1d2bc8791920ec4e62ec5e",
+  "deform360_code_repository": "lhy0807/deform360",
+  "deform360_code_commit": "0fe36f0b7a7a917ba62b5f8cee707299a9a4a317",
+  "runner_label": "gpuserver6000",
+  "roots": [
+    {
+      "role": "primary_raw",
+      "path": "/mnt/lexar4tb/datasets/deform360/data-7fea8e2/raw"
+    },
+    {
+      "role": "fresh_single_episode_raw",
+      "path": "/mnt/lexar4tb/datasets/deform360/fresh-download-20260811-v1/raw"
+    },
+    {
+      "role": "official_hub_mixed",
+      "path": "/mnt/lexar4tb/datasets/deform360-official-hub-visuotactile-v1"
+    }
+  ],
+  "derived_output_root": "/mnt/lexar4tb/datasets/deform360/causal4d-public-expansion-v1",
+  "expected_gpuserver6000_object_ids": [
+    "001-rope",
+    "002-rope-silk",
+    "003-cable",
+    "026-sock-cloth",
+    "031-cotton-cloth",
+    "036-napkin-cloth",
+    "058-roll-napkin",
+    "081-stripe-rope",
+    "083-blanket-cloth",
+    "085-scarf-cloth",
+    "086-cotton-scarf-cloth",
+    "092-squirrel",
+    "097-pillow",
+    "106-baking-mat",
+    "118-envelope-cloth",
+    "140-rubber-glove-cloth",
+    "148-crepe-paper-cloth",
+    "152-slime",
+    "153-cake",
+    "167-glove-gray-cloth",
+    "170-spider",
+    "171-penguin",
+    "186-monster",
+    "193-frog",
+    "194-fish-orange",
+    "198-kneepad-cloth"
+  ],
+  "known_external_processed_only_object_ids": [
+    "004-rubber-band"
+  ],
+  "exact_reproduction_object_ids": [
+    "001-rope"
+  ],
+  "exploratory_preprocessing_object_ids": [
+    "003-cable",
+    "086-cotton-scarf-cloth",
+    "171-penguin"
+  ],
+  "protected_locked_cohort_object_ids": [
+    "002-rope-silk",
+    "081-stripe-rope",
+    "083-blanket-cloth",
+    "085-scarf-cloth",
+    "092-squirrel",
+    "170-spider"
+  ],
+  "qualification": {
+    "expected_episode_count": 10,
+    "exact_raw_camera_count": 41,
+    "minimum_ten_episode_camera_count": 36,
+    "minimum_single_episode_camera_count": 32,
+    "expected_tactile_sensor_count": 4,
+    "minimum_processed_camera_count": 32
+  },
+  "information_boundary": {
+    "public_data_only": true,
+    "new_physical_data_collected": false,
+    "raw_sources_read_only": true,
+    "raw_sources_modified": false,
+    "metadata_inventory_decodes_media": false,
+    "protected_locked_targets_opened": false,
+    "new_paper_claim_authorized_by_qualification": false
+  }
+}
