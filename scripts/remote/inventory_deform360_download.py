@@ -88,7 +88,9 @@ def _bounded_scan(root: Path, *, max_depth: int, max_entries: int) -> dict[str, 
     entries: list[dict[str, Any]] = []
     counts: Counter[str] = Counter()
     suffix_counts: Counter[str] = Counter()
-    object_locations = {name: {"directories": [], "archives": []} for name in _COHORT_OBJECTS}
+    object_locations = {
+        name: {"directories": [], "archives": []} for name in _COHORT_OBJECTS
+    }
     incomplete_markers: list[str] = []
     archive_files: list[str] = []
     interesting_directories: list[str] = []
@@ -174,7 +176,11 @@ def _bounded_scan(root: Path, *, max_depth: int, max_entries: int) -> dict[str, 
             for object_id in _COHORT_OBJECTS:
                 if child.name == object_id and is_directory:
                     object_locations[object_id]["directories"].append(relative)
-                if is_file and child.name.startswith(object_id) and _is_archive(child.name):
+                if (
+                    is_file
+                    and child.name.startswith(object_id)
+                    and _is_archive(child.name)
+                ):
                     object_locations[object_id]["archives"].append(relative)
 
             if is_directory and depth + 1 < max_depth:
@@ -230,8 +236,7 @@ def build_inventory(root: Path, *, max_depth: int, max_entries: int) -> dict[str
             "archive_files": [],
             "incomplete_markers": [],
             "cohort_locations": {
-                name: {"directories": [], "archives": []}
-                for name in _COHORT_OBJECTS
+                name: {"directories": [], "archives": []} for name in _COHORT_OBJECTS
             },
             "derived_layout_candidates": [],
             "errors": [],
