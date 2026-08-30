@@ -153,12 +153,42 @@ jobs:
           set -euo pipefail
           mkdir -p "${EVIDENCE_DIR}" "${DERIVED_ROOT}"
           runtime="${HOLDINGS_PYTHON}"
+          runtime_site="${RUNNER_TEMP}/causal4d-holdings-site-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          rm -rf -- "${runtime_site}"
+          mkdir -p "${runtime_site}"
+          opencv_state="already-available"
+          if ! "${runtime}" -c 'import cv2' >/dev/null 2>&1; then
+            opencv_state="unavailable"
+            if "${runtime}" -m pip --version >/dev/null 2>&1; then
+              set +e
+              "${runtime}" -m pip install \
+                --disable-pip-version-check \
+                --no-input \
+                --no-cache-dir \
+                --no-deps \
+                --target "${runtime_site}" \
+                "opencv-contrib-python-headless==4.10.0.84" \
+                2>&1 | tee "${EVIDENCE_DIR}/opencv-provision.log"
+              provision_status=${PIPESTATUS[0]}
+              set -e
+              if [[ ${provision_status} -eq 0 ]] && \
+                PYTHONPATH="${runtime_site}" "${runtime}" -c 'import cv2'
+              then
+                opencv_state="provisioned-local"
+              fi
+            else
+              echo "pip unavailable for ${runtime}" \
+                | tee "${EVIDENCE_DIR}/opencv-provision.log"
+            fi
+          fi
+          export PYTHONPATH="${runtime_site}:$PWD/src:$PWD/_deform360"
           echo "RUN_PYTHON=${runtime}" >> "${GITHUB_ENV}"
-          export PYTHONPATH="$PWD/src:$PWD/_deform360"
           echo "PYTHONPATH=${PYTHONPATH}" >> "${GITHUB_ENV}"
           {
-            echo "runtime_mode=system-python"
+            echo "runtime_mode=system-python-with-isolated-target"
             echo "python=${runtime}"
+            echo "runtime_site=${runtime_site}"
+            echo "opencv_state=${opencv_state}"
           } > "${EVIDENCE_DIR}/runtime-selection.txt"
           "${runtime}" - <<'PY'
           import numpy
