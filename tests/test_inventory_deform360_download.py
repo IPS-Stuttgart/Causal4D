@@ -59,9 +59,7 @@ def test_inventory_finds_nested_cohort_and_download_markers(tmp_path: Path) -> N
         "processed-repository/processed/170-spider"
     ]
     assert scan["derived_layout_candidates"] == ["derived-v1"]
-    assert scan["incomplete_markers"] == [
-        ".cache/huggingface/download/x.incomplete"
-    ]
+    assert scan["incomplete_markers"] == [".cache/huggingface/download/x.incomplete"]
     assert payload["download_may_be_active"] is True
     assert payload["information_boundary"] == {
         "dataset_modified": False,
