@@ -10,6 +10,26 @@ WORKFLOW_DIR = ROOT / ".github" / "workflows"
 REGISTRY = ROOT / ".github" / "self-hosted-jobs.json"
 JOB_HEADER = re.compile(r"^  (?P<job>[A-Za-z0-9_-]+):\s*$")
 PINNED_ACTION = re.compile(r"[0-9a-f]{40}")
+REVIEWED_FILE_MAIN_TRIGGERS = {
+    "deform-dlo45-public-gpuserver4090.yml": (
+        "ops/deform-dlo45-public-gpuserver4090-request.json"
+    ),
+    "deform360-official-pcd-source-pilot.yml": (
+        "ops/deform360-official-pcd-source-pilot-request.json"
+    ),
+    "deform360-official-pcd-source-pilot-v3.yml": (
+        "ops/deform360-official-pcd-source-pilot-v3-request.json"
+    ),
+    "deform360-official-pcd-source-pilot-v4.yml": (
+        "ops/deform360-official-pcd-source-pilot-v4-request.json"
+    ),
+    "deform360-official-pcd-source-pilot-v5.yml": (
+        "ops/deform360-official-pcd-source-pilot-v5-request.json"
+    ),
+    "public-realworld-probe-gpuserver4090.yml": (
+        "ops/public-realworld-probe-gpuserver4090-request.json"
+    ),
+}
 
 
 def _job_blocks(text: str) -> dict[str, str]:
@@ -146,6 +166,46 @@ def _main_only_errors(workflow_text: str, block: str) -> list[str]:
     return errors
 
 
+def _reviewed_file_main_errors(
+    workflow_name: str,
+    workflow_text: str,
+    block: str,
+) -> list[str]:
+    errors = _common_self_hosted_errors(block)
+    request_path = REVIEWED_FILE_MAIN_TRIGGERS.get(workflow_name)
+    if request_path is None:
+        errors.append("workflow is not an exact reviewed-file exception")
+        return errors
+    prefix = workflow_text.split("permissions:", maxsplit=1)[0]
+    required = {
+        "  push:": "workflow lacks the reviewed push trigger",
+        "  workflow_dispatch:": "workflow lacks manual reviewed dispatch",
+        "    branches: [main]": "push trigger is not bound to main",
+        request_path: "workflow is not bound to its exact reviewed request file",
+    }
+    for fragment, message in required.items():
+        if fragment not in prefix:
+            errors.append(message)
+    if prefix.count(request_path) != 1:
+        errors.append("reviewed request path must occur exactly once in trigger block")
+    for forbidden_event in ("  issues:", "  schedule:", "  workflow_call:"):
+        if forbidden_event in prefix:
+            errors.append(f"reviewed-file workflow also exposes {forbidden_event.strip()}")
+    if "  pull_request:" in prefix and "github.event_name != 'pull_request'" not in block:
+        errors.append("self-hosted job is not excluded from pull requests")
+    for forbidden_payload in (
+        "github.event.head_commit.message",
+        "github.event.commits",
+        "github.event.pull_request.body",
+    ):
+        if forbidden_payload in block:
+            errors.append(
+                f"untrusted push or pull-request payload reaches self-hosted job: "
+                f"{forbidden_payload}"
+            )
+    return errors
+
+
 def _exact_maintainer_issue_errors(
     workflow_text: str,
     block: str,
@@ -217,11 +277,14 @@ def _v5_checkout_reprovision_issue_main_errors(
 
 def _authorization_errors(
     authorization_model: str,
+    workflow_name: str,
     workflow_text: str,
     block: str,
 ) -> list[str]:
     if authorization_model == "main-only":
         return _main_only_errors(workflow_text, block)
+    if authorization_model == "reviewed-file-main":
+        return _reviewed_file_main_errors(workflow_name, workflow_text, block)
     if authorization_model == "maintainer-issue-main":
         return _maintainer_issue_main_errors(workflow_text, block)
     if authorization_model == "single-operator-v5-issue-main":
@@ -236,6 +299,7 @@ def test_self_hosted_job_registry_is_complete_and_unique() -> None:
     assert payload["schema_version"] == 1
     assert set(payload["authorization_models"]) == {
         "main-only",
+        "reviewed-file-main",
         "maintainer-issue-main",
         "single-operator-v5-issue-main",
         "v5-checkout-reprovision-issue-main",
@@ -266,6 +330,7 @@ def test_every_self_hosted_job_is_exact_sha_and_secret_free() -> None:
         assert (
             _authorization_errors(
                 entry["authorization_model"],
+                entry["workflow"],
                 workflow_text,
                 block,
             )
