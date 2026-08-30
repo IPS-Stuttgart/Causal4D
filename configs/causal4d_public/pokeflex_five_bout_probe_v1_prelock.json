@@ -1,0 +1,109 @@
+{
+  "schema": "causal4d.pokeflex-five-bout-probe-prelock-v1",
+  "protocol_id": "causal4d-pokeflex-five-bout-probe-v1",
+  "status": "source-and-calibration-authorized-target-closed",
+  "dataset": {
+    "public_name": "PokeFlex",
+    "input_root": "/mnt/lexar4tb/datasets/pokeflex/inputs",
+    "input_resolved_root": "/home/florianpfaff/pokeflex-official13-public-v1-f794cef-attempt2/causal_dataset",
+    "target_root": "/mnt/lexar4tb/datasets/pokeflex/targets",
+    "target_resolved_root": "/home/florianpfaff/pokeflex-official13-public-v1-f794cef-scoring/scoring_dataset",
+    "canonical_archive_root": "/mnt/lexar4tb/pokeflex",
+    "canonical_archive_root_runner_status": "present-but-mode-0700-and-unreadable-to-workflow-runner",
+    "upstream_repository": "pokeflex-dataset/reconstruction",
+    "upstream_commit": "aaa8726072834a95bbe97e1a113588968c36e185"
+  },
+  "source_only_structure_evidence": {
+    "location_probe_run": 33326527701,
+    "location_probe_artifact": 9736382608,
+    "location_probe_artifact_sha256": "f88a0c9ab7f8caed7489d906c7cb45557a55418e68302e4a75d87022c5e78851",
+    "source_inventory_run": 33326998316,
+    "source_inventory_artifact": 9736512836,
+    "source_inventory_artifact_sha256": "1748bf2138353300646049b28a6b020aa6cdcc13e315b33f1a975e1331e75814",
+    "five_bout_run": 33327289470,
+    "five_bout_artifact": 9736595541,
+    "five_bout_artifact_sha256": "874c4020b1b2a28d84a7e025a1dac86edaa3ea084d07d31345664ccbeb20c878",
+    "paired_object_take_count": 13,
+    "five_bout_admitted_count": 10,
+    "target_geometry_opened": false
+  },
+  "fixed_bout_segmentation": {
+    "expected_bouts": 5,
+    "force_norm_smoothing_radius_records": 2,
+    "local_peak_radius_records": 3,
+    "minimum_peak_separation_records": 18,
+    "inter_bout_reset_gate": "force valley below 0.35 of the smaller adjacent peak",
+    "target_availability_gate": "at least one target-mesh filename in every bout window",
+    "excluded_before_geometry": [
+      "3dPrintedBunny_T1",
+      "3dPrintedPyramid_T6",
+      "PlushTurtle_T3"
+    ]
+  },
+  "split_rule": {
+    "ordering": "ascending SHA256('causal4d-pokeflex-five-bout-probe-v1:' + object_take_id)",
+    "source_count": 5,
+    "calibration_count": 2,
+    "target_count": 3,
+    "source": [
+      "PlushMoon_T1",
+      "PlushOctopus_T6",
+      "PlushDice_T8",
+      "Beanbag_T6",
+      "FoamCylinder_T1"
+    ],
+    "calibration": [
+      "ToiletPaperRoll_T1",
+      "MemoryFoam_T2"
+    ],
+    "sealed_target": [
+      "FoamHalfSphere_T3",
+      "FoamDice_T3",
+      "PlushVolleyball_T4"
+    ]
+  },
+  "registered_task": {
+    "candidate_diagnostic_bouts": [1, 2, 3, 4],
+    "held_out_challenge_bout": 5,
+    "interpretation": "retrospective selection of one reset-separated diagnostic poke to predict the fifth recorded poke",
+    "causal_limit": "all bouts were recorded sequentially; this is not randomized online policy execution",
+    "response_functional": {
+      "geometry": "symmetric Euclidean Chamfer between the input template mesh and the target mesh nearest the force peak",
+      "normalization": "divide Chamfer by input-template bounding-box diagonal",
+      "model_scale": "natural logarithm of normalized Chamfer plus 1e-9",
+      "mesh_sampling": "deterministic at most 2048 OBJ vertices using evenly spaced source indices",
+      "target_topology_requirement": "none; no same-index or persistent-vertex assumption"
+    }
+  },
+  "registered_policies": {
+    "no_probe": "source mean of challenge log-response",
+    "generic_information": "candidate with largest source marginal log-response variance",
+    "task_conditioned": "candidate maximizing cov(Y_a,Q)^2 / (var(Y_a) + 0.25*var(Y_a) + 1e-12)",
+    "random_cost_matched": "uniform expected loss over the four candidate bouts",
+    "dependence_destroyed": "cyclically permute complete challenge responses across source objects while preserving candidate and challenge marginals"
+  },
+  "source_gate": {
+    "evaluation": "leave-one-source-object-out",
+    "requirements": [
+      "task-conditioned and generic-information select different candidates on the complete source fit",
+      "task-conditioned mean leave-one-out squared log-error is lower than generic-information",
+      "task-conditioned mean leave-one-out squared log-error is lower than no-probe",
+      "matched task value is greater than dependence-destroyed task value"
+    ],
+    "failure_action": "retain source-negative result and do not open calibration or target geometry"
+  },
+  "calibration_gate": {
+    "requirements": [
+      "task-conditioned total squared log-error across both calibration objects is lower than generic-information",
+      "task-conditioned total squared log-error across both calibration objects is lower than no-probe",
+      "neither calibration object has task-conditioned squared log-error above twice its no-probe squared log-error plus 1e-12"
+    ],
+    "failure_action": "retain calibration-negative result and keep all three target objects closed"
+  },
+  "target_policy": {
+    "opened_by_this_protocol": false,
+    "minimum_status_after_positive_calibration": "separate reviewed target-opening commit and exact source/calibration artifact bindings",
+    "claim_if_eventually_positive": "pilot evidence only; three target objects are insufficient for an arbitrary-object generalization claim"
+  },
+  "claim_boundary": "This prelock can establish source/calibration feasibility of task-conditioned diagnostic-poke selection. It cannot establish online intervention execution, safety, persistent material-point identity, calibrated real posterior uncertainty, or broad object generalization."
+}
