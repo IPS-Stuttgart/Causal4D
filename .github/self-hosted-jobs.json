@@ -6,9 +6,6 @@
     "maintainer-issue-main": {
       "description": "Exact registered-maintainer issue trigger on reviewed refs/heads/main, exact GITHUB_SHA checkout, clean-tree verification, read-only self-hosted token, no issue text execution, and no secrets."
     },
-    "object-registration-input-stage-issue-main": {
-      "description": "Exact registered-maintainer issue trigger on reviewed refs/heads/main for source-only object-registration node-set staging, exact GITHUB_SHA checkout, clean-tree verification, byte-audited pre-freeze dataset additions, read-only self-hosted token, no issue text execution, and no secrets."
-    },
     "single-operator-v5-issue-main": {
       "description": "Exact registered-owner issue trigger on reviewed refs/heads/main for the nonphysical source-independent v5 owner-identity bootstrap, exact GITHUB_SHA checkout, read-only self-hosted token, no issue text execution, and no secrets."
     },
@@ -166,7 +163,7 @@
     },
     {
       "authorization_model": "main-only",
-      "dataset_acess": "approved-source-only-deform360",
+      "dataset_access": "approved-source-only-deform360",
       "job": "source-diagnostic",
       "purpose": "Locked Deform360 source prefix-kinematics diagnostic",
       "runner_labels": [
@@ -181,7 +178,7 @@
     },
     {
       "authorization_model": "main-only",
-      "dataset_acess": "approved-source-only-deform360-read-only-inventory-and-derived-evaluation",
+      "dataset_access": "approved-source-only-deform360-read-only-inventory-and-derived-evaluation",
       "job": "evaluate",
       "purpose": "Qualify and preprocess mounted public Deform360 holdings on gpuserver6000",
       "runner_labels": [
@@ -196,7 +193,7 @@
     },
     {
       "authorization_model": "main-only",
-      "dataset_acess": "approved-source-only-deform360-read-only-inventory-and-derived-evaluation",
+      "dataset_access": "approved-source-only-deform360-read-only-inventory-and-derived-evaluation",
       "job": "source-diagnostic",
       "purpose": "Locked Deform360 source reset-mechanics diagnostic on gpuserver4090",
       "runner_labels": [
@@ -265,21 +262,6 @@
       ],
       "secrets_allowed": false,
       "workflow": "self-hosted-evaluation.yml"
-    },
-    {
-      "authorization_model": "object-registration-input-stage-issue-main",
-      "dataset_access": "registered-local-preacquisition-object-registration-node-set-stage",
-      "job": "stage",
-      "purpose": "Stage exact approved source-only node sets before manual object registration",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi",
-        "data-causal4d-physical-v1"
-      ],
-      "secrets_allowed": false,
-      "workflow": "stage-object-registration-inputs-self-hosted.yml"
     },
     {
       "authorization_model": "main-only",
