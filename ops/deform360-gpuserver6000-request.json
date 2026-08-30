@@ -5,7 +5,7 @@
   "workflow": "deform360-public-holdings-gpuserver6000.yml",
   "ref": "main",
   "process_candidates": true,
-  "max_objects": "1",
+  "max_objects": "4",
   "hash_001_media": false,
-  "request_id": "2026-08-30-gpuserver6000-public-holdings-v1"
+  "request_id": "2026-08-31-gpuserver6000-public-holdings-expansion-v1"
 }
