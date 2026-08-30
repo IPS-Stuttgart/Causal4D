@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/deform360-fragment-admission-run.yml"
       - "scripts/remote/audit_deform360_fragments.py"
+      - "scripts/remote/audit_deform360_fragments_v2.py"
       - "scripts/remote/merge_deform360_fragment_audits.py"
 
 permissions:
@@ -30,6 +31,7 @@ jobs:
         run: |
           python3 -m compileall -q \
             scripts/remote/audit_deform360_fragments.py \
+            scripts/remote/audit_deform360_fragments_v2.py \
             scripts/remote/merge_deform360_fragment_audits.py
 
   audit-6000:
@@ -54,7 +56,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/deform360-fragment-audit
-          /usr/bin/python3 scripts/remote/audit_deform360_fragments.py \
+          /usr/bin/python3 scripts/remote/audit_deform360_fragments_v2.py \
             --server-id gpuserver6000 \
             --root main-raw=raw:/mnt/lexar4tb/datasets/deform360/data-7fea8e2/raw \
             --root fresh-raw=raw:/mnt/lexar4tb/datasets/deform360/fresh-download-20260811-v1/raw \
@@ -97,7 +99,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/deform360-fragment-audit
-          /usr/bin/python3 scripts/remote/audit_deform360_fragments.py \
+          /usr/bin/python3 scripts/remote/audit_deform360_fragments_v2.py \
             --server-id gpuserver4090 \
             --root reusable-aligned=aligned:/home/florianpfaff/deform360-reusable-sota-v1/aligned \
             --root fresh-source=mixed:/home/florianpfaff/deform360-fresh-source-processed-v1-1a3f9b1 \
