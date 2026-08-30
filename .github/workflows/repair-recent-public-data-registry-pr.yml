@@ -1,0 +1,157 @@
+name: Repair recent public-data self-hosted registrations
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/repair-recent-public-data-registry-pr.yml"
+      - ".github/self-hosted-jobs.json"
+      - ".github/workflows/deform-dlo45-public-gpuserver4090.yml"
+      - ".github/workflows/deform360-official-pcd-source-pilot.yml"
+      - ".github/workflows/deform360-official-pcd-source-pilot-v3.yml"
+      - ".github/workflows/deform360-official-pcd-source-pilot-v4.yml"
+      - ".github/workflows/deform360-official-pcd-source-pilot-v5.yml"
+      - ".github/workflows/public-realworld-probe-gpuserver4090.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'science/tracking-cloth-task-observation-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact PR head branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          persist-credentials: true
+          clean: true
+
+      - name: Make inherited jobs dispatch-only and register them exactly
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          workflow_paths = [
+              Path('.github/workflows/deform-dlo45-public-gpuserver4090.yml'),
+              Path('.github/workflows/deform360-official-pcd-source-pilot.yml'),
+              Path('.github/workflows/deform360-official-pcd-source-pilot-v3.yml'),
+              Path('.github/workflows/deform360-official-pcd-source-pilot-v4.yml'),
+              Path('.github/workflows/deform360-official-pcd-source-pilot-v5.yml'),
+              Path('.github/workflows/public-realworld-probe-gpuserver4090.yml'),
+          ]
+          one_line = "    if: github.ref == 'refs/heads/main'\n"
+          broad = (
+              "    if: >-\n"
+              "      github.event_name != 'pull_request' &&\n"
+              "      github.ref == 'refs/heads/main'\n"
+          )
+          dispatch_only = (
+              "    if: >-\n"
+              "      github.event_name == 'workflow_dispatch' &&\n"
+              "      github.ref == 'refs/heads/main'\n"
+          )
+          for path in workflow_paths:
+              text = path.read_text(encoding='utf-8')
+              matches = text.count(one_line) + text.count(broad)
+              if matches != 1:
+                  raise SystemExit(
+                      f'{path}: expected exactly one recognized main-only guard; found {matches}'
+                  )
+              if one_line in text:
+                  text = text.replace(one_line, dispatch_only, 1)
+              else:
+                  text = text.replace(broad, dispatch_only, 1)
+              path.write_text(text, encoding='utf-8')
+
+          registry_path = Path('.github/self-hosted-jobs.json')
+          registry = json.loads(registry_path.read_text(encoding='utf-8'))
+          jobs = registry['jobs']
+          additions = [
+              {
+                  'authorization_model': 'main-only',
+                  'dataset_access': 'verified-public-deform-dlo45-source-gate-and-conditional-target',
+                  'job': 'evaluate',
+                  'purpose': 'Target-closed DEFORM DLO4/DLO5 public evaluation',
+                  'runner_labels': ['self-hosted', 'Linux', 'X64', 'nvidia-smi', 'gpuserver4090'],
+                  'secrets_allowed': False,
+                  'workflow': 'deform-dlo45-public-gpuserver4090.yml',
+              },
+              {
+                  'authorization_model': 'main-only',
+                  'dataset_access': 'approved-source-only-deform360-official-pcd',
+                  'job': 'evaluate',
+                  'purpose': 'Original Deform360 official point-cloud source pilot',
+                  'runner_labels': ['self-hosted', 'Linux', 'X64', 'nvidia-smi', 'gpuserver4090'],
+                  'secrets_allowed': False,
+                  'workflow': 'deform360-official-pcd-source-pilot.yml',
+              },
+              {
+                  'authorization_model': 'main-only',
+                  'dataset_access': 'approved-source-only-deform360-official-pcd',
+                  'job': 'evaluate',
+                  'purpose': 'V3 Deform360 official point-cloud source pilot',
+                  'runner_labels': ['self-hosted', 'Linux', 'X64', 'nvidia-smi', 'gpuserver4090'],
+                  'secrets_allowed': False,
+                  'workflow': 'deform360-official-pcd-source-pilot-v3.yml',
+              },
+              {
+                  'authorization_model': 'main-only',
+                  'dataset_access': 'approved-source-only-deform360-official-pcd',
+                  'job': 'evaluate',
+                  'purpose': 'V4 Deform360 official point-cloud source pilot',
+                  'runner_labels': ['self-hosted', 'Linux', 'X64', 'nvidia-smi', 'gpuserver4090'],
+                  'secrets_allowed': False,
+                  'workflow': 'deform360-official-pcd-source-pilot-v4.yml',
+              },
+              {
+                  'authorization_model': 'main-only',
+                  'dataset_access': 'approved-source-only-deform360-official-pcd',
+                  'job': 'evaluate',
+                  'purpose': 'V5 standalone Deform360 official point-cloud source pilot',
+                  'runner_labels': ['self-hosted', 'Linux', 'X64', 'nvidia-smi', 'gpuserver4090'],
+                  'secrets_allowed': False,
+                  'workflow': 'deform360-official-pcd-source-pilot-v5.yml',
+              },
+              {
+                  'authorization_model': 'main-only',
+                  'dataset_access': 'verified-public-dataset-read-only-probe',
+                  'job': 'probe',
+                  'purpose': 'Read-only inventory of complete public real-world holdings',
+                  'runner_labels': ['self-hosted', 'Linux', 'X64', 'nvidia-smi', 'gpuserver4090'],
+                  'secrets_allowed': False,
+                  'workflow': 'public-realworld-probe-gpuserver4090.yml',
+              },
+          ]
+          by_key = {(item['workflow'], item['job']): item for item in jobs}
+          for item in additions:
+              key = (item['workflow'], item['job'])
+              if key in by_key and by_key[key] != item:
+                  raise SystemExit(f'conflicting existing registry entry for {key}')
+              by_key[key] = item
+          registry['jobs'] = [by_key[key] for key in sorted(by_key)]
+          registry_path.write_text(
+              json.dumps(registry, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          PY
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            .github/self-hosted-jobs.json \
+            .github/workflows/deform-dlo45-public-gpuserver4090.yml \
+            .github/workflows/deform360-official-pcd-source-pilot.yml \
+            .github/workflows/deform360-official-pcd-source-pilot-v3.yml \
+            .github/workflows/deform360-official-pcd-source-pilot-v4.yml \
+            .github/workflows/deform360-official-pcd-source-pilot-v5.yml \
+            .github/workflows/public-realworld-probe-gpuserver4090.yml
+          git commit -m 'Register recent public-data jobs and require reviewed dispatch'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
