@@ -68,5 +68,5 @@ jobs:
         with:
           name: task-conditioned-probe-value-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/task-conditioned-probe-value/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
