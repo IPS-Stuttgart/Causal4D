@@ -1,0 +1,79 @@
+name: Public deformable location probe
+
+on:
+  push:
+    branches:
+      - science/public-deformable-dataset-admissibility-20260831
+    paths:
+      - .github/workflows/public-deformable-location-probe.yml
+      - scripts/remote/probe_public_deformable_locations.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-deformable-location-probe-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  probe-4090:
+    runs-on: [self-hosted, Linux, X64, gpuserver4090]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+      - name: Probe reviewed paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          mkdir -p public-deformable-location-probe
+          /usr/bin/python3 scripts/remote/probe_public_deformable_locations.py \
+            --server gpuserver4090 \
+            --output public-deformable-location-probe/gpuserver4090.json
+          sha256sum public-deformable-location-probe/* \
+            > public-deformable-location-probe/SHA256SUMS-4090
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: public-deformable-location-probe-4090-${{ github.run_id }}
+          path: public-deformable-location-probe
+          if-no-files-found: error
+          retention-days: 30
+
+  probe-6000:
+    runs-on: [self-hosted, Linux, X64, gpuserver6000]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+      - name: Probe reviewed paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          mkdir -p public-deformable-location-probe
+          /usr/bin/python3 scripts/remote/probe_public_deformable_locations.py \
+            --server gpuserver6000 \
+            --output public-deformable-location-probe/gpuserver6000.json
+          {
+            echo "mounts"
+            findmnt -T /mnt/lexar4tb || true
+            echo "pokeflex-path"
+            namei -l /mnt/lexar4tb/pokeflex || true
+            echo "pokeflex-listing"
+            ls -la /mnt/lexar4tb/pokeflex || true
+          } > public-deformable-location-probe/gpuserver6000-mount.txt
+          sha256sum public-deformable-location-probe/* \
+            > public-deformable-location-probe/SHA256SUMS-6000
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: public-deformable-location-probe-6000-${{ github.run_id }}
+          path: public-deformable-location-probe
+          if-no-files-found: error
+          retention-days: 30
