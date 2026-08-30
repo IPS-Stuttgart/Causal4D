@@ -65,11 +65,11 @@ jobs:
               raise SystemExit("validator insertion marker changed")
           text = text.replace(marker, insertion, 1)
 
-          old_branch = '''    if authorization_model == "maintainer-issue-main":
+          old = '''    if authorization_model == "maintainer-issue-main":
               return _maintainer_issue_main_errors(workflow_text, block)
               if authorization_model == "single-operator-v5-issue-main":
           '''
-          new_branch = '''    if authorization_model == "maintainer-issue-main":
+          new = '''    if authorization_model == "maintainer-issue-main":
               return _maintainer_issue_main_errors(workflow_text, block)
               if authorization_model == "object-registration-input-stage-issue-main":
                   return _object_registration_input_stage_issue_main_errors(
@@ -78,38 +78,56 @@ jobs:
                   )
               if authorization_model == "single-operator-v5-issue-main":
           '''
-          old_branch = "\n".join(
+          old = "\n".join(
               line[10:] if line.startswith("          ") else line
-              for line in old_branch.splitlines()
+              for line in old.splitlines()
           ) + "\n"
-          new_branch = "\n".join(
+          new = "\n".join(
               line[10:] if line.startswith("          ") else line
-              for line in new_branch.splitlines()
+              for line in new.splitlines()
           ) + "\n"
-          if old_branch not in text:
+          if old not in text:
+              old = '''    if authorization_model == "maintainer-issue-main":
+              return _maintainer_issue_main_errors(workflow_text, block)
+              if authorization_model == "single-operator-v5-issue-main":
+          '''
+              old = old.replace("              return", "        return").replace(
+                  "              if", "    if"
+              )
+              new = new.replace("              return", "        return").replace(
+                  "              if", "    if"
+              ).replace("                  return", "        return").replace(
+                  "                      workflow_text", "            workflow_text"
+              ).replace("                      block", "            block").replace(
+                  "                  )", "        )"
+              )
+          if old not in text:
               raise SystemExit("authorization branch marker changed")
-          text = text.replace(old_branch, new_branch, 1)
+          text = text.replace(old, new, 1)
 
-          old_set = '''        "main-only",
+          old = '''        "main-only",
               "maintainer-issue-main",
               "single-operator-v5-issue-main",
           '''
-          new_set = '''        "main-only",
+          new = '''        "main-only",
               "maintainer-issue-main",
               "object-registration-input-stage-issue-main",
               "single-operator-v5-issue-main",
           '''
-          old_set = "\n".join(
+          old = "\n".join(
               line[10:] if line.startswith("          ") else line
-              for line in old_set.splitlines()
+              for line in old.splitlines()
           ) + "\n"
-          new_set = "\n".join(
+          new = "\n".join(
               line[10:] if line.startswith("          ") else line
-              for line in new_set.splitlines()
+              for line in new.splitlines()
           ) + "\n"
-          if old_set not in text:
+          if old not in text:
+              old = old.replace("              ", "        ")
+              new = new.replace("              ", "        ")
+          if old not in text:
               raise SystemExit("authorization set marker changed")
-          text = text.replace(old_set, new_set, 1)
+          text = text.replace(old, new, 1)
           path.write_text(text, encoding="utf-8")
           PY
 
