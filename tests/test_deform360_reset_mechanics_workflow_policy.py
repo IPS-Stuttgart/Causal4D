@@ -10,10 +10,7 @@ WORKFLOW = ROOT / ".github/workflows/deform360-reset-mechanics.yml"
 def test_reset_mechanics_workflow_is_read_only_and_source_scoped() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
     assert "permissions:\n  contents: read" in text
-    assert (
-        "runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]"
-        in text
-    )
+    assert "runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]" in text
     assert "/mnt/seagate10tb/florianpfaff/datasets/deform360" in text
     assert "github.ref == 'refs/heads/main'" in text
     assert (
