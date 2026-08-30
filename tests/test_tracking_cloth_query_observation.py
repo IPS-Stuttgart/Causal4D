@@ -33,8 +33,7 @@ def _write_csv(
         writer.writerow(["marker ids"])
         writer.writerow(["units", "millimeters"])
         writer.writerow(
-            ["Frame", "Time"]
-            + [f"coordinate_{index}" for index in range(3 * markers)]
+            ["Frame", "Time"] + [f"coordinate_{index}" for index in range(3 * markers)]
         )
         for frame in range(frames):
             time = frame / 120.0
@@ -42,21 +41,13 @@ def _write_csv(
             for marker in range(markers):
                 x = 100.0 * (marker % 4) + 5.0 * np.sin(time * 3 + marker)
                 y = 80.0 * (marker // 4) + 2.0 * np.cos(time * 2 + marker)
-                z = (
-                    500.0
-                    - 30.0 * (marker // 4)
-                    + 10.0 * np.sin(time * 5 + marker / 3)
-                )
+                z = 500.0 - 30.0 * (marker // 4) + 10.0 * np.sin(time * 5 + marker / 3)
                 values.extend([x, y, z])
             writer.writerow([frame, time, *values])
 
 
 def test_csv_read_and_window_extraction(tmp_path: Path) -> None:
-    path = (
-        tmp_path
-        / "Free-hanging"
-        / "cotton_A3_shake_fast_hanger.csv"
-    )
+    path = tmp_path / "Free-hanging" / "cotton_A3_shake_fast_hanger.csv"
     _write_csv(path)
     key = MODULE.classify_recording(path, tmp_path)
     assert key is not None
@@ -96,9 +87,7 @@ def test_task_and_generic_can_select_different_groups() -> None:
     for recording_index in range(5):
         count = 60
         signal = rng.normal(size=(count, 1))
-        y = np.repeat(signal, 4, axis=1) + 0.05 * rng.normal(
-            size=(count, 4)
-        )
+        y = np.repeat(signal, 4, axis=1) + 0.05 * rng.normal(size=(count, 4))
         x_by_candidate = {}
         for name in MODULE.CANDIDATES:
             if name == "lower":

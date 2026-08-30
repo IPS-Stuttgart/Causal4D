@@ -32,8 +32,7 @@ PILOT_KIND = "TrackingClothTaskConditionedObservationV1"
 RESULT_SCHEMA = "causal4d.tracking-cloth-query-observation-result"
 REQUEST_SCHEMA = "causal4d.tracking-cloth-query-observation-request"
 EXPECTED_ROOT = Path(
-    "/home/github-runner/.cache/datasets/"
-    "tracking-cloth-deformation-v1-zenodo-14644526"
+    "/home/github-runner/.cache/datasets/tracking-cloth-deformation-v1-zenodo-14644526"
 )
 MATERIALS = ("cotton", "denim", "wool", "polyester")
 CANDIDATES = ("upper", "lower", "central", "lateral", "fast")
@@ -247,11 +246,15 @@ def read_recording(key: RecordingKey) -> Recording:
             continue
         parsed.append(values)
     if len(parsed) < 50:
-        raise ValueError(f"too few numeric frames in {key.relative_path}: {len(parsed)}")
+        raise ValueError(
+            f"too few numeric frames in {key.relative_path}: {len(parsed)}"
+        )
     matrix = np.asarray(parsed, dtype=np.float64)
     times = matrix[:, 1]
     if not np.all(np.diff(times) > 0.0):
-        raise ValueError(f"timestamps are not strictly increasing in {key.relative_path}")
+        raise ValueError(
+            f"timestamps are not strictly increasing in {key.relative_path}"
+        )
     points = matrix[:, 2:].reshape(matrix.shape[0], markers, 3)
     finite_frames = np.flatnonzero(
         np.sum(np.isfinite(points), axis=(1, 2)) >= 3 * min(markers, 12)
@@ -334,9 +337,7 @@ def group_feature(
     mean = np.mean(residual, axis=0)
     separation = previous[indices[1]] - previous[indices[0]]
     norm = float(np.linalg.norm(separation))
-    direction = (
-        separation / norm if norm > 1e-12 else np.array([1.0, 0.0, 0.0])
-    )
+    direction = separation / norm if norm > 1e-12 else np.array([1.0, 0.0, 0.0])
     differential = float((residual[1] - residual[0]) @ direction)
     return np.asarray(
         [mean[0], mean[1], mean[2], differential],
@@ -401,9 +402,7 @@ def extract_windows(
         baseline_query = query_vector(predicted_future, query_indices)
         actual_query = query_vector(future, query_indices)
         for name, indices in groups.items():
-            x_rows[name].append(
-                group_feature(now, predicted_now, previous, indices)
-            )
+            x_rows[name].append(group_feature(now, predicted_now, previous, indices))
         y_rows.append(actual_query - baseline_query)
         baseline_rows.append(baseline_query)
         actual_rows.append(actual_query)
@@ -423,12 +422,7 @@ def extract_windows(
 
 
 def fit_model(x: FloatArray, y: FloatArray, *, ridge: float) -> LinearGaussianModel:
-    if (
-        x.ndim != 2
-        or y.ndim != 2
-        or x.shape[0] != y.shape[0]
-        or x.shape[0] < 8
-    ):
+    if x.ndim != 2 or y.ndim != 2 or x.shape[0] != y.shape[0] or x.shape[0] < 8:
         raise ValueError("invalid regression arrays")
     x_mean = np.mean(x, axis=0)
     x_scale = np.std(x, axis=0, ddof=1)
@@ -450,10 +444,7 @@ def fit_model(x: FloatArray, y: FloatArray, *, ridge: float) -> LinearGaussianMo
         )
         * 1e-6
     )
-    covariance = (
-        0.5 * (covariance + covariance.T)
-        + floor * np.eye(covariance.shape[0])
-    )
+    covariance = 0.5 * (covariance + covariance.T) + floor * np.eye(covariance.shape[0])
     return LinearGaussianModel(
         x_mean,
         x_scale,
@@ -474,10 +465,7 @@ def fit_no_observation(y: FloatArray) -> tuple[FloatArray, FloatArray]:
         )
         * 1e-6
     )
-    covariance = (
-        0.5 * (covariance + covariance.T)
-        + floor * np.eye(covariance.shape[0])
-    )
+    covariance = 0.5 * (covariance + covariance.T) + floor * np.eye(covariance.shape[0])
     return mean, covariance
 
 
@@ -525,16 +513,12 @@ def choose_groups(
             per_recording: list[float] = []
             for held_out in range(len(batches)):
                 training = [
-                    batch
-                    for index, batch in enumerate(batches)
-                    if index != held_out
+                    batch for index, batch in enumerate(batches) if index != held_out
                 ]
                 x_train, y_train = _stack_batches(training, candidate)
                 model = fit_model(x_train, y_train, ridge=ridge)
                 batch = batches[held_out]
-                error = batch.y - model.predict(
-                    batch.x_by_candidate[candidate]
-                )
+                error = batch.y - model.predict(batch.x_by_candidate[candidate])
                 per_recording.append(_recording_mse(error))
             task_scores[candidate] = float(np.mean(per_recording))
             x_all, _ = _stack_batches(batches, candidate)
@@ -611,9 +595,7 @@ def _gaussian_metrics(
         + np.sum(whitened**2, axis=1)
     )
     std = np.sqrt(np.diag(covariance))
-    coverage = np.mean(
-        np.abs(error) <= 1.6448536269514722 * std[None, :]
-    )
+    coverage = np.mean(np.abs(error) <= 1.6448536269514722 * std[None, :])
     return float(np.mean(nll)), float(coverage)
 
 
@@ -665,9 +647,7 @@ def score_batches(
                     fitted["candidate_models"][random_group].covariance,
                 ),
                 "dependence_destroyed": (
-                    fitted["destroyed"].predict(
-                        batch.x_by_candidate[task_group]
-                    ),
+                    fitted["destroyed"].predict(batch.x_by_candidate[task_group]),
                     fitted["destroyed"].covariance,
                 ),
             }
@@ -719,21 +699,16 @@ def aggregate_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
         )
         aggregate["arms"][arm] = {
             "equal_recording_mse_m2": float(np.mean(mse)),
-            "equal_recording_rmse_mm": 1000.0
-            * math.sqrt(float(np.mean(mse))),
+            "equal_recording_rmse_mm": 1000.0 * math.sqrt(float(np.mean(mse))),
             "equal_recording_gaussian_nll": float(np.mean(nll)),
-            "equal_recording_marginal_90_coverage": float(
-                np.mean(coverage)
-            ),
+            "equal_recording_marginal_90_coverage": float(np.mean(coverage)),
         }
-    baseline = aggregate["arms"]["constant_velocity"][
-        "equal_recording_mse_m2"
-    ]
+    baseline = aggregate["arms"]["constant_velocity"]["equal_recording_mse_m2"]
     for arm in arms:
         value = aggregate["arms"][arm]["equal_recording_mse_m2"]
-        aggregate["arms"][arm][
-            "relative_mse_improvement_vs_constant_velocity"
-        ] = float((baseline - value) / baseline) if baseline > 0.0 else 0.0
+        aggregate["arms"][arm]["relative_mse_improvement_vs_constant_velocity"] = (
+            float((baseline - value) / baseline) if baseline > 0.0 else 0.0
+        )
     return aggregate
 
 
@@ -742,15 +717,9 @@ def source_gate(
     request: dict[str, Any],
 ) -> dict[str, Any]:
     aggregate = aggregate_rows(rows)
-    task = aggregate["arms"]["task_conditioned"][
-        "equal_recording_mse_m2"
-    ]
-    generic = aggregate["arms"]["generic_information"][
-        "equal_recording_mse_m2"
-    ]
-    baseline = aggregate["arms"]["constant_velocity"][
-        "equal_recording_mse_m2"
-    ]
+    task = aggregate["arms"]["task_conditioned"]["equal_recording_mse_m2"]
+    generic = aggregate["arms"]["generic_information"]["equal_recording_mse_m2"]
+    baseline = aggregate["arms"]["constant_velocity"]["equal_recording_mse_m2"]
     task_vs_generic = (generic - task) / generic
     task_vs_baseline = (baseline - task) / baseline
     recording_differences = np.asarray(
@@ -768,25 +737,13 @@ def source_gate(
         if not subset:
             continue
         task_s = float(
-            np.mean(
-                [
-                    row["arms"]["task_conditioned"]["mse_m2"]
-                    for row in subset
-                ]
-            )
+            np.mean([row["arms"]["task_conditioned"]["mse_m2"] for row in subset])
         )
         generic_s = float(
-            np.mean(
-                [
-                    row["arms"]["generic_information"]["mse_m2"]
-                    for row in subset
-                ]
-            )
+            np.mean([row["arms"]["generic_information"]["mse_m2"] for row in subset])
         )
         ratios[scenario] = task_s / generic_s if generic_s > 0 else math.inf
-    distinct = sum(
-        row["task_selected"] != row["generic_selected"] for row in rows
-    )
+    distinct = sum(row["task_selected"] != row["generic_selected"] for row in rows)
     thresholds = request["source_gate"]
     checks = {
         "minimum_improvement_vs_generic": task_vs_generic
@@ -807,9 +764,7 @@ def source_gate(
         "passed": all(checks.values()),
         "checks": checks,
         "task_vs_generic_relative_mse_improvement": float(task_vs_generic),
-        "task_vs_constant_velocity_relative_mse_improvement": float(
-            task_vs_baseline
-        ),
+        "task_vs_constant_velocity_relative_mse_improvement": float(task_vs_baseline),
         "task_vs_generic_recording_win_fraction": win_fraction,
         "task_to_generic_scenario_mse_ratios": ratios,
         "distinct_task_vs_generic_selection_rows": int(distinct),
@@ -827,10 +782,7 @@ def _bootstrap_difference(
 ) -> dict[str, float]:
     by_material: dict[str, list[float]] = {}
     for row in rows:
-        difference = (
-            row["arms"][arm_a]["mse_m2"]
-            - row["arms"][arm_b]["mse_m2"]
-        )
+        difference = row["arms"][arm_a]["mse_m2"] - row["arms"][arm_b]["mse_m2"]
         by_material.setdefault(row["material"], []).append(float(difference))
     rng = np.random.default_rng(seed)
     simulated = np.empty(draws, dtype=np.float64)
@@ -880,10 +832,7 @@ def read_materials(
     recordings: list[Recording] = []
     manifest: list[dict[str, Any]] = []
     for key in keys:
-        if (
-            key.material not in materials
-            or key.scenario not in PRIMARY_SCENARIOS
-        ):
+        if key.material not in materials or key.scenario not in PRIMARY_SCENARIOS:
             continue
         recording = read_recording(key)
         recordings.append(recording)
@@ -918,9 +867,7 @@ def run_evaluation(root: Path, request: dict[str, Any]) -> dict[str, Any]:
             for scenario in (*PRIMARY_SCENARIOS, "hitting")
         },
         "target_paths_classified_from_names_only": [
-            key.relative_path
-            for key in keys
-            if key.material in {"wool", "polyester"}
+            key.relative_path for key in keys if key.material in {"wool", "polyester"}
         ],
     }
     expected = request["expected_census"]
@@ -1049,10 +996,7 @@ def run_evaluation(root: Path, request: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_result(result: dict[str, Any]) -> None:
-    if (
-        result.get("schema") != RESULT_SCHEMA
-        or result.get("schema_version") != 1
-    ):
+    if result.get("schema") != RESULT_SCHEMA or result.get("schema_version") != 1:
         raise ValueError("unexpected result schema")
     gate_passed = bool(result["source_gate"]["passed"])
     if bool(result["target_contents_opened"]) != gate_passed:
