@@ -8,6 +8,7 @@ on:
       - ".github/workflows/deform360-fragment-admission-run.yml"
       - "scripts/remote/audit_deform360_fragments.py"
       - "scripts/remote/audit_deform360_fragments_v2.py"
+      - "scripts/remote/inspect_deform360_aligned_layout.py"
       - "scripts/remote/merge_deform360_fragment_audits.py"
 
 permissions:
@@ -32,6 +33,7 @@ jobs:
           python3 -m compileall -q \
             scripts/remote/audit_deform360_fragments.py \
             scripts/remote/audit_deform360_fragments_v2.py \
+            scripts/remote/inspect_deform360_aligned_layout.py \
             scripts/remote/merge_deform360_fragment_audits.py
 
   audit-6000:
@@ -104,6 +106,9 @@ jobs:
             --root reusable-aligned=aligned:/home/florianpfaff/deform360-reusable-sota-v1/aligned \
             --root fresh-source=mixed:/home/florianpfaff/deform360-fresh-source-processed-v1-1a3f9b1 \
             --output build/deform360-fragment-audit/gpuserver4090.json
+          /usr/bin/python3 scripts/remote/inspect_deform360_aligned_layout.py \
+            /home/florianpfaff/deform360-reusable-sota-v1/aligned/004-rubber-band \
+            --output build/deform360-fragment-audit/gpuserver4090-004-layout.json
           {
             echo "runner=${RUNNER_NAME}"
             echo "revision=${GITHUB_SHA}"
@@ -140,7 +145,7 @@ jobs:
           set -euo pipefail
           mapfile -t reports < <(
             find build/deform360-fragment-audit-inputs \
-              -type f -name 'gpuserver*.json' -print | sort
+              -type f -name 'gpuserver*.json' ! -name '*layout*' -print | sort
           )
           test "${#reports[@]}" -eq 2
           mkdir -p build/deform360-fragment-admission
