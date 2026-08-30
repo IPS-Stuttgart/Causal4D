@@ -12,17 +12,21 @@ import zipfile
 from collections import Counter
 from pathlib import Path, PurePosixPath
 
-MAX_ENTRIES = 300
+MAX_ENTRIES = 500
 MAX_ARCHIVES = 40
 MAX_MEMBERS = 200_000
 
 CANDIDATES = {
     "gpuserver6000": (
         "/mnt/lexar4tb/pokeflex",
-        "/mnt/lexar4tb/PokeFlex",
         "/mnt/lexar4tb/datasets/pokeflex",
-        "/mnt/lexar4tb/datasets/PokeFlex",
+        "/mnt/lexar4tb/datasets/pokeflex/inputs",
+        "/mnt/lexar4tb/datasets/pokeflex/targets",
         "/mnt/lexar4tb/datasets/deform360",
+        "/mnt/lexar4tb/datasets/deform360/action-aligned-source-v1",
+        "/mnt/lexar4tb/datasets/cloth-sim2real-covariance-v1",
+        "/mnt/lexar4tb/datasets/cloth-sim2real-covariance-v1/dataset-268d07d94396f6f4ca277b6da0e8acf43512747fea6d40327eb33166da972c7f",
+        "/mnt/lexar4tb/datasets/trackdeform3d",
     ),
     "gpuserver4090": (
         "/mnt/seagate10tb/florianpfaff/datasets/dot",
@@ -60,6 +64,9 @@ def _child_entry(child: Path) -> dict[str, object]:
     try:
         result["is_dir"] = child.is_dir()
         result["is_file"] = child.is_file()
+        if result["is_symlink"]:
+            result["link_target"] = os.readlink(child)
+            result["resolved"] = str(child.resolve(strict=False))
     except OSError as exc:
         result["target_error"] = repr(exc)
         result["is_dir"] = False
@@ -96,6 +103,11 @@ def entry(path: Path) -> dict[str, object]:
             "is_file": is_file,
         }
     )
+    if result["is_symlink"]:
+        try:
+            result["link_target"] = os.readlink(path)
+        except OSError as exc:
+            result["link_error"] = repr(exc)
     if not is_directory:
         return result
     try:
