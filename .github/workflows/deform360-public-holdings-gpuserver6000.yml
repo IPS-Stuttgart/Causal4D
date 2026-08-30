@@ -157,10 +157,9 @@ jobs:
           rm -rf -- "${runtime_site}"
           mkdir -p "${runtime_site}"
           provision_state="already-available"
-          if ! "${runtime}" - <<'PY' >/dev/null 2>&1
-          import cv2
-          from huggingface_hub import snapshot_download
-          PY
+          if ! "${runtime}" -c \
+            'import cv2; from huggingface_hub import snapshot_download' \
+            >/dev/null 2>&1
           then
             provision_state="unavailable"
             if "${runtime}" -m pip --version >/dev/null 2>&1; then
@@ -184,10 +183,8 @@ jobs:
               opencv_status=${PIPESTATUS[0]}
               set -e
               if [[ ${hf_status} -eq 0 && ${opencv_status} -eq 0 ]] && \
-                PYTHONPATH="${runtime_site}" "${runtime}" - <<'PY'
-              import cv2
-              from huggingface_hub import snapshot_download
-              PY
+                PYTHONPATH="${runtime_site}" "${runtime}" -c \
+                  'import cv2; from huggingface_hub import snapshot_download'
               then
                 provision_state="provisioned-local"
               fi
