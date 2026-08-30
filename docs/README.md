@@ -40,6 +40,7 @@ The first paper is public-data-only. These documents define the active empirical
 program:
 
 - [Deform360 `001-rope` held-out-action protocol](causal4d_deform360_public_protocol.md)
+- [Deform360 `002-rope-silk` point-cloud pilot result and paper decision](causal4d_deform360_official_pcd_source_pilot_v5_result.md)
 - [PokeFlex public readiness and retained source-gate negative](causal4d_pokeflex_public_readiness.md)
 - [Paper reproduction](paper_reproduction.md)
 - [Controlled collaborator demonstration](controlled_collaborator_demo.md)
