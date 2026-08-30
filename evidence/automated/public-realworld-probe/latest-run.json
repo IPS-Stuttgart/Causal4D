@@ -1,0 +1,33 @@
+{
+  "probed_revision": "f8fd72d2c5ece5a05a3fc30d4c5292bc4306605b",
+  "ranking": [
+    {
+      "dataset": "tracking_cloth",
+      "reasons": [
+        "mounted root exists",
+        "100 object-state filename hints",
+        "4 recording-like directories"
+      ],
+      "score": 6
+    },
+    {
+      "dataset": "dot",
+      "reasons": [
+        "mounted root exists",
+        "all 21 expected ZIP archives visible"
+      ],
+      "score": 5
+    },
+    {
+      "dataset": "deform",
+      "reasons": [
+        "mounted root exists",
+        "100 object-state filename hints"
+      ],
+      "score": 4
+    }
+  ],
+  "schema_version": 1,
+  "workflow_run_id": 33330590086,
+  "workflow_run_url": "https://github.com/IPS-Stuttgart/Causal4D/actions/runs/33330590086"
+}
