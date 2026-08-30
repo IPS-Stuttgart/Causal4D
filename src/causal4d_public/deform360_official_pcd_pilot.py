@@ -296,7 +296,8 @@ def load_pilot_config(path: str | Path) -> tuple[PilotConfig, dict[str, Any]]:
 
 def _member_frame_id(name: str) -> int:
     match = _FRAME_PATTERN.search(Path(name).stem)
-    _require(match is not None, f"point-cloud member lacks a frame index: {name}")
+    if match is None:
+        raise ValueError(f"point-cloud member lacks a frame index: {name}")
     return int(match.group(1))
 
 
@@ -337,7 +338,8 @@ def load_episode_archive(
             if member.isfile() and member.name.lower().endswith(".npz")
         ]
         members.sort(key=lambda member: (_member_frame_id(member.name), member.name))
-        _require(members, f"archive contains no NPZ point-cloud frames: {path}")
+        if not members:
+            raise ValueError(f"archive contains no NPZ point-cloud frames: {path}")
         parsed_ids = [_member_frame_id(member.name) for member in members]
         _require(
             len(set(parsed_ids)) == len(parsed_ids) and np.all(np.diff(parsed_ids) > 0),
@@ -345,10 +347,8 @@ def load_episode_archive(
         )
         for member, frame_id in zip(members, parsed_ids, strict=True):
             extracted = archive.extractfile(member)
-            _require(
-                extracted is not None,
-                f"failed to read archive member: {member.name}",
-            )
+            if extracted is None:
+                raise ValueError(f"failed to read archive member: {member.name}")
             raw = extracted.read()
             with np.load(BytesIO(raw), allow_pickle=False) as payload:
                 keys = tuple(sorted(payload.files))
@@ -1017,8 +1017,9 @@ def validate_official_point_cloud_source_pilot(payload: Mapping[str, Any]) -> No
         == _payload_sha256(payload, digest_field="result_sha256"),
         "result checksum mismatch",
     )
-    boundary = payload.get("information_boundary")
-    _require(isinstance(boundary, Mapping), "result boundary is missing")
+    boundary_raw = payload.get("information_boundary")
+    _require(isinstance(boundary_raw, Mapping), "result boundary is missing")
+    boundary = cast(Mapping[str, Any], boundary_raw)
     _require(
         boundary.get("source_only") is True
         and boundary.get("forbidden_episode_payloads_read") is False
@@ -1029,11 +1030,12 @@ def validate_official_point_cloud_source_pilot(payload: Mapping[str, Any]) -> No
         and boundary.get("paper_claim_authorized") is False,
         "result crossed a source, data, or claim boundary",
     )
-    episodes = payload.get("episode_records")
+    episodes_raw = payload.get("episode_records")
     _require(
-        isinstance(episodes, list) and len(episodes) >= 3,
+        isinstance(episodes_raw, list) and len(episodes_raw) >= 3,
         "episode records are missing",
     )
+    episodes = cast(list[Any], episodes_raw)
     episode_ids = [
         record.get("episode_id") for record in episodes if isinstance(record, Mapping)
     ]
@@ -1042,8 +1044,9 @@ def validate_official_point_cloud_source_pilot(payload: Mapping[str, Any]) -> No
         len(set(episode_ids)) == len(episode_ids),
         "episode records are duplicated",
     )
-    dataset = payload.get("dataset")
-    _require(isinstance(dataset, Mapping), "dataset record is missing")
+    dataset_raw = payload.get("dataset")
+    _require(isinstance(dataset_raw, Mapping), "dataset record is missing")
+    dataset = cast(Mapping[str, Any], dataset_raw)
     _require(
         episode_ids == dataset.get("source_episode_ids"),
         "result episode roster differs from the source roster",
@@ -1053,8 +1056,11 @@ def validate_official_point_cloud_source_pilot(payload: Mapping[str, Any]) -> No
         & set(cast(Sequence[int], dataset.get("forbidden_episode_ids"))),
         "result includes a forbidden episode",
     )
+    decision_raw = payload.get("decision")
+    _require(isinstance(decision_raw, Mapping), "decision record is missing")
+    decision = cast(Mapping[str, Any], decision_raw)
     _require(
-        payload.get("decision", {}).get("paper_claim_authorized") is False,
+        decision.get("paper_claim_authorized") is False,
         "pilot result authorized a paper claim",
     )
 
