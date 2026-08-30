@@ -200,22 +200,8 @@ def test_rejects_staging_after_registered_action_changes(tmp_path: Path) -> None
     assert not (dataset / "contact_node_sets").exists()
 
 
-def test_workflow_is_narrowly_authorized_and_keeps_the_serial_manual() -> None:
-    text = WORKFLOW.read_text(encoding="utf-8")
-
-    assert "[self-hosted] stage Causal4D object-registration inputs" in text
-    assert "github.event.issue.user.login == 'FlorianPfaff'" in text
-    assert "github.event.issue.user.id == 6773539" in text
-    assert "permissions:\n  contents: read" in text
-    assert (
-        "runs-on: [self-hosted, Linux, X64, nvidia-smi, "
-        "data-causal4d-physical-v1]" in text
-    )
-    assert "stage_self_hosted_object_registration_inputs.py" in text
-    assert "ready_except_physical_serial" in text
-    assert "physical_instance_serial" in text
-    assert "object_registration_json_created" in text
-    assert "secrets." not in text
+def test_superseded_staging_workflow_is_removed() -> None:
+    assert not WORKFLOW.exists()
 
 
 def test_documentation_preserves_object_registration_claim_boundary() -> None:
