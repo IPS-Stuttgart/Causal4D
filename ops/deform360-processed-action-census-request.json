@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "request_id": "causal4d-deform360-processed-action-census-v1-run-1",
+  "enabled": true,
+  "protocol_id": "causal4d-deform360-processed-action-census-v1",
+  "config_sha256": "d07cf785c4f7fbeeb46556fb3dd7ba99ac20c2d59ec2b459d0a0a551dd126135",
+  "source_bundle_audit_id": "7ad71382a8234676aa02f203317bc8788aba96da5a2eb2a9ee12f1693ae89d80",
+  "source_bundle_metadata_manifest_sha256": "9e98b067419dfbbe4d3fdd75b8b56f108a52e58037e2e14e0998c1ae86b46a1d",
+  "processed_root": "/mnt/seagate10tb/florianpfaff/datasets/deform360/processed-repository/processed",
+  "runner_label": "gpuserver4090",
+  "metadata_json_authorized": true,
+  "point_cloud_payloads_authorized": false,
+  "robot_arrays_authorized": false,
+  "tactile_payloads_authorized": false,
+  "video_payloads_authorized": false,
+  "target_outcomes_authorized": false,
+  "dataset_mutation_authorized": false
+}
