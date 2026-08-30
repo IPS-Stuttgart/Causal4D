@@ -22,13 +22,7 @@
       "workflow": "acquisition-readiness-self-hosted.yml",
       "job": "inspect",
       "authorization_model": "main-only",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi",
-        "data-causal4d-physical-v1"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi", "data-causal4d-physical-v1"],
       "purpose": "Read-only registered acquisition readiness and interface qualification",
       "dataset_access": "registered-local-preacquisition-read-only",
       "secrets_allowed": false
@@ -37,13 +31,7 @@
       "workflow": "automatable-preacquisition-self-hosted.yml",
       "job": "execute",
       "authorization_model": "main-only",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi",
-        "data-causal4d-physical-v1"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi", "data-causal4d-physical-v1"],
       "purpose": "Execute one exact allowlisted nonphysical registered next action",
       "dataset_access": "registered-local-preacquisition-single-template-write",
       "secrets_allowed": false
@@ -52,27 +40,25 @@
       "workflow": "bootstrap-single-operator-v5-self-hosted.yml",
       "job": "bootstrap",
       "authorization_model": "single-operator-v5-issue-main",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi",
-        "data-causal4d-physical-v1"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi", "data-causal4d-physical-v1"],
       "purpose": "Create or revalidate the fresh v5 single-operator acquisition scaffold",
       "dataset_access": "registered-local-preacquisition-v5-owner-identity-bootstrap",
+      "secrets_allowed": false
+    },
+    {
+      "workflow": "complete-deformable-dataset-admission.yml",
+      "job": "source-inventory",
+      "authorization_model": "main-only",
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi", "gpuserver4090"],
+      "purpose": "Read-only source admission for complete DOT, Tracking Cloth Deformation, and DEFORM DLO4/DLO5 layouts",
+      "dataset_access": "source-only-file-metadata-text-manifests-numpy-headers-and-zip-central-directories",
       "secrets_allowed": false
     },
     {
       "workflow": "contact-posterior-concentration.yml",
       "job": "evaluate",
       "authorization_model": "main-only",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi"],
       "purpose": "Fresh-seed source-only concentration diagnostic",
       "dataset_access": "none",
       "secrets_allowed": false
@@ -81,12 +67,7 @@
       "workflow": "contact-posterior-diagnostics.yml",
       "job": "diagnose",
       "authorization_model": "main-only",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi"],
       "purpose": "Independent-seed controlled contact-posterior diagnostics",
       "dataset_access": "none",
       "secrets_allowed": false
@@ -95,12 +76,7 @@
       "workflow": "contact-topology-covariance.yml",
       "job": "evaluate",
       "authorization_model": "main-only",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi"],
       "purpose": "Sealed dual-lane topology-covariance reproduction",
       "dataset_access": "none",
       "secrets_allowed": false
@@ -109,12 +85,7 @@
       "workflow": "controlled-demo-video.yml",
       "job": "render",
       "authorization_model": "main-only",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "collaborator-demo"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "collaborator-demo"],
       "purpose": "Controlled collaborator presentation bundle",
       "dataset_access": "none",
       "secrets_allowed": false
@@ -123,13 +94,7 @@
       "workflow": "correct-operator-registry-self-hosted.yml",
       "job": "correct",
       "authorization_model": "main-only",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi",
-        "data-causal4d-physical-v1"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi", "data-causal4d-physical-v1"],
       "purpose": "Replace the unsupported roster with the single real participant",
       "dataset_access": "registered-local-preacquisition-operator-registry-correction",
       "secrets_allowed": false
@@ -138,13 +103,7 @@
       "workflow": "deform360-contact-support.yml",
       "job": "source-diagnostic",
       "authorization_model": "main-only",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi",
-        "data-deform360-v1"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi", "data-deform360-v1"],
       "purpose": "Locked Deform360 source contact/support diagnostic",
       "dataset_access": "approved-source-only-deform360",
       "secrets_allowed": false
@@ -153,13 +112,7 @@
       "workflow": "deform360-filament-support.yml",
       "job": "source-diagnostic",
       "authorization_model": "main-only",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi",
-        "data-deform360-v1"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi", "data-deform360-v1"],
       "purpose": "Locked Deform360 source filament-support diagnostic",
       "dataset_access": "approved-source-only-deform360",
       "secrets_allowed": false
@@ -168,13 +121,7 @@
       "workflow": "deform360-prefix-kinematics.yml",
       "job": "source-diagnostic",
       "authorization_model": "main-only",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi",
-        "data-deform360-v1"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi", "data-deform360-v1"],
       "purpose": "Locked Deform360 source prefix-kinematics diagnostic",
       "dataset_acess": "approved-source-only-deform360",
       "secrets_allowed": false
@@ -183,13 +130,7 @@
       "workflow": "deform360-reset-mechanics.yml",
       "job": "source-diagnostic",
       "authorization_model": "main-only",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi",
-        "gpuserver4090"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi", "gpuserver4090"],
       "purpose": "Locked Deform360 source reset-mechanics diagnostic on gpuserver4090",
       "dataset_acess": "approved-source-only-deform360-read-only-inventory-and-derived-evaluation",
       "secrets_allowed": false
@@ -198,12 +139,7 @@
       "workflow": "optional-integrations.yml",
       "job": "gpu",
       "authorization_model": "main-only",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi"],
       "purpose": "Optional CUDA/Warp integration smoke",
       "dataset_access": "none",
       "secrets_allowed": false
@@ -212,12 +148,7 @@
       "workflow": "prepared-joint-observation-self-hosted.yml",
       "job": "validate",
       "authorization_model": "maintainer-issue-main",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi"],
       "purpose": "Installed-wheel prepared joint-observation parity and scale validation",
       "dataset_access": "none",
       "secrets_allowed": false
@@ -226,13 +157,7 @@
       "workflow": "reprovision-v5-checkout-self-hosted.yml",
       "job": "reprovision",
       "authorization_model": "v5-checkout-reprovision-issue-main",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi",
-        "data-causal4d-physical-v1"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi", "data-causal4d-physical-v1"],
       "purpose": "Atomically replace a stale clean pre-freeze v5 acquisition checkout",
       "dataset_access": "registered-local-preacquisition-v5-checkout-replacement-with-byte-verification",
       "secrets_allowed": false
@@ -241,12 +166,7 @@
       "workflow": "self-hosted-evaluation.yml",
       "job": "evaluate",
       "authorization_model": "main-only",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi"],
       "purpose": "Higher-powered controlled and GPU diagnostics",
       "dataset_access": "none",
       "secrets_allowed": false
@@ -255,13 +175,7 @@
       "workflow": "stage-object-registration-inputs-self-hosted.yml",
       "job": "stage",
       "authorization_model": "object-registration-input-stage-issue-main",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi",
-        "data-causal4d-physical-v1"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi", "data-causal4d-physical-v1"],
       "purpose": "Stage exact approved source-only node sets before manual object registration",
       "dataset_access": "registered-local-preacquisition-object-registration-node-set-stage",
       "secrets_allowed": false
@@ -270,13 +184,7 @@
       "workflow": "workstation2-evaluation.yml",
       "job": "evaluate",
       "authorization_model": "main-only",
-      "runner_labels": [
-        "self-hosted",
-        "Linux",
-        "X64",
-        "nvidia-smi",
-        "host-workstation2"
-      ],
+      "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi", "host-workstation2"],
       "purpose": "CUDA qualification and controlled replication",
       "dataset_access": "none",
       "secrets_allowed": false
