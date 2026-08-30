@@ -50,7 +50,11 @@ released reconstructed point trajectories. It does not establish held-out target
 transfer, unseen-object generalization, calibrated real physical uncertainty,
 Prob4D provider competence, online robot probing, or safety.
 
-## Execution
+## Validation and execution
+
+The source implementation and focused synthetic tests are checked with the pinned
+repository Ruff formatter, Ruff linting, mypy, and pytest before the request may
+reach the self-hosted lane.
 
 The reviewed workflow runs on
 `[self-hosted, Linux, X64, nvidia-smi, gpuserver4090]` and reads
