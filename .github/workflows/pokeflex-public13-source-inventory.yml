@@ -1,0 +1,71 @@
+name: PokeFlex public13 source inventory
+
+on:
+  push:
+    branches:
+      - science/public-deformable-dataset-admissibility-20260831
+    paths:
+      - .github/workflows/pokeflex-public13-source-inventory.yml
+      - scripts/remote/inventory_pokeflex_public13.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pokeflex-public13-source-inventory-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inventory:
+    name: Source-authorized PokeFlex 13-pair inventory
+    runs-on: [self-hosted, Linux, X64, gpuserver6000]
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact reviewed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Verify clean checkout and script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+          /usr/bin/python3 -m py_compile scripts/remote/inventory_pokeflex_public13.py
+
+      - name: Inventory input robot records and target structure only
+        shell: bash
+        run: |
+          set -euo pipefail
+          input=/mnt/lexar4tb/datasets/pokeflex/inputs
+          target=/mnt/lexar4tb/datasets/pokeflex/targets
+          test -d "$input"
+          test -d "$target"
+          output=pokeflex-public13-source-inventory
+          mkdir -p "$output"
+          /usr/bin/python3 scripts/remote/inventory_pokeflex_public13.py \
+            --inputs "$input" \
+            --targets "$target" \
+            --output "$output/inventory.json"
+          {
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "revision=${GITHUB_SHA}"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "runner=${RUNNER_NAME}"
+            echo "inputs=$(readlink -f "$input")"
+            echo "targets=$(readlink -f "$target")"
+            uname -a
+          } > "$output/runner.txt"
+          sha256sum "$output"/* > "$output/SHA256SUMS"
+
+      - name: Upload bounded source inventory
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pokeflex-public13-source-inventory-${{ github.run_id }}
+          path: pokeflex-public13-source-inventory
+          if-no-files-found: error
+          retention-days: 30
