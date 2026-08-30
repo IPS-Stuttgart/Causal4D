@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "request": "run-deform360-official-pcd-hosted-replication",
+  "enabled": true,
+  "workflow": "deform360-official-pcd-hosted-replication.yml",
+  "ref": "main",
+  "protocol_id": "causal4d-deform360-official-pcd-hosted-replication-v1",
+  "method_protocol_id": "causal4d-deform360-official-pcd-source-pilot-v1",
+  "config_sha256": "801f856de3988161308b35b6fbf00aa617801d1928e7a7dc83b16bba89f32d92",
+  "request_id": "2026-08-30-deform360-official-pcd-hosted-replication-v1"
+}
