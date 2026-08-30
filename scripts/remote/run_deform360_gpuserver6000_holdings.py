@@ -127,9 +127,9 @@ def _metadata_fingerprint(root: Path) -> dict[str, Any]:
         else:
             kind = "other"
         digest.update(
-            (
-                f"{relative}\0{kind}\0{stat.st_size}\0{stat.st_mtime_ns}\n"
-            ).encode("utf-8")
+            (f"{relative}\0{kind}\0{stat.st_size}\0{stat.st_mtime_ns}\n").encode(
+                "utf-8"
+            )
         )
     return {
         "root": str(root),

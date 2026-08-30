@@ -4,27 +4,20 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OPERATIONAL = (
-    ROOT / ".github/workflows/deform360-public-holdings-gpuserver6000.yml"
-)
+OPERATIONAL = ROOT / ".github/workflows/deform360-public-holdings-gpuserver6000.yml"
 DISPATCHER = ROOT / ".github/workflows/deform360-public-holdings-file-dispatch.yml"
 REQUEST = ROOT / "ops/deform360-gpuserver6000-request.json"
-CONFIG = (
-    ROOT
-    / "configs/causal4d_public/deform360_gpuserver6000_holdings_v1.json"
-)
+CONFIG = ROOT / "configs/causal4d_public/deform360_gpuserver6000_holdings_v1.json"
 
 
 def test_operational_workflow_is_main_only_and_uses_gpuserver6000() -> None:
     text = OPERATIONAL.read_text(encoding="utf-8")
     assert "github.event_name == 'workflow_dispatch'" in text
     assert "github.ref == 'refs/heads/main'" in text
-    assert (
-        "runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver6000]" in text
-    )
+    assert "runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver6000]" in text
     assert "ref: ${{ github.sha }}" in text
     assert "persist-credentials: false" in text
-    assert "test -z \"$(git status --porcelain=v1)\"" in text
+    assert 'test -z "$(git status --porcelain=v1)"' in text
     assert "secrets." not in text
 
 
@@ -34,9 +27,7 @@ def test_workflow_uses_read_only_sources_and_isolated_output() -> None:
     raw_paths = {item["path"] for item in config["roots"]}
     output = config["derived_output_root"]
 
-    assert output == (
-        "/mnt/lexar4tb/datasets/deform360/causal4d-public-expansion-v1"
-    )
+    assert output == ("/mnt/lexar4tb/datasets/deform360/causal4d-public-expansion-v1")
     assert output in text
     for path in raw_paths:
         assert path != output

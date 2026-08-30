@@ -77,8 +77,7 @@ def load_config(path: Path) -> dict[str, Any]:
     _require(isinstance(value, dict), "config must be a JSON object")
     _require(value.get("schema_version") == 1, "unsupported config schema")
     _require(
-        value.get("protocol_id")
-        == "causal4d-deform360-gpuserver6000-holdings-v1",
+        value.get("protocol_id") == "causal4d-deform360-gpuserver6000-holdings-v1",
         "unexpected protocol id",
     )
     _require(value.get("runner_label") == "gpuserver6000", "unexpected runner")
@@ -277,10 +276,9 @@ def _processed_episode_record(path: Path) -> dict[str, Any]:
     for child in _safe_children(path):
         if not child.is_dir():
             continue
-        if (
-            (child / "undistorted.mp4").is_file()
-            and (child / "aligned_timestamps.txt").is_file()
-        ):
+        if (child / "undistorted.mp4").is_file() and (
+            child / "aligned_timestamps.txt"
+        ).is_file():
             camera_count += 1
         if (child / "synced_tactile.npy").is_file():
             tactile_count += 1
@@ -379,25 +377,16 @@ def build_report(config: Mapping[str, Any]) -> dict[str, Any]:
         str(item) for item in config["expected_gpuserver6000_object_ids"]
     )
     exact_ids = sorted(
-        {
-            item["object_id"]
-            for item in raw_records
-            if item["exact_raw_candidate"]
-        }
+        {item["object_id"] for item in raw_records if item["exact_raw_candidate"]}
     )
     ten_raw_ids = sorted(
-        {
-            item["object_id"]
-            for item in raw_records
-            if item["ten_episode_candidate"]
-        }
+        {item["object_id"] for item in raw_records if item["ten_episode_candidate"]}
     )
     single_ids = sorted(
         {
             item["object_id"]
             for item in raw_records
-            if item["classification"]
-            == "single_episode_multiview_tactile_calibration"
+            if item["classification"] == "single_episode_multiview_tactile_calibration"
         }
     )
     ten_processed_ids = sorted(
