@@ -5,24 +5,20 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/task-conditioned-format-capsule.yml"
-      - "src/causal4d/task_conditioned_design.py"
-      - "scripts/experiments/task_conditioned_probe_value.py"
-      - "scripts/ci/verify_task_conditioned_probe_value.py"
-      - "tests/test_task_conditioned_design.py"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   format-capsule:
-    name: Produce exact formatted source capsule
+    name: Apply exact formatted source capsule
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
+          ref: ${{ github.head_ref }}
+          persist-credentials: true
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.10"
@@ -35,14 +31,20 @@ jobs:
             scripts/experiments/task_conditioned_probe_value.py \
             scripts/ci/verify_task_conditioned_probe_value.py \
             tests/test_task_conditioned_design.py
-      - name: Upload exact formatted files
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: task-conditioned-formatted-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            src/causal4d/task_conditioned_design.py
-            scripts/experiments/task_conditioned_probe_value.py
-            scripts/ci/verify_task_conditioned_probe_value.py
+      - name: Commit exact formatter output to this PR branch
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/causal4d/task_conditioned_design.py \
+            scripts/experiments/task_conditioned_probe_value.py \
+            scripts/ci/verify_task_conditioned_probe_value.py \
             tests/test_task_conditioned_design.py
-          if-no-files-found: error
-          retention-days: 1
+          if git diff --cached --quiet; then
+            echo "No formatting changes remain."
+            exit 0
+          fi
+          git commit -m "Format task-conditioned probe-value sources"
+          git push origin "HEAD:${BRANCH}"
