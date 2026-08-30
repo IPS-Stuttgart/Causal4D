@@ -1,0 +1,108 @@
+name: Publish DEFORM DLO4 and DLO5 public result
+
+on:
+  workflow_run:
+    workflows:
+      - DEFORM DLO4 and DLO5 public evaluation on gpuserver4090
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: publish-deform-dlo45-public-result
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish deterministic public-data evidence snapshot
+    if: >-
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out current main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Download the completed evaluation artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _published_artifact
+          artifact_json="$(gh api "repos/${REPOSITORY}/actions/runs/${RUN_ID}/artifacts")"
+          artifact_url="$(printf '%s' "${artifact_json}" | jq -r '
+            [.artifacts[] | select(.name | startswith("deform-dlo45-public-evaluation-"))]
+            | if length == 1 then .[0].archive_download_url else error("expected one artifact") end
+          ')"
+          gh api "${artifact_url}" > _published_artifact/artifact.zip
+          unzip -q _published_artifact/artifact.zip -d _published_artifact/unpacked
+          test -f _published_artifact/unpacked/evidence.json
+          test -f _published_artifact/unpacked/report.md
+
+      - name: Validate and stage the snapshot
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          destination="evidence/automated/deform-dlo45-public"
+          mkdir -p "${destination}"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          source = Path("_published_artifact/unpacked/evidence.json")
+          evidence = json.loads(source.read_text(encoding="utf-8"))
+          assert evidence["artifact_kind"] == "Causal4DDeformDLO45PublicEvaluationV1"
+          assert evidence["information_boundary"]["public_data_only"] is True
+          assert evidence["information_boundary"]["new_physical_data_collected"] is False
+          assert evidence["repository_revision"] == os.environ["HEAD_SHA"]
+          destination = Path("evidence/automated/deform-dlo45-public")
+          (destination / "latest.json").write_text(
+              json.dumps(evidence, indent=2, sort_keys=True, allow_nan=False) + "\n",
+              encoding="utf-8",
+          )
+          (destination / "latest.md").write_text(
+              Path("_published_artifact/unpacked/report.md").read_text(encoding="utf-8"),
+              encoding="utf-8",
+          )
+          metadata = {
+              "schema_version": 1,
+              "workflow_run_id": int(os.environ["RUN_ID"]),
+              "workflow_run_url": os.environ["RUN_URL"],
+              "evaluated_revision": os.environ["HEAD_SHA"],
+              "decision": evidence["decision"],
+              "claim_eligible": evidence["claim_eligible"],
+          }
+          (destination / "latest-run.json").write_text(
+              json.dumps(metadata, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Commit the evidence snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add evidence/automated/deform-dlo45-public/
+          if git diff --cached --quiet; then
+            echo "Snapshot is unchanged."
+            exit 0
+          fi
+          git commit -m "Publish DEFORM DLO4/DLO5 public result [skip ci]"
+          git pull --rebase origin main
+          git push origin HEAD:main
