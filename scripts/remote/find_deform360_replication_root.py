@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+from collections.abc import Iterator
 from pathlib import Path
 
 
@@ -14,10 +15,49 @@ _REQUIRED = (
     Path("aligned/170-spider/episode_0000/robot/robot.npz"),
     Path("observations/170-spider/episode_0000/sampled_hulls.json"),
 )
+_DEFAULT_CANDIDATES = (
+    Path("/home/florianpfaff/codex-runs/deform360-replication-locked-v1"),
+    Path("/home/github-runner/.cache/datasets/deform360"),
+    Path("/home/github-runner/.cache/datasets/deform360/derived"),
+    Path("/home/florianpfaff/deform360-fresh-source-processed-v1-1a3f9b1"),
+    Path("/mnt/seagate10tb/florianpfaff/datasets/deform360"),
+    Path("/mnt/seagate10tb/florianpfaff/datasets/deform360/derived"),
+    Path(
+        "/mnt/seagate10tb/florianpfaff/datasets/deform360/"
+        "deform360-replication-locked-v1"
+    ),
+)
+_SEARCH_PARENTS = (
+    Path("/home/github-runner/.cache/datasets"),
+    Path("/home/florianpfaff/codex-runs"),
+    Path("/home/florianpfaff"),
+    Path("/mnt/seagate10tb/florianpfaff/datasets/deform360"),
+)
 
 
 def _valid(root: Path) -> bool:
     return root.is_dir() and all((root / path).is_file() for path in _REQUIRED)
+
+
+def _bounded_candidates(parent: Path) -> Iterator[Path]:
+    """Yield plausible roots without recursively scanning raw video trees."""
+
+    if not parent.is_dir():
+        return
+    yield parent
+    try:
+        children = tuple(sorted(path for path in parent.iterdir() if path.is_dir()))
+    except OSError:
+        return
+    yield from children
+    for child in children:
+        if child.name in {"raw", "processed", ".cache", ".git"}:
+            continue
+        try:
+            grandchildren = sorted(path for path in child.iterdir() if path.is_dir())
+        except OSError:
+            continue
+        yield from grandchildren
 
 
 def _parse_args() -> argparse.Namespace:
@@ -39,31 +79,23 @@ def main() -> None:
         print(root)
         return
 
-    candidates = list(args.candidates)
-    candidates.extend(
-        [
-            Path("/home/florianpfaff/codex-runs/deform360-replication-locked-v1"),
-            Path("/home/github-runner/.cache/datasets/deform360"),
-            Path("/home/github-runner/.cache/datasets/deform360/derived"),
-        ]
-    )
+    candidates = [*args.candidates, *_DEFAULT_CANDIDATES]
+    seen: set[Path] = set()
     for candidate in candidates:
         root = candidate.expanduser().resolve()
+        if root in seen:
+            continue
+        seen.add(root)
         if _valid(root):
             print(root)
             return
 
     matches: dict[Path, None] = {}
-    for parent in (
-        Path("/home/github-runner/.cache/datasets"),
-        Path("/home/florianpfaff/codex-runs"),
-    ):
-        if not parent.is_dir():
-            continue
-        for hull in parent.glob(
-            "**/observations/002-rope-silk/episode_0000/sampled_hulls.json"
-        ):
-            root = hull.parents[3].resolve()
+    for parent in _SEARCH_PARENTS:
+        for root in _bounded_candidates(parent.expanduser().resolve()):
+            if root in seen:
+                continue
+            seen.add(root)
             if _valid(root):
                 matches[root] = None
     if len(matches) != 1:

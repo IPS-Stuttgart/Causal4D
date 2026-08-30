@@ -7,6 +7,7 @@ on:
       - ".github/workflows/deform360-reset-mechanics.yml"
       - "configs/causal4d_public/deform360_reset_mechanics_v1.json"
       - "docs/causal4d_deform360_reset_mechanics.md"
+      - "scripts/remote/find_deform360_replication_root.py"
       - "scripts/remote/run_deform360_reset_mechanics.py"
       - "scripts/remote/run_deform360_reset_mechanics_workflow.sh"
       - "src/causal4d_public/deform360_reset_mechanics.py"
@@ -17,6 +18,7 @@ on:
     paths:
       - ".github/workflows/deform360-reset-mechanics.yml"
       - "configs/causal4d_public/deform360_reset_mechanics_v1.json"
+      - "scripts/remote/find_deform360_replication_root.py"
       - "scripts/remote/run_deform360_reset_mechanics.py"
       - "scripts/remote/run_deform360_reset_mechanics_workflow.sh"
       - "src/causal4d_public/deform360_reset_mechanics.py"
@@ -65,6 +67,7 @@ jobs:
       - name: Check the diagnostic surface
         run: |
           files=(
+            scripts/remote/find_deform360_replication_root.py
             scripts/remote/run_deform360_reset_mechanics.py
             src/causal4d_public/deform360_reset_mechanics.py
             tests/test_deform360_reset_mechanics.py
@@ -73,6 +76,7 @@ jobs:
           python -m ruff check "${files[@]}"
           python -m ruff format --check "${files[@]}"
           python -m mypy --no-site-packages \
+            scripts/remote/find_deform360_replication_root.py \
             src/causal4d_public/deform360_reset_mechanics.py \
             scripts/remote/run_deform360_reset_mechanics.py
           bash -n scripts/remote/run_deform360_reset_mechanics_workflow.sh
@@ -93,9 +97,10 @@ jobs:
       github.ref == 'refs/heads/main' &&
       inputs.run_source_diagnostic
     needs: contract
-    runs-on: [self-hosted, Linux, X64, nvidia-smi, data-deform360-v1]
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]
     timeout-minutes: 480
     env:
+      DEFORM360_DOWNLOAD_ROOT: /mnt/seagate10tb/florianpfaff/datasets/deform360
       DEFORM360_REPLICATION_ROOT: ${{ inputs.data_root }}
     steps:
       - name: Check out exact reviewed Causal4D revision
@@ -122,7 +127,142 @@ jobs:
             '{"schema_version":1,"state":"initialized","head_sha":"'"${GITHUB_SHA}"'","run_id":"'"${GITHUB_RUN_ID}"'"}' \
             > deform360-reset-mechanics/status.json
 
+      - name: Inventory mounted Deform360 data
+        id: dataset
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          download_root = Path(os.environ["DEFORM360_DOWNLOAD_ROOT"]).resolve()
+          raw_root = download_root / "raw"
+          processed_root = download_root / "processed"
+          cohort = (
+              "002-rope-silk",
+              "081-stripe-rope",
+              "085-scarf-cloth",
+              "083-blanket-cloth",
+              "092-squirrel",
+              "170-spider",
+          )
+
+          def directories(root: Path) -> list[str]:
+              if not root.is_dir():
+                  return []
+              try:
+                  return sorted(path.name for path in root.iterdir() if path.is_dir())
+              except OSError:
+                  return []
+
+          configured = os.environ.get("DEFORM360_REPLICATION_ROOT", "").strip()
+          command = [
+              "/usr/bin/python3",
+              "scripts/remote/find_deform360_replication_root.py",
+          ]
+          environment = dict(os.environ)
+          if not configured:
+              environment.pop("DEFORM360_REPLICATION_ROOT", None)
+          resolution = subprocess.run(
+              command,
+              check=False,
+              capture_output=True,
+              text=True,
+              env=environment,
+          )
+          resolved = resolution.stdout.strip() if resolution.returncode == 0 else ""
+
+          raw_objects = directories(raw_root)
+          processed_objects = directories(processed_root)
+          report = {
+              "schema_version": 1,
+              "artifact_kind": "Causal4DDeform360MountedDataInventory",
+              "download_root": str(download_root),
+              "download_root_exists": download_root.is_dir(),
+              "configured_derived_root": configured or None,
+              "derived_root_ready": bool(resolved),
+              "resolved_derived_root": resolved or None,
+              "resolution_returncode": resolution.returncode,
+              "resolution_stderr": resolution.stderr.strip() or None,
+              "raw_object_count": len(raw_objects),
+              "processed_object_count": len(processed_objects),
+              "cohort_raw_presence": {name: name in raw_objects for name in cohort},
+              "cohort_processed_presence": {
+                  name: name in processed_objects for name in cohort
+              },
+              "top_level_directories": directories(download_root),
+              "source_only": True,
+              "future_outcomes_read": False,
+              "dataset_modified": False,
+          }
+          Path("deform360-reset-mechanics/download-inventory.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          output = Path(os.environ["GITHUB_OUTPUT"])
+          with output.open("a", encoding="utf-8") as stream:
+              stream.write(f"ready={'true' if resolved else 'false'}\n")
+              if resolved:
+                  stream.write(f"root={resolved}\n")
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "commit=${GITHUB_SHA}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            uname -a
+            nvidia-smi -L
+            df -h "${DEFORM360_DOWNLOAD_ROOT}"
+          } > deform360-reset-mechanics/runner.txt
+
+      - name: Record derived-data readiness
+        if: steps.dataset.outputs.ready != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          Path("deform360-reset-mechanics/status.json").write_text(
+              json.dumps(
+                  {
+                      "schema_version": 1,
+                      "state": "download_present_derived_layout_not_ready",
+                      "head_sha": os.environ["GITHUB_SHA"],
+                      "run_id": os.environ["GITHUB_RUN_ID"],
+                      "source_only": True,
+                      "future_outcomes_read": False,
+                      "dataset_modified": False,
+                  },
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Export resolved derived-data root
+        if: steps.dataset.outputs.ready == 'true'
+        shell: bash
+        env:
+          RESOLVED_ROOT: ${{ steps.dataset.outputs.root }}
+        run: |
+          set -euo pipefail
+          test -n "${RESOLVED_ROOT}"
+          echo "DEFORM360_REPLICATION_ROOT=${RESOLVED_ROOT}" >> "$GITHUB_ENV"
+
       - name: Select the conditional reproduction runtime
+        if: steps.dataset.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -135,6 +275,7 @@ jobs:
           echo "RESET_MECHANICS_PYTHON=${selected}" >> "$GITHUB_ENV"
 
       - name: Read locked repository pins
+        if: steps.dataset.outputs.ready == 'true'
         id: repository-pins
         shell: bash
         run: |
@@ -166,6 +307,7 @@ jobs:
           PY
 
       - name: Check out pinned public BayesianPhysTwin
+        if: steps.dataset.outputs.ready == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: IPS-Stuttgart/BayesianPhysTwin
@@ -175,6 +317,7 @@ jobs:
           clean: true
 
       - name: Check out pinned Deform360 code
+        if: steps.dataset.outputs.ready == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: lhy0807/deform360
@@ -184,6 +327,7 @@ jobs:
           clean: true
 
       - name: Check out pinned official PhysTwin
+        if: steps.dataset.outputs.ready == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Jianghanxiao/PhysTwin
@@ -193,6 +337,7 @@ jobs:
           clean: true
 
       - name: Run locked source diagnostic
+        if: steps.dataset.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -232,6 +377,36 @@ jobs:
             echo "### Deform360 observed-reset mechanics"
             echo
             echo "- Head: \`${GITHUB_SHA}\`"
+            /usr/bin/python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          inventory_path = Path(
+              "deform360-reset-mechanics/download-inventory.json"
+          )
+          if inventory_path.is_file():
+              inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+              print(
+                  "- Download root: "
+                  f"`{inventory['download_root']}` "
+                  f"(exists={inventory['download_root_exists']})"
+              )
+              print(
+                  "- Raw objects visible: "
+                  f"`{inventory['raw_object_count']}`; "
+                  "processed objects visible: "
+                  f"`{inventory['processed_object_count']}`"
+              )
+              print(
+                  "- Derived layout ready: "
+                  f"`{inventory['derived_root_ready']}`"
+              )
+              if inventory["resolved_derived_root"]:
+                  print(
+                      "- Resolved derived root: "
+                      f"`{inventory['resolved_derived_root']}`"
+                  )
+          PY
             if [[ -f deform360-reset-mechanics/result.json ]]; then
               "$RESET_MECHANICS_PYTHON" - <<'PY'
           import json
@@ -257,7 +432,7 @@ jobs:
               )
           PY
             else
-              echo "- Diagnostic stopped before producing result.json."
+              echo "- No derived-data result was produced in this run."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
