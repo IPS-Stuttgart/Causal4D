@@ -43,6 +43,30 @@ GLOB_ROOTS = {
 }
 
 
+def _child_entry(child: Path) -> dict[str, object]:
+    result: dict[str, object] = {"name": child.name}
+    try:
+        info = child.lstat()
+    except OSError as exc:
+        result["error"] = repr(exc)
+        return result
+    result.update(
+        {
+            "mode": stat.filemode(info.st_mode),
+            "size_bytes": info.st_size,
+            "is_symlink": stat.S_ISLNK(info.st_mode),
+        }
+    )
+    try:
+        result["is_dir"] = child.is_dir()
+        result["is_file"] = child.is_file()
+    except OSError as exc:
+        result["target_error"] = repr(exc)
+        result["is_dir"] = False
+        result["is_file"] = False
+    return result
+
+
 def entry(path: Path) -> dict[str, object]:
     result: dict[str, object] = {"path": str(path)}
     try:
@@ -50,6 +74,13 @@ def entry(path: Path) -> dict[str, object]:
     except OSError as exc:
         result.update({"exists": False, "error": repr(exc)})
         return result
+    try:
+        is_directory = path.is_dir()
+        is_file = path.is_file()
+    except OSError as exc:
+        is_directory = False
+        is_file = False
+        result["target_error"] = repr(exc)
     result.update(
         {
             "exists": True,
@@ -57,15 +88,15 @@ def entry(path: Path) -> dict[str, object]:
             "uid": info.st_uid,
             "gid": info.st_gid,
             "size_bytes": info.st_size,
-            "is_symlink": path.is_symlink(),
+            "is_symlink": stat.S_ISLNK(info.st_mode),
             "resolved": str(path.resolve(strict=False)),
             "readable": os.access(path, os.R_OK),
             "executable": os.access(path, os.X_OK),
-            "is_directory": path.is_dir(),
-            "is_file": path.is_file(),
+            "is_directory": is_directory,
+            "is_file": is_file,
         }
     )
-    if not path.is_dir():
+    if not is_directory:
         return result
     try:
         children = sorted(path.iterdir(), key=lambda item: item.name.lower())
@@ -73,22 +104,17 @@ def entry(path: Path) -> dict[str, object]:
         result["list_error"] = repr(exc)
         return result
     result["entry_count"] = len(children)
-    result["entries"] = [
-        {
-            "name": child.name,
-            "is_dir": child.is_dir(),
-            "is_file": child.is_file(),
-            "is_symlink": child.is_symlink(),
-            "size_bytes": child.lstat().st_size,
-        }
-        for child in children[:MAX_ENTRIES]
-    ]
+    result["entries"] = [_child_entry(child) for child in children[:MAX_ENTRIES]]
     result["entries_truncated"] = len(children) > MAX_ENTRIES
     return result
 
 
 def zip_summary(path: Path) -> dict[str, object]:
-    result: dict[str, object] = {"path": str(path), "size_bytes": path.stat().st_size}
+    try:
+        size_bytes = path.stat().st_size
+    except OSError as exc:
+        return {"path": str(path), "error": repr(exc)}
+    result: dict[str, object] = {"path": str(path), "size_bytes": size_bytes}
     try:
         with zipfile.ZipFile(path) as archive:
             infos = archive.infolist()
@@ -118,12 +144,19 @@ def zip_summary(path: Path) -> dict[str, object]:
     return result
 
 
+def _is_directory(path: Path) -> bool:
+    try:
+        return path.is_dir()
+    except OSError:
+        return False
+
+
 def matching_paths(server: str) -> list[str]:
     matches: set[str] = set()
     tokens = ("poke", "deform", "cloth", "dot")
     for root_text in GLOB_ROOTS[server]:
         root = Path(root_text)
-        if not root.is_dir():
+        if not _is_directory(root):
             continue
         try:
             first_level = list(root.iterdir())
@@ -133,7 +166,7 @@ def matching_paths(server: str) -> list[str]:
             lowered = candidate.name.lower()
             if any(token in lowered for token in tokens):
                 matches.add(str(candidate))
-            if not candidate.is_dir():
+            if not _is_directory(candidate):
                 continue
             try:
                 second_level = list(candidate.iterdir())
@@ -169,8 +202,12 @@ def main() -> int:
             children = list(root.iterdir())
         except OSError:
             continue
-        for path in sorted(children)[:MAX_ENTRIES]:
-            if path.is_file() and path.name.lower().endswith(".zip"):
+        for path in sorted(children, key=lambda item: item.name.lower())[:MAX_ENTRIES]:
+            try:
+                is_zip = path.is_file() and path.name.lower().endswith(".zip")
+            except OSError:
+                is_zip = False
+            if is_zip:
                 archives.append(zip_summary(path))
                 if len(archives) >= MAX_ARCHIVES:
                     break
