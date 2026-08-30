@@ -1,0 +1,59 @@
+name: Sort self-hosted registry on Tracking Cloth branch
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/sort-self-hosted-registry-pr.yml"
+      - ".github/self-hosted-jobs.json"
+
+permissions:
+  contents: write
+
+jobs:
+  sort:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'science/tracking-cloth-task-observation-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact PR head branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          persist-credentials: true
+          clean: true
+
+      - name: Sort jobs by workflow and job identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('.github/self-hosted-jobs.json')
+          payload = json.loads(path.read_text(encoding='utf-8'))
+          jobs = payload.get('jobs')
+          if not isinstance(jobs, list):
+              raise SystemExit('registry jobs is not a list')
+          keys = [(item['workflow'], item['job']) for item in jobs]
+          if len(keys) != len(set(keys)):
+              raise SystemExit('registry contains duplicate workflow/job identities')
+          payload['jobs'] = sorted(jobs, key=lambda item: (item['workflow'], item['job']))
+          path.write_text(
+              json.dumps(payload, indent=2, sort_keys=False) + '\n',
+              encoding='utf-8',
+          )
+          PY
+          git diff --check
+          if git diff --quiet -- .github/self-hosted-jobs.json; then
+            echo 'Registry is already sorted.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/self-hosted-jobs.json
+          git commit -m 'Sort self-hosted job registry canonically'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
