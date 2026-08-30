@@ -36,8 +36,11 @@ def _readonly_float(
 
 
 def _probability(value: object, *, name: str) -> float:
-    if isinstance(value, (bool, np.bool_)):
-        raise TypeError(f"{name} must be numeric, not Boolean")
+    if isinstance(value, (bool, np.bool_)) or not isinstance(
+        value,
+        (int, float, np.integer, np.floating),
+    ):
+        raise TypeError(f"{name} must be a real numeric scalar")
     numeric = float(value)
     if not np.isfinite(numeric) or not 0.0 <= numeric <= 1.0:
         raise ValueError(f"{name} must lie in [0, 1]")
@@ -45,8 +48,11 @@ def _probability(value: object, *, name: str) -> float:
 
 
 def _nonnegative(value: object, *, name: str) -> float:
-    if isinstance(value, (bool, np.bool_)):
-        raise TypeError(f"{name} must be numeric, not Boolean")
+    if isinstance(value, (bool, np.bool_)) or not isinstance(
+        value,
+        (int, float, np.integer, np.floating),
+    ):
+        raise TypeError(f"{name} must be a real numeric scalar")
     numeric = float(value)
     if not np.isfinite(numeric) or numeric < 0.0:
         raise ValueError(f"{name} must be finite and nonnegative")
@@ -96,7 +102,7 @@ def _validate_likelihood(
 
 def _metric(value: FloatArray | None, *, dimension: int) -> FloatArray:
     if value is None:
-        result = np.eye(dimension, dtype=np.float64)
+        result: FloatArray = np.eye(dimension, dtype=np.float64)
         result.setflags(write=False)
         return result
     matrix = _readonly_float(value, name="query_metric", ndim=2).copy()
