@@ -1,0 +1,127 @@
+name: PokeFlex five-bout source gate
+
+on:
+  push:
+    branches:
+      - science/public-deformable-dataset-admissibility-20260831
+    paths:
+      - .github/workflows/pokeflex-five-bout-source-gate.yml
+      - configs/causal4d_public/pokeflex_five_bout_probe_v1_prelock.json
+      - scripts/remote/run_pokeflex_five_bout_source_gate.py
+      - tests/test_pokeflex_five_bout_source_gate.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pokeflex-five-bout-source-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install focused runtime and validate contract
+        run: |
+          python -m pip install numpy pytest
+          python -m py_compile scripts/remote/run_pokeflex_five_bout_source_gate.py
+          python -m pytest -q tests/test_pokeflex_five_bout_source_gate.py
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          path = Path("configs/causal4d_public/pokeflex_five_bout_probe_v1_prelock.json")
+          payload = json.loads(path.read_text())
+          assert payload["status"] == "source-and-calibration-authorized-target-closed"
+          assert len(payload["split_rule"]["source"]) == 5
+          assert len(payload["split_rule"]["calibration"]) == 2
+          assert len(payload["split_rule"]["sealed_target"]) == 3
+          assert not set(payload["split_rule"]["source"]) & set(payload["split_rule"]["sealed_target"])
+          print(hashlib.sha256(path.read_bytes()).hexdigest())
+          PY
+
+  source-calibration:
+    name: Source-first response gate with sealed target
+    needs: contract
+    runs-on: [self-hosted, Linux, X64, gpuserver6000]
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact reviewed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+      - name: Verify exact clean checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install bounded numerical runtime
+        run: python -m pip install numpy pytest
+      - name: Re-run focused method tests on data runner
+        run: python -m pytest -q tests/test_pokeflex_five_bout_source_gate.py
+      - name: Execute prelocked source and conditional calibration phases
+        shell: bash
+        run: |
+          set -euo pipefail
+          output=pokeflex-five-bout-source-gate
+          mkdir -p "$output"
+          python scripts/remote/run_pokeflex_five_bout_source_gate.py \
+            --prelock configs/causal4d_public/pokeflex_five_bout_probe_v1_prelock.json \
+            --output "$output/result.json" \
+            2>&1 | tee "$output/run.log"
+          {
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "revision=${GITHUB_SHA}"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "runner=${RUNNER_NAME}"
+            echo "input_root=$(readlink -f /mnt/lexar4tb/datasets/pokeflex/inputs)"
+            echo "target_root=$(readlink -f /mnt/lexar4tb/datasets/pokeflex/targets)"
+            python --version
+            python -c 'import numpy; print("numpy=" + numpy.__version__)'
+          } > "$output/runner.txt"
+      - name: Verify target remained unopened and report decision
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path("pokeflex-five-bout-source-gate/result.json")
+          report = json.loads(path.read_text())
+          assert report["sealed_target"]["directories_traversed"] is False
+          assert report["sealed_target"]["files_stat_ed"] is False
+          assert report["sealed_target"]["geometry_opened"] is False
+          target_names = report["sealed_target"]["names"]
+          for opened in report["opened_target_meshes"]:
+              assert not any(name in opened for name in target_names), opened
+          print(json.dumps({
+              "decision": report["decision"],
+              "source_passed": report["source"]["passed"],
+              "calibration_state": report["calibration"].get("state", "evaluated"),
+              "calibration_passed": report["calibration"].get("passed", False),
+              "opened_target_meshes": len(report["opened_target_meshes"]),
+          }, sort_keys=True))
+          PY
+          sha256sum pokeflex-five-bout-source-gate/* \
+            > pokeflex-five-bout-source-gate/SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pokeflex-five-bout-source-gate-${{ github.run_id }}
+          path: pokeflex-five-bout-source-gate
+          if-no-files-found: error
+          retention-days: 30
