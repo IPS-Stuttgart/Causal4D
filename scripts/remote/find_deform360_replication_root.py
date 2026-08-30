@@ -15,23 +15,29 @@ _REQUIRED = (
     Path("aligned/170-spider/episode_0000/robot/robot.npz"),
     Path("observations/170-spider/episode_0000/sampled_hulls.json"),
 )
+_MOUNT = Path("/mnt/seagate10tb/florianpfaff/datasets/deform360")
 _DEFAULT_CANDIDATES = (
     Path("/home/florianpfaff/codex-runs/deform360-replication-locked-v1"),
     Path("/home/github-runner/.cache/datasets/deform360"),
     Path("/home/github-runner/.cache/datasets/deform360/derived"),
     Path("/home/florianpfaff/deform360-fresh-source-processed-v1-1a3f9b1"),
-    Path("/mnt/seagate10tb/florianpfaff/datasets/deform360"),
-    Path("/mnt/seagate10tb/florianpfaff/datasets/deform360/derived"),
-    Path(
-        "/mnt/seagate10tb/florianpfaff/datasets/deform360/"
-        "deform360-replication-locked-v1"
-    ),
+    _MOUNT,
+    _MOUNT / "derived",
+    _MOUNT / "deform360-replication-locked-v1",
+    _MOUNT / "raw-repository",
+    _MOUNT / "raw-repository" / "raw",
+    _MOUNT / "raw-repository" / "deform360",
+    _MOUNT / "processed-repository",
+    _MOUNT / "processed-repository" / "processed",
+    _MOUNT / "processed-repository" / "deform360",
 )
 _SEARCH_PARENTS = (
     Path("/home/github-runner/.cache/datasets"),
     Path("/home/florianpfaff/codex-runs"),
     Path("/home/florianpfaff"),
-    Path("/mnt/seagate10tb/florianpfaff/datasets/deform360"),
+    _MOUNT,
+    _MOUNT / "raw-repository",
+    _MOUNT / "processed-repository",
 )
 
 
