@@ -188,10 +188,10 @@
         "Linux",
         "X64",
         "nvidia-smi",
-        "data-deform360-v1"
+        "gpuserver4090"
       ],
-      "purpose": "Locked Deform360 source reset-mechanics diagnostic",
-      "dataset_acess": "approved-source-only-deform360",
+      "purpose": "Locked Deform360 source reset-mechanics diagnostic on gpuserver4090",
+      "dataset_acess": "approved-source-only-deform360-read-only-inventory-and-derived-evaluation",
       "secrets_allowed": false
     },
     {
