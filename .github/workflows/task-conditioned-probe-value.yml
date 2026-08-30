@@ -1,0 +1,72 @@
+name: Task-conditioned probe-value mechanism
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/task-conditioned-probe-value.yml"
+      - "src/causal4d/task_conditioned_design.py"
+      - "scripts/experiments/task_conditioned_probe_value.py"
+      - "scripts/ci/verify_task_conditioned_probe_value.py"
+      - "tests/test_task_conditioned_design.py"
+      - "docs/task_conditioned_probe_value.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: task-conditioned-probe-value-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  controlled-mechanism:
+    name: Controlled task-conditioned value
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SOURCE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Causal4D development environment
+        run: python -m pip install -e ".[dev]"
+      - name: Check focused source
+        run: |
+          python -m ruff check \
+            src/causal4d/task_conditioned_design.py \
+            scripts/experiments/task_conditioned_probe_value.py \
+            scripts/ci/verify_task_conditioned_probe_value.py \
+            tests/test_task_conditioned_design.py
+          python -m mypy --python-version 3.12 \
+            src/causal4d/task_conditioned_design.py
+          python -m pytest -q tests/test_task_conditioned_design.py
+      - name: Run source-gated controlled study
+        run: |
+          python scripts/experiments/task_conditioned_probe_value.py \
+            --source-revision "$SOURCE_REVISION" \
+            --output build/task-conditioned-probe-value/result.json
+      - name: Verify mechanism and target decision
+        run: |
+          python scripts/ci/verify_task_conditioned_probe_value.py \
+            build/task-conditioned-probe-value/result.json \
+            --output-json \
+              build/task-conditioned-probe-value/verification.json
+      - name: Upload controlled result bundle
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: task-conditioned-probe-value-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/task-conditioned-probe-value/
+          if-no-files-found: error
+          retention-days: 30
