@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "Deform360ProcessedActionCensusConfig",
+  "protocol_id": "causal4d-deform360-processed-action-census-v1",
+  "status": "source-only-target-blind-metadata-census",
+  "dataset_repository": "brownu/deform360_processed",
+  "dataset_code_repository": "lhy0807/deform360",
+  "dataset_code_revision": "0fe36f0b7a7a917ba62b5f8cee707299a9a4a317",
+  "source_bundle_audit_id": "7ad71382a8234676aa02f203317bc8788aba96da5a2eb2a9ee12f1693ae89d80",
+  "source_bundle_metadata_manifest_sha256": "9e98b067419dfbbe4d3fdd75b8b56f108a52e58037e2e14e0998c1ae86b46a1d",
+  "source_bundle_audit_github_run_id": "33328148206",
+  "processed_root": "/mnt/seagate10tb/florianpfaff/datasets/deform360/processed-repository/processed",
+  "runner_label": "gpuserver4090",
+  "known_opened_object_ids": [
+    "001-rope",
+    "002-rope-silk",
+    "003-cable",
+    "004-rubber-band"
+  ],
+  "limits": {
+    "maximum_objects": 100,
+    "maximum_episodes": 1000,
+    "maximum_metadata_bytes": 1048576,
+    "maximum_nodes_per_document": 20000,
+    "maximum_depth": 12,
+    "maximum_string_characters": 512
+  },
+  "semantic_keys": {
+    "sequence_containers": [
+      "sequences",
+      "episodes",
+      "interactions",
+      "trials"
+    ],
+    "action": [
+      "action",
+      "action_label",
+      "action_name",
+      "action_description",
+      "primitive",
+      "primitive_name",
+      "interaction",
+      "interaction_name",
+      "task",
+      "task_name",
+      "motion",
+      "motion_name",
+      "description",
+      "sequence_name",
+      "sequence_description"
+    ],
+    "bimanual": [
+      "bimanual",
+      "is_bimanual",
+      "two_gripper",
+      "two_grippers",
+      "gripper_count",
+      "num_grippers"
+    ],
+    "reset_group": [
+      "reset_id",
+      "reset_group",
+      "initial_state_id",
+      "initial_condition_id",
+      "initial_configuration_id",
+      "start_state_id",
+      "start_configuration_id",
+      "reset_condition"
+    ]
+  },
+  "admission": {
+    "complete_episode_count": 10,
+    "minimum_parsed_episode_fraction": 0.95,
+    "minimum_resolved_action_fraction": 0.8,
+    "minimum_complete_object_count": 30,
+    "minimum_global_action_label_count": 4,
+    "minimum_actions_per_object": 4,
+    "minimum_objects_with_minimum_actions": 20,
+    "minimum_reset_ready_object_count": 16,
+    "minimum_reset_ready_object_fraction": 0.5
+  },
+  "information_boundary": {
+    "metadata_json_opened": true,
+    "point_cloud_payloads_opened": false,
+    "robot_arrays_opened": false,
+    "tactile_payloads_opened": false,
+    "video_payloads_opened": false,
+    "target_scores_opened": false,
+    "dataset_modified": false,
+    "paper_claim_authorized": false
+  },
+  "config_sha256": "d07cf785c4f7fbeeb46556fb3dd7ba99ac20c2d59ec2b459d0a0a551dd126135"
+}
