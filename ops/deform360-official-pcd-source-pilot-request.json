@@ -6,5 +6,5 @@
   "ref": "main",
   "processed_root": "/mnt/seagate10tb/florianpfaff/datasets/deform360/processed-repository/processed",
   "protocol_id": "causal4d-deform360-official-pcd-source-pilot-v1",
-  "request_id": "2026-08-30-gpuserver4090-official-pcd-source-pilot-v1"
+  "request_id": "2026-08-30-gpuserver4090-official-pcd-source-pilot-v2"
 }
