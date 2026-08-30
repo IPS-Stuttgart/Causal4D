@@ -42,9 +42,7 @@ def test_workflow_uses_read_only_sources_and_isolated_output() -> None:
 def test_file_change_dispatcher_is_hosted_and_fixed() -> None:
     text = DISPATCHER.read_text(encoding="utf-8")
     assert '      - "ops/deform360-gpuserver6000-request.json"' in text
-    assert (
-        '      - "ops/deform360-reset-mechanics-gpuserver4090-request.json"' in text
-    )
+    assert '      - "ops/deform360-reset-mechanics-gpuserver4090-request.json"' in text
     assert "runs-on: ubuntu-latest" in text
     assert "self-hosted" not in text
     assert "actions: write" in text
@@ -90,7 +88,7 @@ def test_reset_request_is_source_only_on_gpuserver4090() -> None:
         "DEFORM360_DOWNLOAD_ROOT: /mnt/seagate10tb/florianpfaff/datasets/deform360"
         in workflow
     )
-    assert 'github.event_name == \'workflow_dispatch\'' in workflow
+    assert "github.event_name == 'workflow_dispatch'" in workflow
     assert "source-only" in workflow.lower()
 
 
