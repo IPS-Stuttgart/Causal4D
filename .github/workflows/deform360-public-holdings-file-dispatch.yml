@@ -1,10 +1,11 @@
-name: Dispatch Deform360 public holdings from file change
+name: Dispatch reviewed Deform360 jobs from file change
 
 on:
   push:
     branches: [main]
     paths:
       - "ops/deform360-gpuserver6000-request.json"
+      - "ops/deform360-reset-mechanics-gpuserver4090-request.json"
   workflow_dispatch:
 
 permissions:
@@ -12,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: deform360-public-holdings-file-dispatch
+  group: deform360-reviewed-file-dispatch
   cancel-in-progress: false
 
 jobs:
@@ -27,7 +28,7 @@ jobs:
           persist-credentials: false
           clean: true
 
-      - name: Validate fixed request
+      - name: Select and validate one fixed request
         id: request
         shell: bash
         run: |
@@ -35,59 +36,111 @@ jobs:
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
           /usr/bin/python3 - <<'PY' >> "${GITHUB_OUTPUT}"
           import json
+          import os
           from pathlib import Path
 
-          path = Path("ops/deform360-gpuserver6000-request.json")
+          holdings_path = "ops/deform360-gpuserver6000-request.json"
+          reset_path = "ops/deform360-reset-mechanics-gpuserver4090-request.json"
+          allowed_paths = {holdings_path, reset_path}
+
+          if os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch":
+              selected_path = holdings_path
+          else:
+              event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
+              changed = set()
+              for commit in event.get("commits", []):
+                  for field in ("added", "modified", "removed"):
+                      changed.update(commit.get(field, []))
+              changed_requests = sorted(changed & allowed_paths)
+              if len(changed_requests) != 1:
+                  raise SystemExit(
+                      "push must change exactly one reviewed Deform360 request file"
+                  )
+              selected_path = changed_requests[0]
+
+          path = Path(selected_path)
           request = json.loads(path.read_text(encoding="utf-8"))
-          expected_keys = {
+          common = {
               "schema_version",
               "request",
               "enabled",
               "workflow",
               "ref",
-              "process_candidates",
-              "max_objects",
-              "hash_001_media",
               "request_id",
           }
-          if set(request) != expected_keys:
-              raise SystemExit("request keys differ from the reviewed schema")
-          if request["schema_version"] != 1:
+          if request.get("schema_version") != 1:
               raise SystemExit("unsupported request schema")
-          if request["request"] != "run-deform360-public-holdings-gpuserver6000":
-              raise SystemExit("unexpected request name")
-          if request["enabled"] is not True:
+          if request.get("enabled") is not True:
               raise SystemExit("request is disabled")
-          if request["workflow"] != "deform360-public-holdings-gpuserver6000.yml":
-              raise SystemExit("unexpected workflow")
-          if request["ref"] != "main":
+          if request.get("ref") != "main":
               raise SystemExit("only reviewed main may be dispatched")
-          if type(request["process_candidates"]) is not bool:
-              raise SystemExit("process_candidates must be boolean")
-          if type(request["hash_001_media"]) is not bool:
-              raise SystemExit("hash_001_media must be boolean")
-          if request["max_objects"] not in {"0", "1", "2", "3", "4"}:
-              raise SystemExit("max_objects is outside the reviewed range")
-          request_id = request["request_id"]
+          request_id = request.get("request_id")
           if not isinstance(request_id, str) or not request_id.strip():
               raise SystemExit("request_id must be nonempty text")
+
+          if selected_path == holdings_path:
+              expected_keys = common | {
+                  "process_candidates",
+                  "max_objects",
+                  "hash_001_media",
+              }
+              if set(request) != expected_keys:
+                  raise SystemExit("holdings request keys differ from the reviewed schema")
+              if request["request"] != "run-deform360-public-holdings-gpuserver6000":
+                  raise SystemExit("unexpected holdings request name")
+              if request["workflow"] != "deform360-public-holdings-gpuserver6000.yml":
+                  raise SystemExit("unexpected holdings workflow")
+              if type(request["process_candidates"]) is not bool:
+                  raise SystemExit("process_candidates must be boolean")
+              if type(request["hash_001_media"]) is not bool:
+                  raise SystemExit("hash_001_media must be boolean")
+              if request["max_objects"] not in {"0", "1", "2", "3", "4"}:
+                  raise SystemExit("max_objects is outside the reviewed range")
+              inputs = {
+                  "process_candidates": str(request["process_candidates"]).lower(),
+                  "max_objects": request["max_objects"],
+                  "hash_001_media": str(request["hash_001_media"]).lower(),
+              }
+              kind = "public-holdings-gpuserver6000"
+          else:
+              expected_keys = common | {"data_root", "run_source_diagnostic"}
+              if set(request) != expected_keys:
+                  raise SystemExit(
+                      "reset-mechanics request keys differ from the reviewed schema"
+                  )
+              if request["request"] != "run-deform360-reset-mechanics-gpuserver4090":
+                  raise SystemExit("unexpected reset-mechanics request name")
+              if request["workflow"] != "deform360-reset-mechanics.yml":
+                  raise SystemExit("unexpected reset-mechanics workflow")
+              if request["data_root"] != "":
+                  raise SystemExit(
+                      "reset-mechanics request must use target-closed automatic root resolution"
+                  )
+              if request["run_source_diagnostic"] is not True:
+                  raise SystemExit("source diagnostic must be explicitly enabled")
+              inputs = {
+                  "data_root": "",
+                  "run_source_diagnostic": "true",
+              }
+              kind = "reset-mechanics-gpuserver4090-source-only"
+
+          print("request_path=" + selected_path)
+          print("kind=" + kind)
           print("workflow=" + request["workflow"])
           print("ref=" + request["ref"])
-          print("process_candidates=" + str(request["process_candidates"]).lower())
-          print("max_objects=" + request["max_objects"])
-          print("hash_001_media=" + str(request["hash_001_media"]).lower())
           print("request_id=" + request_id)
+          print("inputs_json=" + json.dumps(inputs, separators=(",", ":")))
           PY
 
-      - name: Dispatch main-only gpuserver6000 workflow
+      - name: Dispatch the reviewed main-only workflow
         env:
           GH_TOKEN: ${{ github.token }}
           WORKFLOW: ${{ steps.request.outputs.workflow }}
           REF: ${{ steps.request.outputs.ref }}
-          PROCESS_CANDIDATES: ${{ steps.request.outputs.process_candidates }}
-          MAX_OBJECTS: ${{ steps.request.outputs.max_objects }}
-          HASH_001_MEDIA: ${{ steps.request.outputs.hash_001_media }}
+          INPUTS_JSON: ${{ steps.request.outputs.inputs_json }}
           REQUEST_ID: ${{ steps.request.outputs.request_id }}
+          REQUEST_PATH: ${{ steps.request.outputs.request_path }}
+          REQUEST_KIND: ${{ steps.request.outputs.kind }}
         shell: bash
         run: |
           set -euo pipefail
@@ -99,11 +152,7 @@ jobs:
               json.dumps(
                   {
                       "ref": os.environ["REF"],
-                      "inputs": {
-                          "process_candidates": os.environ["PROCESS_CANDIDATES"],
-                          "max_objects": os.environ["MAX_OBJECTS"],
-                          "hash_001_media": os.environ["HASH_001_MEDIA"],
-                      },
+                      "inputs": json.loads(os.environ["INPUTS_JSON"]),
                   },
                   separators=(",", ":"),
               )
@@ -128,15 +177,13 @@ jobs:
                   {
                       "schema_version": 1,
                       "request_id": os.environ["REQUEST_ID"],
+                      "request_path": os.environ["REQUEST_PATH"],
+                      "request_kind": os.environ["REQUEST_KIND"],
                       "source_sha": os.environ["GITHUB_SHA"],
                       "source_run_id": os.environ["GITHUB_RUN_ID"],
                       "workflow": os.environ["WORKFLOW"],
                       "ref": os.environ["REF"],
-                      "inputs": {
-                          "process_candidates": os.environ["PROCESS_CANDIDATES"],
-                          "max_objects": os.environ["MAX_OBJECTS"],
-                          "hash_001_media": os.environ["HASH_001_MEDIA"],
-                      },
+                      "inputs": json.loads(os.environ["INPUTS_JSON"]),
                       "public_data_only": True,
                       "new_physical_data_collected": False,
                   },
@@ -151,7 +198,7 @@ jobs:
       - name: Upload dispatch receipt
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
-          name: deform360-gpuserver6000-dispatch-${{ github.sha }}
+          name: deform360-reviewed-dispatch-${{ github.sha }}
           path: dispatch-receipt.json
           if-no-files-found: error
           retention-days: 30
