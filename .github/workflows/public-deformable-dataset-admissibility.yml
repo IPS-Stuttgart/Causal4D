@@ -1,0 +1,112 @@
+name: Public deformable dataset admissibility
+
+on:
+  push:
+    branches:
+      - science/public-deformable-dataset-admissibility-20260831
+    paths:
+      - .github/workflows/public-deformable-dataset-admissibility.yml
+      - scripts/remote/inventory_public_deformable_holdings.py
+      - ops/public-deformable-dataset-admissibility-trigger.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-deformable-dataset-admissibility-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inventory-4090:
+    name: Inventory complete and available holdings on gpuserver4090
+    runs-on: [self-hosted, Linux, X64, gpuserver4090]
+    timeout-minutes: 120
+    steps:
+      - name: Check out the exact pushed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Verify clean exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+          /usr/bin/python3 -m py_compile scripts/remote/inventory_public_deformable_holdings.py
+
+      - name: Inventory source structure without loading outcomes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public-deformable-inventory
+          /usr/bin/python3 scripts/remote/inventory_public_deformable_holdings.py \
+            --server gpuserver4090 \
+            --output public-deformable-inventory/gpuserver4090.json
+          {
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "revision=${GITHUB_SHA}"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "runner=${RUNNER_NAME}"
+            uname -a
+            df -h /mnt/seagate10tb || true
+          } > public-deformable-inventory/gpuserver4090-runner.txt
+          sha256sum public-deformable-inventory/* > public-deformable-inventory/SHA256SUMS-4090
+
+      - name: Upload 4090 inventory
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: public-deformable-inventory-4090-${{ github.run_id }}
+          path: public-deformable-inventory
+          if-no-files-found: error
+          retention-days: 30
+
+  inventory-6000:
+    name: Inventory PokeFlex and partial Deform360 on gpuserver6000
+    runs-on: [self-hosted, Linux, X64, gpuserver6000]
+    timeout-minutes: 120
+    steps:
+      - name: Check out the exact pushed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Verify clean exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+          /usr/bin/python3 -m py_compile scripts/remote/inventory_public_deformable_holdings.py
+
+      - name: Inventory source structure without loading outcomes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public-deformable-inventory
+          /usr/bin/python3 scripts/remote/inventory_public_deformable_holdings.py \
+            --server gpuserver6000 \
+            --output public-deformable-inventory/gpuserver6000.json
+          {
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "revision=${GITHUB_SHA}"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "runner=${RUNNER_NAME}"
+            uname -a
+            df -h /mnt/lexar4tb || true
+          } > public-deformable-inventory/gpuserver6000-runner.txt
+          sha256sum public-deformable-inventory/* > public-deformable-inventory/SHA256SUMS-6000
+
+      - name: Upload 6000 inventory
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: public-deformable-inventory-6000-${{ github.run_id }}
+          path: public-deformable-inventory
+          if-no-files-found: error
+          retention-days: 30
