@@ -320,9 +320,7 @@ def _mean_interval(values: np.ndarray) -> dict[str, float]:
     mean = float(np.mean(values))
     if values.size < 2:
         return {"mean": mean, "lower": mean, "upper": mean}
-    error = float(
-        1.96 * float(np.std(values, ddof=1)) / np.sqrt(values.size)
-    )
+    error = float(1.96 * float(np.std(values, ddof=1)) / np.sqrt(values.size))
     return {"mean": mean, "lower": mean - error, "upper": mean + error}
 
 
@@ -334,12 +332,10 @@ def _paired_summary(
         raise ValueError("paired policies must use the same episode count")
     return {
         "query_squared_error_difference_mm2": _mean_interval(
-            candidate["query_squared_errors"]
-            - comparator["query_squared_errors"]
+            candidate["query_squared_errors"] - comparator["query_squared_errors"]
         ),
         "decision_loss_difference": _mean_interval(
-            candidate["decision_losses"]
-            - comparator["decision_losses"]
+            candidate["decision_losses"] - comparator["decision_losses"]
         ),
     }
 
@@ -357,22 +353,15 @@ def _activation_gate(
     source: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     decisions = evaluation["decisions"]
-    report_by_name = {
-        report.name: report
-        for report in evaluation["reports"]
-    }
+    report_by_name = {report.name: report for report in evaluation["reports"]}
     destroyed_max = max(
-        report.query_value
-        for report in evaluation["destroyed_reports"]
-        if report.safe
+        report.query_value for report in evaluation["destroyed_reports"] if report.safe
     )
     expected_task = PROTOCOL["source_activation_gates"]["task_policy_probe"]
     expected_information = PROTOCOL["source_activation_gates"][
         "information_policy_probe"
     ]
-    expected_unsafe = PROTOCOL["source_activation_gates"][
-        "unsafe_probe_rejected"
-    ]
+    expected_unsafe = PROTOCOL["source_activation_gates"]["unsafe_probe_rejected"]
     source_fraction = (
         source["generic-information"]["query_mse_mm2"]
         - source["task-query"]["query_mse_mm2"]
@@ -389,8 +378,7 @@ def _activation_gate(
             decisions["task-decision"].selected_probe_name == expected_task
         ),
         "information_selects_nuisance_probe": (
-            decisions["generic-information"].selected_probe_name
-            == expected_information
+            decisions["generic-information"].selected_probe_name == expected_information
         ),
         "unsafe_target_probe_rejected": (
             not report_by_name[expected_unsafe].safe
@@ -416,9 +404,7 @@ def _activation_gate(
             ]
         ),
         "destroyed_dependence_returns_fallback": (
-            decisions[
-                "destroyed-dependence-task"
-            ].exact_no_probe_fallback
+            decisions["destroyed-dependence-task"].exact_no_probe_fallback
         ),
     }
     return {
@@ -431,20 +417,15 @@ def _activation_gate(
 
 
 def run(source_revision: str) -> dict[str, Any]:
-    if (
-        len(source_revision) != 40
-        or any(character not in "0123456789abcdef" for character in source_revision)
+    if len(source_revision) != 40 or any(
+        character not in "0123456789abcdef" for character in source_revision
     ):
-        raise ValueError(
-            "source_revision must be a full lowercase hexadecimal commit"
-        )
+        raise ValueError("source_revision must be a full lowercase hexadecimal commit")
     problem = build_problem()
     evaluation = evaluate_policies(problem)
     selected = {
         "task-query": evaluation["decisions"]["task-query"].selected_probe_name,
-        "task-decision": evaluation["decisions"][
-            "task-decision"
-        ].selected_probe_name,
+        "task-decision": evaluation["decisions"]["task-decision"].selected_probe_name,
         "generic-information": evaluation["decisions"][
             "generic-information"
         ].selected_probe_name,
@@ -469,8 +450,7 @@ def run(source_revision: str) -> dict[str, Any]:
             probe_name=probe_name,
             latent_seed=int(PROTOCOL["source_seed"]),
             outcome_seed=(
-                int(PROTOCOL["source_seed"])
-                + 1009 * probe_outcome_offsets[probe_name]
+                int(PROTOCOL["source_seed"]) + 1009 * probe_outcome_offsets[probe_name]
             ),
             episodes=int(PROTOCOL["source_episodes"]),
         )
@@ -486,21 +466,15 @@ def run(source_revision: str) -> dict[str, Any]:
             "numpy": np.__version__,
         },
         "analytic": {
-            "probe_reports": [
-                _report_dict(report)
-                for report in evaluation["reports"]
-            ],
+            "probe_reports": [_report_dict(report) for report in evaluation["reports"]],
             "destroyed_dependence_reports": [
-                _report_dict(report)
-                for report in evaluation["destroyed_reports"]
+                _report_dict(report) for report in evaluation["destroyed_reports"]
             ],
             "policy_decisions": {
                 name: _decision_dict(decision)
                 for name, decision in evaluation["decisions"].items()
             },
-            "weight_preserving_permutation": problem[
-                "permutation"
-            ].tolist(),
+            "weight_preserving_permutation": problem["permutation"].tolist(),
         },
         "source": {
             "policies": {
@@ -525,8 +499,7 @@ def run(source_revision: str) -> dict[str, Any]:
 
     target_per_seed: list[dict[str, Any]] = []
     pooled: dict[str, dict[str, list[np.ndarray]]] = {
-        policy: {"query": [], "decision": []}
-        for policy in selected
+        policy: {"query": [], "decision": []} for policy in selected
     }
     for seed in PROTOCOL["target_seeds"]:
         seed_record: dict[str, Any] = {
@@ -543,22 +516,13 @@ def run(source_revision: str) -> dict[str, Any]:
                 problem,
                 probe_name=probe_name,
                 latent_seed=int(seed),
-                outcome_seed=(
-                    int(seed)
-                    + 1009 * probe_outcome_offsets[probe_name]
-                ),
+                outcome_seed=(int(seed) + 1009 * probe_outcome_offsets[probe_name]),
                 episodes=int(PROTOCOL["target_episodes_per_seed"]),
             )
             records[policy] = record
-            seed_record["policies"][policy] = _public_simulation_record(
-                record
-            )
-            pooled[policy]["query"].append(
-                record["query_squared_errors"]
-            )
-            pooled[policy]["decision"].append(
-                record["decision_losses"]
-            )
+            seed_record["policies"][policy] = _public_simulation_record(record)
+            pooled[policy]["query"].append(record["query_squared_errors"])
+            pooled[policy]["decision"].append(record["decision_losses"])
         seed_record["task_query_vs_information"] = _paired_summary(
             records["task-query"],
             records["generic-information"],

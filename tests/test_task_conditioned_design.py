@@ -77,32 +77,39 @@ def test_task_value_separates_relevant_from_high_information_probe() -> None:
     assert by_name["nuisance"].decision_value == pytest.approx(0.0)
     assert by_name["target"].query_value == pytest.approx(1044.0)
     assert by_name["target"].decision_value == pytest.approx(0.3)
-    assert by_name["target"].expected_posterior_query_risk == pytest.approx(
-        1856.0
-    )
+    assert by_name["target"].expected_posterior_query_risk == pytest.approx(1856.0)
     assert by_name["risky"].query_value == pytest.approx(2672.64)
     assert not by_name["risky"].safe
-    assert by_name["risky"].reason_codes == (
-        "prospective-physical-risk-cap-exceeded",
+    assert by_name["risky"].reason_codes == ("prospective-physical-risk-cap-exceeded",)
+    assert (
+        select_probe(
+            reports,
+            objective="query",
+            minimum_net_value=1e-12,
+        ).selected_probe_name
+        == "target"
     )
-    assert select_probe(
-        reports,
-        objective="query",
-        minimum_net_value=1e-12,
-    ).selected_probe_name == "target"
-    assert select_probe(
-        reports,
-        objective="decision",
-        minimum_net_value=1e-12,
-    ).selected_probe_name == "target"
-    assert select_probe(
-        reports,
-        objective="information",
-        minimum_net_value=1e-12,
-    ).selected_probe_name == "nuisance"
+    assert (
+        select_probe(
+            reports,
+            objective="decision",
+            minimum_net_value=1e-12,
+        ).selected_probe_name
+        == "target"
+    )
+    assert (
+        select_probe(
+            reports,
+            objective="information",
+            minimum_net_value=1e-12,
+        ).selected_probe_name
+        == "nuisance"
+    )
 
 
-def test_dependence_control_preserves_marginals_but_removes_single_probe_value() -> None:
+def test_dependence_control_preserves_marginals_but_removes_single_probe_value() -> (
+    None
+):
     prior, query, loss, probes = benchmark_problem()
     permutation = np.array([0, 4, 1, 5, 6, 2, 7, 3])
     shuffled_query = weight_preserving_query_permutation(
@@ -130,7 +137,9 @@ def test_dependence_control_preserves_marginals_but_removes_single_probe_value()
         decision_loss=shuffled_loss,
         risk_cap=0.02,
     )
-    assert max(report.query_value for report in reports if report.safe) == pytest.approx(
+    assert max(
+        report.query_value for report in reports if report.safe
+    ) == pytest.approx(
         0.0,
         abs=1e-12,
     )
@@ -298,9 +307,7 @@ def test_semidefinite_metric_ignores_unregistered_coordinate() -> None:
     prior = np.ones(2)
     query = np.array([[-1.0, -100.0], [1.0, 100.0]])
     metric = np.diag([1.0, 0.0])
-    assert query_bayes_risk(prior, query, query_metric=metric) == pytest.approx(
-        1.0
-    )
+    assert query_bayes_risk(prior, query, query_metric=metric) == pytest.approx(1.0)
     with pytest.raises(ValueError, match="positive direction"):
         query_bayes_risk(
             prior,
@@ -340,18 +347,17 @@ def test_controlled_study_opens_target_only_after_source_gate() -> None:
     assert report["target"]["opened"]
     aggregate = report["target"]["aggregate"]
     assert aggregate["task-query"] == aggregate["task-decision"]
-    assert aggregate["task-query"]["query_mse_mm2"] < (
-        aggregate["generic-information"]["query_mse_mm2"]
+    assert (
+        aggregate["task-query"]["query_mse_mm2"]
+        < (aggregate["generic-information"]["query_mse_mm2"])
     )
-    assert aggregate["task-query"]["decision_loss"] < (
-        aggregate["generic-information"]["decision_loss"]
+    assert (
+        aggregate["task-query"]["decision_loss"]
+        < (aggregate["generic-information"]["decision_loss"])
     )
     contrast = report["target"]["task_query_vs_information"]
     assert contrast["relative_query_mse_reduction"] > 0.35
-    assert (
-        contrast["paired_query_squared_error_difference_mm2"]["upper"]
-        < 0.0
-    )
+    assert contrast["paired_query_squared_error_difference_mm2"]["upper"] < 0.0
     assert contrast["paired_decision_loss_difference"]["upper"] < 0.0
 
 

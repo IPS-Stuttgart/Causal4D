@@ -85,9 +85,7 @@ def _validate_likelihood(
     if matrix.shape[0] < 1 or matrix.shape[1] < 1:
         raise ValueError("outcome_likelihood must be nonempty")
     if hypotheses is not None and matrix.shape[0] != hypotheses:
-        raise ValueError(
-            "outcome_likelihood must have one row per hypothesis"
-        )
+        raise ValueError("outcome_likelihood must have one row per hypothesis")
     if np.any(matrix < 0.0) or np.any(matrix > 1.0):
         raise ValueError("outcome_likelihood entries must lie in [0, 1]")
     if not np.allclose(
@@ -207,12 +205,8 @@ class ProbeSelectionDecision:
 
     def __post_init__(self) -> None:
         _validate_objective(self.objective)
-        if self.exact_no_probe_fallback != (
-            self.selected_probe_name is None
-        ):
-            raise ValueError(
-                "fallback flag must agree with selected_probe_name"
-            )
+        if self.exact_no_probe_fallback != (self.selected_probe_name is None):
+            raise ValueError("fallback flag must agree with selected_probe_name")
         if not np.isfinite(self.score):
             raise ValueError("score must be finite")
         if not self.reason_code:
@@ -234,9 +228,8 @@ def posterior_weights(
         outcome_likelihood,
         hypotheses=prior.size,
     )
-    if (
-        isinstance(outcome_index, bool)
-        or not isinstance(outcome_index, (int, np.integer))
+    if isinstance(outcome_index, bool) or not isinstance(
+        outcome_index, (int, np.integer)
     ):
         raise TypeError("outcome_index must be an integer")
     index = int(outcome_index)
@@ -266,11 +259,7 @@ def mutual_information_nats(
     positive = joint > 0.0
     denominator = np.broadcast_to(outcome_mass, joint.shape)
     value = np.sum(
-        joint[positive]
-        * (
-            np.log(likelihood[positive])
-            - np.log(denominator[positive])
-        )
+        joint[positive] * (np.log(likelihood[positive]) - np.log(denominator[positive]))
     )
     return float(max(value, 0.0))
 
@@ -289,9 +278,7 @@ def query_bayes_risk(
         ndim=2,
     )
     if query.shape[0] != prior.size or query.shape[1] < 1:
-        raise ValueError(
-            "query_values must have one nonempty row per hypothesis"
-        )
+        raise ValueError("query_values must have one nonempty row per hypothesis")
     metric = _metric(query_metric, dimension=query.shape[1])
     mean = prior @ query
     centered = query - mean
@@ -327,9 +314,7 @@ def expected_posterior_query_risk(
         ndim=2,
     )
     if query.shape[0] != prior.size or query.shape[1] < 1:
-        raise ValueError(
-            "query_values must have one nonempty row per hypothesis"
-        )
+        raise ValueError("query_values must have one nonempty row per hypothesis")
     metric = _metric(query_metric, dimension=query.shape[1])
     joint = prior[:, None] * likelihood
     outcome_mass = np.sum(joint, axis=0)
@@ -367,9 +352,7 @@ def decision_bayes_risk(
         ndim=2,
     )
     if loss.shape[0] < 1 or loss.shape[1] != prior.size:
-        raise ValueError(
-            "decision_loss must have shape (decisions, hypotheses)"
-        )
+        raise ValueError("decision_loss must have shape (decisions, hypotheses)")
     if np.any(loss < 0.0):
         raise ValueError("decision_loss must be nonnegative")
     return float(np.min(loss @ prior))
@@ -392,9 +375,7 @@ def expected_posterior_decision_risk(
         ndim=2,
     )
     if loss.shape[0] < 1 or loss.shape[1] != prior.size:
-        raise ValueError(
-            "decision_loss must have shape (decisions, hypotheses)"
-        )
+        raise ValueError("decision_loss must have shape (decisions, hypotheses)")
     if np.any(loss < 0.0):
         raise ValueError("decision_loss must be nonnegative")
     joint = prior[:, None] * likelihood

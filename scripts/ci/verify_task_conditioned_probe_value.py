@@ -21,9 +21,7 @@ def _canonical_json(value: object) -> str:
 def verify(result_path: Path) -> dict[str, Any]:
     report = json.loads(result_path.read_text(encoding="utf-8"))
     protocol = report["protocol"]
-    expected_hash = hashlib.sha256(
-        _canonical_json(protocol).encode()
-    ).hexdigest()
+    expected_hash = hashlib.sha256(_canonical_json(protocol).encode()).hexdigest()
     if report["protocol_sha256"] != expected_hash:
         raise ValueError("protocol hash mismatch")
     if not report["source"]["activation_gate"]["passed"]:
@@ -41,20 +39,20 @@ def verify(result_path: Path) -> dict[str, Any]:
     if not decisions["destroyed-dependence-task"]["exact_no_probe_fallback"]:
         raise ValueError("destroyed-dependence control did not fall back")
 
-    probes = {
-        row["name"]: row
-        for row in report["analytic"]["probe_reports"]
-    }
+    probes = {row["name"]: row for row in report["analytic"]["probe_reports"]}
     if probes["nuisance-rich"]["query_value"] != 0.0:
         raise ValueError("nuisance-rich probe unexpectedly has task-query value")
     if abs(probes["target-moderate"]["query_value"] - 1044.0) > 1e-9:
         raise ValueError("target-moderate analytic query value drifted")
     if abs(probes["target-moderate"]["decision_value"] - 0.3) > 1e-12:
         raise ValueError("target-moderate analytic decision value drifted")
-    if probes["nuisance-rich"]["mutual_information_nats"] <= (
-        probes["target-moderate"]["mutual_information_nats"]
+    if (
+        probes["nuisance-rich"]["mutual_information_nats"]
+        <= (probes["target-moderate"]["mutual_information_nats"])
     ):
-        raise ValueError("generic information ordering no longer isolates the mechanism")
+        raise ValueError(
+            "generic information ordering no longer isolates the mechanism"
+        )
     if probes["target-risky"]["safe"]:
         raise ValueError("risk cap failed to reject target-risky")
     if probes["target-risky"]["reason_codes"] != [
@@ -63,20 +61,20 @@ def verify(result_path: Path) -> dict[str, Any]:
         raise ValueError("risk rejection reason drifted")
 
     destroyed = report["analytic"]["destroyed_dependence_reports"]
-    safe_destroyed_values = [
-        row["query_value"]
-        for row in destroyed
-        if row["safe"]
-    ]
+    safe_destroyed_values = [row["query_value"] for row in destroyed if row["safe"]]
     if max(safe_destroyed_values) > 1e-10:
         raise ValueError("dependence-destroying task value did not collapse")
 
     aggregate = report["target"]["aggregate"]
     if aggregate["task-query"] != aggregate["task-decision"]:
-        raise ValueError("identical selected probes produced different target summaries")
+        raise ValueError(
+            "identical selected probes produced different target summaries"
+        )
     contrast = report["target"]["task_query_vs_information"]
     if contrast["relative_query_mse_reduction"] <= 0.35:
-        raise ValueError("target query-MSE reduction is below the frozen mechanism margin")
+        raise ValueError(
+            "target query-MSE reduction is below the frozen mechanism margin"
+        )
     if contrast["paired_query_squared_error_difference_mm2"]["upper"] >= 0.0:
         raise ValueError("paired query-error contrast does not exclude zero")
     if contrast["paired_decision_loss_difference"]["upper"] >= 0.0:
@@ -91,9 +89,7 @@ def verify(result_path: Path) -> dict[str, Any]:
         "selected_information_probe": decisions["generic-information"][
             "selected_probe_name"
         ],
-        "relative_query_mse_reduction": contrast[
-            "relative_query_mse_reduction"
-        ],
+        "relative_query_mse_reduction": contrast["relative_query_mse_reduction"],
         "decision_loss_difference": contrast["decision_loss_difference"],
         "claim_boundary": report["claim_boundary"],
     }
