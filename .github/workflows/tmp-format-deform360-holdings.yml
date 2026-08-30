@@ -1,0 +1,49 @@
+name: Temporary format Deform360 holdings files
+
+on:
+  push:
+    branches:
+      - feat/deform360-gpuserver6000-public-holdings
+    paths:
+      - ".github/workflows/tmp-format-deform360-holdings.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/deform360-gpuserver6000-public-holdings
+          persist-credentials: true
+
+      - name: Install formatter
+        run: python3 -m pip install ruff==0.16.5
+
+      - name: Format focused files
+        run: |
+          python3 -m ruff format \
+            scripts/remote/audit_deform360_gpuserver6000_holdings.py \
+            scripts/remote/run_deform360_gpuserver6000_holdings.py \
+            tests/test_deform360_gpuserver6000_workflow_policy.py
+
+      - name: Commit formatted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            scripts/remote/audit_deform360_gpuserver6000_holdings.py \
+            scripts/remote/run_deform360_gpuserver6000_holdings.py \
+            tests/test_deform360_gpuserver6000_workflow_policy.py
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No formatting changes required"
+            exit 0
+          fi
+          git commit -m "Format Deform360 public holdings files"
+          git push origin HEAD:feat/deform360-gpuserver6000-public-holdings
