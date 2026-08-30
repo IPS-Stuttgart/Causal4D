@@ -196,19 +196,16 @@ def test_synthetic_damped_motion_runs_end_to_end(tmp_path: Path) -> None:
         "paper_claim_authorized": False,
     }
     primary = result["horizon_summaries"]["6"]
-    assert primary["comparisons"]["guarded"][
-        "relative_improvement_vs_persistence"
-    ] > 0.0
+    assert (
+        primary["comparisons"]["guarded"]["relative_improvement_vs_persistence"] > 0.0
+    )
     assert result["decision"]["paper_claim_authorized"] is False
 
 
 def test_missing_source_archive_fails_before_any_result(tmp_path: Path) -> None:
     processed = _write_dataset(tmp_path / "processed")
     missing = (
-        processed
-        / "002-rope-silk"
-        / f"episode_{SOURCE_EPISODES[-1]}"
-        / "pcd_clean.tar"
+        processed / "002-rope-silk" / f"episode_{SOURCE_EPISODES[-1]}" / "pcd_clean.tar"
     )
     missing.unlink()
     output = tmp_path / "result.json"

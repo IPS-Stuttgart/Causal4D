@@ -96,8 +96,7 @@ class PilotConfig:
             len(self.source_episode_ids) >= 3
             and len(set(self.source_episode_ids)) == len(self.source_episode_ids)
             and all(
-                type(value) is int and value >= 0
-                for value in self.source_episode_ids
+                type(value) is int and value >= 0 for value in self.source_episode_ids
             ),
             "source_episode_ids must contain at least three unique "
             "nonnegative integers",
@@ -169,8 +168,7 @@ class PilotConfig:
             "decision_maximum_worst_episode_ratio must be at least one",
         )
         _require(
-            self.minimum_frames
-            >= self.horizon_frames[-1] + self.reset_count + 3,
+            self.minimum_frames >= self.horizon_frames[-1] + self.reset_count + 3,
             "minimum_frames cannot support the reset and horizon ladder",
         )
 
@@ -342,8 +340,7 @@ def load_episode_archive(
         _require(members, f"archive contains no NPZ point-cloud frames: {path}")
         parsed_ids = [_member_frame_id(member.name) for member in members]
         _require(
-            len(set(parsed_ids)) == len(parsed_ids)
-            and np.all(np.diff(parsed_ids) > 0),
+            len(set(parsed_ids)) == len(parsed_ids) and np.all(np.diff(parsed_ids) > 0),
             "point-cloud archive frame identities are duplicated or unordered",
         )
         for member, frame_id in zip(members, parsed_ids, strict=True):
@@ -664,9 +661,7 @@ def evaluate_episode_candidate(
                 np.mean([row["posterior_rho_mean"] for row in reset_rows])
             ),
             "mean_posterior_rho_standard_deviation": float(
-                np.mean(
-                    [row["posterior_rho_standard_deviation"] for row in reset_rows]
-                )
+                np.mean([row["posterior_rho_standard_deviation"] for row in reset_rows])
             ),
             "reset_records": reset_rows,
         }
@@ -708,9 +703,9 @@ def _fit_guard(
     persistence_mean = float(
         np.mean([row["persistence_identity_rmse_m"] for row in rows])
     )
-    relative_improvement = (
-        persistence_mean - candidate_mean
-    ) / max(persistence_mean, np.finfo(np.float64).tiny)
+    relative_improvement = (persistence_mean - candidate_mean) / max(
+        persistence_mean, np.finfo(np.float64).tiny
+    )
     win_fraction = float(np.mean([row["win"] for row in rows]))
     worst_ratio = float(max(row["candidate_to_persistence_ratio"] for row in rows))
     accepted = bool(
@@ -885,9 +880,7 @@ def run_official_point_cloud_source_pilot(
     episode_records = []
     for held_index, held in enumerate(sequences):
         training = [
-            sequence
-            for index, sequence in enumerate(sequences)
-            if index != held_index
+            sequence for index, sequence in enumerate(sequences) if index != held_index
         ]
         prior = fit_training_prior(training, config=config)
         candidate_horizons = evaluate_episode_candidate(
@@ -1042,9 +1035,7 @@ def validate_official_point_cloud_source_pilot(payload: Mapping[str, Any]) -> No
         "episode records are missing",
     )
     episode_ids = [
-        record.get("episode_id")
-        for record in episodes
-        if isinstance(record, Mapping)
+        record.get("episode_id") for record in episodes if isinstance(record, Mapping)
     ]
     _require(len(episode_ids) == len(episodes), "episode record is malformed")
     _require(
