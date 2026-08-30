@@ -7,6 +7,8 @@ ROOT = Path(__file__).resolve().parents[1]
 OPERATIONAL = ROOT / ".github/workflows/deform360-public-holdings-gpuserver6000.yml"
 DISPATCHER = ROOT / ".github/workflows/deform360-public-holdings-file-dispatch.yml"
 REQUEST = ROOT / "ops/deform360-gpuserver6000-request.json"
+RESET_REQUEST = ROOT / "ops/deform360-reset-mechanics-gpuserver4090-request.json"
+RESET_WORKFLOW = ROOT / ".github/workflows/deform360-reset-mechanics.yml"
 CONFIG = ROOT / "configs/causal4d_public/deform360_gpuserver6000_holdings_v1.json"
 
 
@@ -39,12 +41,16 @@ def test_workflow_uses_read_only_sources_and_isolated_output() -> None:
 
 def test_file_change_dispatcher_is_hosted_and_fixed() -> None:
     text = DISPATCHER.read_text(encoding="utf-8")
-    assert 'paths:\n      - "ops/deform360-gpuserver6000-request.json"' in text
+    assert '      - "ops/deform360-gpuserver6000-request.json"' in text
+    assert '      - "ops/deform360-reset-mechanics-gpuserver4090-request.json"' in text
     assert "runs-on: ubuntu-latest" in text
     assert "self-hosted" not in text
     assert "actions: write" in text
     assert "only reviewed main may be dispatched" in text
     assert "deform360-public-holdings-gpuserver6000.yml" in text
+    assert "deform360-reset-mechanics.yml" in text
+    assert "GITHUB_EVENT_PATH" in text
+    assert "changed_requests" in text
     assert "workflow_dispatch" in text
 
 
@@ -61,6 +67,29 @@ def test_request_is_bounded_to_one_exact_reproduction_object() -> None:
         "hash_001_media": False,
         "request_id": "2026-08-30-gpuserver6000-public-holdings-v1",
     }
+
+
+def test_reset_request_is_source_only_on_gpuserver4090() -> None:
+    request = json.loads(RESET_REQUEST.read_text(encoding="utf-8"))
+    assert request == {
+        "schema_version": 1,
+        "request": "run-deform360-reset-mechanics-gpuserver4090",
+        "enabled": True,
+        "workflow": "deform360-reset-mechanics.yml",
+        "ref": "main",
+        "data_root": "",
+        "run_source_diagnostic": True,
+        "request_id": "2026-08-30-gpuserver4090-reset-mechanics-source-v1",
+    }
+
+    workflow = RESET_WORKFLOW.read_text(encoding="utf-8")
+    assert "runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]" in workflow
+    assert (
+        "DEFORM360_DOWNLOAD_ROOT: /mnt/seagate10tb/florianpfaff/datasets/deform360"
+        in workflow
+    )
+    assert "github.event_name == 'workflow_dispatch'" in workflow
+    assert "source-only" in workflow.lower()
 
 
 def test_config_excludes_locked_cohort_from_processing() -> None:

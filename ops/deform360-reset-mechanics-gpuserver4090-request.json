@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "request": "run-deform360-reset-mechanics-gpuserver4090",
+  "enabled": true,
+  "workflow": "deform360-reset-mechanics.yml",
+  "ref": "main",
+  "data_root": "",
+  "run_source_diagnostic": true,
+  "request_id": "2026-08-30-gpuserver4090-reset-mechanics-source-v1"
+}
