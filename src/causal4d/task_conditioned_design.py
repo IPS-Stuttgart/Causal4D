@@ -15,6 +15,8 @@ from typing import Any, Literal, TypeAlias
 import numpy as np
 from numpy.typing import NDArray
 
+from .immutable_array import readonly_array
+
 FloatArray: TypeAlias = NDArray[np.floating[Any]]
 IntArray: TypeAlias = NDArray[np.integer[Any]]
 Objective = Literal["query", "decision", "information"]
@@ -31,8 +33,7 @@ def _readonly_float(
         raise ValueError(f"{name} must be {ndim}-dimensional")
     if not np.all(np.isfinite(array)):
         raise ValueError(f"{name} must be finite")
-    array.setflags(write=False)
-    return array
+    return readonly_array(array, dtype=np.float64)
 
 
 def _probability(value: object, *, name: str) -> float:
@@ -68,8 +69,7 @@ def normalized_prior(prior_weights: FloatArray) -> FloatArray:
         )
     weights /= np.max(weights)
     weights /= np.sum(weights)
-    weights.setflags(write=False)
-    return weights
+    return readonly_array(weights, dtype=np.float64)
 
 
 def _validate_likelihood(
@@ -101,8 +101,7 @@ def _validate_likelihood(
 def _metric(value: FloatArray | None, *, dimension: int) -> FloatArray:
     if value is None:
         result: FloatArray = np.eye(dimension, dtype=np.float64)
-        result.setflags(write=False)
-        return result
+        return readonly_array(result, dtype=np.float64)
     matrix = _readonly_float(value, name="query_metric", ndim=2).copy()
     if matrix.shape != (dimension, dimension):
         raise ValueError("query_metric has the wrong query dimension")
@@ -114,8 +113,7 @@ def _metric(value: FloatArray | None, *, dimension: int) -> FloatArray:
         raise ValueError("query_metric must be positive semidefinite")
     if not np.any(np.linalg.eigvalsh(matrix) > 1e-12 * scale):
         raise ValueError("query_metric must have a positive direction")
-    matrix.setflags(write=False)
-    return matrix
+    return readonly_array(matrix, dtype=np.float64)
 
 
 def _validate_objective(objective: Objective) -> Objective:
@@ -240,8 +238,7 @@ def posterior_weights(
     if total <= 0.0:
         raise ValueError("the requested outcome has zero predictive mass")
     result = joint / total
-    result.setflags(write=False)
-    return result
+    return readonly_array(result, dtype=np.float64)
 
 
 def mutual_information_nats(
@@ -594,8 +591,7 @@ def weight_preserving_query_permutation(
     ):
         raise ValueError("permutation does not preserve prior masses")
     result = np.asarray(query[indices], dtype=np.float64).copy()
-    result.setflags(write=False)
-    return result
+    return readonly_array(result, dtype=np.float64)
 
 
 def weight_preserving_loss_permutation(
@@ -630,8 +626,7 @@ def weight_preserving_loss_permutation(
     ):
         raise ValueError("permutation does not preserve prior masses")
     result = np.asarray(loss[:, indices], dtype=np.float64).copy()
-    result.setflags(write=False)
-    return result
+    return readonly_array(result, dtype=np.float64)
 
 
 __all__ = [
