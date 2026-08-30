@@ -156,11 +156,23 @@ jobs:
           runtime_site="${RUNNER_TEMP}/causal4d-holdings-site-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           rm -rf -- "${runtime_site}"
           mkdir -p "${runtime_site}"
-          opencv_state="already-available"
-          if ! "${runtime}" -c 'import cv2' >/dev/null 2>&1; then
-            opencv_state="unavailable"
+          provision_state="already-available"
+          if ! "${runtime}" - <<'PY' >/dev/null 2>&1
+          import cv2
+          from huggingface_hub import snapshot_download
+          PY
+          then
+            provision_state="unavailable"
             if "${runtime}" -m pip --version >/dev/null 2>&1; then
               set +e
+              "${runtime}" -m pip install \
+                --disable-pip-version-check \
+                --no-input \
+                --no-cache-dir \
+                --target "${runtime_site}" \
+                "huggingface-hub==0.36.0" \
+                2>&1 | tee "${EVIDENCE_DIR}/huggingface-provision.log"
+              hf_status=${PIPESTATUS[0]}
               "${runtime}" -m pip install \
                 --disable-pip-version-check \
                 --no-input \
@@ -169,16 +181,19 @@ jobs:
                 --target "${runtime_site}" \
                 "opencv-contrib-python-headless==4.10.0.84" \
                 2>&1 | tee "${EVIDENCE_DIR}/opencv-provision.log"
-              provision_status=${PIPESTATUS[0]}
+              opencv_status=${PIPESTATUS[0]}
               set -e
-              if [[ ${provision_status} -eq 0 ]] && \
-                PYTHONPATH="${runtime_site}" "${runtime}" -c 'import cv2'
+              if [[ ${hf_status} -eq 0 && ${opencv_status} -eq 0 ]] && \
+                PYTHONPATH="${runtime_site}" "${runtime}" - <<'PY'
+              import cv2
+              from huggingface_hub import snapshot_download
+              PY
               then
-                opencv_state="provisioned-local"
+                provision_state="provisioned-local"
               fi
             else
               echo "pip unavailable for ${runtime}" \
-                | tee "${EVIDENCE_DIR}/opencv-provision.log"
+                | tee "${EVIDENCE_DIR}/runtime-provision.log"
             fi
           fi
           export PYTHONPATH="${runtime_site}:$PWD/src:$PWD/_deform360"
@@ -188,7 +203,7 @@ jobs:
             echo "runtime_mode=system-python-with-isolated-target"
             echo "python=${runtime}"
             echo "runtime_site=${runtime_site}"
-            echo "opencv_state=${opencv_state}"
+            echo "provision_state=${provision_state}"
           } > "${EVIDENCE_DIR}/runtime-selection.txt"
           "${runtime}" - <<'PY'
           import numpy
@@ -201,6 +216,7 @@ jobs:
               print("opencv", cv2.__version__)
           try:
               import deform360
+              from deform360.cli import tactile_main, undistort_main
           except ImportError as error:
               print("deform360 unavailable; preprocessing will be recorded as blocked:", error)
           else:
