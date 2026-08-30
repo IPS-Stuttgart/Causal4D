@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "enabled": true,
+  "runner": "gpuserver4090",
+  "public_data_only": true,
+  "prefix_fraction": 0.30,
+  "bootstrap_replicates": 20000,
+  "request_id": "2026-08-31-deform-dlo45-public-v1"
+}
