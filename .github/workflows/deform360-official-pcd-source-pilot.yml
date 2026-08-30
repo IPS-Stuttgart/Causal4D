@@ -85,6 +85,33 @@ jobs:
           persist-credentials: false
           clean: true
 
+      - name: Initialize evidence directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${EVIDENCE_DIR}"
+          /usr/bin/python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          Path(os.environ["EVIDENCE_DIR"], "status.json").write_text(
+              json.dumps(
+                  {
+                      "schema_version": 1,
+                      "state": "initialized",
+                      "head_sha": os.environ["GITHUB_SHA"],
+                      "run_id": os.environ["GITHUB_RUN_ID"],
+                      "dataset_modified": False,
+                      "forbidden_episode_payloads_read": False,
+                  },
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+
       - name: Verify reviewed request and mounted inputs
         shell: bash
         run: |
@@ -109,7 +136,7 @@ jobs:
                   "processed-repository/processed"
               ),
               "protocol_id": "causal4d-deform360-official-pcd-source-pilot-v1",
-              "request_id": "2026-08-30-gpuserver4090-official-pcd-source-pilot-v1",
+              "request_id": "2026-08-30-gpuserver4090-official-pcd-source-pilot-v2",
           }
           if request != expected:
               raise SystemExit("source-pilot request differs from the reviewed value")
@@ -155,34 +182,124 @@ jobs:
           )
           PY
 
-      - name: Select installed Python runtime
+      - name: Select or bootstrap an isolated Python runtime
         shell: bash
         run: |
           set -euo pipefail
+          probes="${EVIDENCE_DIR}/runtime-probes.txt"
+          : > "${probes}"
           selected=""
-          for candidate in python3.13 python3.12 python3.11 python3.10 /usr/bin/python3 python3; do
-            command -v "${candidate}" >/dev/null 2>&1 || continue
-            if "${candidate}" - <<'PY'
+          deps=""
+          candidates=(
+            /home/florianpfaff/.venvs/bpt-gpu/bin/python
+            /home/github-runner/.venvs/bpt-gpu/bin/python
+            /home/github-runner/.cache/venvs/bpt-gpu/bin/python
+            /home/github-runner/miniconda3/envs/bpt-gpu/bin/python
+            python3.12
+            python3.11
+            python3.10
+            /usr/bin/python3
+            python3
+          )
+          for candidate in "${candidates[@]}"; do
+            if [[ "${candidate}" == */* ]]; then
+              resolved="${candidate}"
+              [[ -x "${resolved}" ]] || continue
+            else
+              resolved="$(command -v "${candidate}" || true)"
+              [[ -n "${resolved}" ]] || continue
+            fi
+            if "${resolved}" - <<'PY' >> "${probes}" 2>&1
           import sys
           if sys.version_info < (3, 10):
               raise SystemExit(1)
           import numpy
+          print(sys.executable, numpy.__version__)
           PY
             then
-              selected="$(command -v "${candidate}")"
+              selected="${resolved}"
               break
             fi
           done
+
+          if [[ -z "${selected}" ]]; then
+            base=""
+            for candidate in python3.12 python3.11 python3.10 /usr/bin/python3 python3; do
+              if [[ "${candidate}" == */* ]]; then
+                resolved="${candidate}"
+                [[ -x "${resolved}" ]] || continue
+              else
+                resolved="$(command -v "${candidate}" || true)"
+                [[ -n "${resolved}" ]] || continue
+              fi
+              if "${resolved}" - <<'PY' >/dev/null 2>&1 && \
+                 "${resolved}" -m pip --version >/dev/null 2>&1
+          import sys
+          if not ((3, 10) <= sys.version_info[:2] < (3, 13)):
+              raise SystemExit(1)
+          PY
+              then
+                base="${resolved}"
+                break
+              fi
+            done
+            test -n "${base}"
+            deps="$PWD/.pilot-deps"
+            rm -rf "${deps}"
+            mkdir -p "${deps}"
+            "${base}" -m pip install \
+              --disable-pip-version-check \
+              --no-input \
+              --no-cache-dir \
+              --target "${deps}" \
+              "numpy==1.26.4" \
+              2>&1 | tee "${EVIDENCE_DIR}/runtime-install.log"
+            PYTHONPATH="${deps}" "${base}" - <<'PY' >> "${probes}" 2>&1
+          import sys
+          import numpy
+          print(sys.executable, numpy.__version__)
+          PY
+            selected="${base}"
+          fi
+
           test -n "${selected}"
           echo "PILOT_PYTHON=${selected}" >> "${GITHUB_ENV}"
-          "${selected}" --version
+          echo "PILOT_DEPS=${deps}" >> "${GITHUB_ENV}"
+          PILOT_SELECTED="${selected}" PILOT_DEPS_SELECTED="${deps}" \
+            PYTHONPATH="${deps}" "${selected}" - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import sys
+          import numpy
+
+          Path(os.environ["EVIDENCE_DIR"], "runtime-selection.json").write_text(
+              json.dumps(
+                  {
+                      "schema_version": 1,
+                      "python": os.environ["PILOT_SELECTED"],
+                      "python_version": sys.version,
+                      "numpy_version": numpy.__version__,
+                      "isolated_target": os.environ["PILOT_DEPS_SELECTED"] or None,
+                      "pip_fallback_used": bool(os.environ["PILOT_DEPS_SELECTED"]),
+                  },
+                  indent=2,
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
 
       - name: Run source-only real-data pilot
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "${EVIDENCE_DIR}"
-          export PYTHONPATH="$PWD/src"
+          if [[ -n "${PILOT_DEPS}" ]]; then
+            export PYTHONPATH="${PILOT_DEPS}:$PWD/src"
+          else
+            export PYTHONPATH="$PWD/src"
+          fi
           {
             echo "runner_name=${RUNNER_NAME}"
             echo "runner_os=${RUNNER_OS}"
@@ -191,6 +308,7 @@ jobs:
             echo "commit=${GITHUB_SHA}"
             echo "workflow_run_id=${GITHUB_RUN_ID}"
             echo "python=${PILOT_PYTHON}"
+            echo "pythonpath=${PYTHONPATH}"
             uname -a
             nvidia-smi -L || true
             df -h "${DATASET_ROOT}"
@@ -200,10 +318,33 @@ jobs:
             --config "${CONFIG}" \
             --output "${EVIDENCE_DIR}/result.json" \
             2>&1 | tee "${EVIDENCE_DIR}/run.log"
+          /usr/bin/python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          Path(os.environ["EVIDENCE_DIR"], "status.json").write_text(
+              json.dumps(
+                  {
+                      "schema_version": 1,
+                      "state": "completed",
+                      "head_sha": os.environ["GITHUB_SHA"],
+                      "run_id": os.environ["GITHUB_RUN_ID"],
+                      "dataset_modified": False,
+                      "forbidden_episode_payloads_read": False,
+                  },
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
           sha256sum \
             "${EVIDENCE_DIR}/result.json" \
             "${EVIDENCE_DIR}/run.log" \
             "${EVIDENCE_DIR}/runner.txt" \
+            "${EVIDENCE_DIR}/runtime-selection.json" \
+            "${EVIDENCE_DIR}/status.json" \
             > "${EVIDENCE_DIR}/SHA256SUMS"
 
       - name: Publish metric-bearing summary
@@ -217,6 +358,11 @@ jobs:
             echo "- Runner label: \`gpuserver4090\`"
             echo "- Dataset: \`${PROCESSED_ROOT}\`"
             if [[ -f "${EVIDENCE_DIR}/result.json" ]]; then
+              if [[ -n "${PILOT_DEPS:-}" ]]; then
+                export PYTHONPATH="${PILOT_DEPS}:$PWD/src"
+              else
+                export PYTHONPATH="$PWD/src"
+              fi
               "${PILOT_PYTHON:-/usr/bin/python3}" - <<'PY'
           import json
           from pathlib import Path
@@ -251,7 +397,7 @@ jobs:
           print("- Paper claim authorized: `false`")
           PY
             else
-              echo "- No metric-bearing result was produced; inspect the run log."
+              echo "- No metric-bearing result was produced; inspect the uploaded evidence."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
