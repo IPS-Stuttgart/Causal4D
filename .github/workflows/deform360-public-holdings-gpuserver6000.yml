@@ -147,16 +147,19 @@ jobs:
           echo "HOLDINGS_PYTHON=${selected}" >> "${GITHUB_ENV}"
           "${selected}" --version
 
-      - name: Prepare isolated public-data runtime and output lock
+      - name: Prepare public-data runtime and output root
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "${EVIDENCE_DIR}" "${DERIVED_ROOT}"
-          "${HOLDINGS_PYTHON}" -m venv --system-site-packages .holdings-runtime
-          runtime="$PWD/.holdings-runtime/bin/python"
+          runtime="${HOLDINGS_PYTHON}"
           echo "RUN_PYTHON=${runtime}" >> "${GITHUB_ENV}"
           export PYTHONPATH="$PWD/src:$PWD/_deform360"
           echo "PYTHONPATH=${PYTHONPATH}" >> "${GITHUB_ENV}"
+          {
+            echo "runtime_mode=system-python"
+            echo "python=${runtime}"
+          } > "${EVIDENCE_DIR}/runtime-selection.txt"
           "${runtime}" - <<'PY'
           import numpy
           print("numpy", numpy.__version__)
