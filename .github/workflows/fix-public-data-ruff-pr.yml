@@ -1,0 +1,53 @@
+name: Fix inherited public-data Ruff findings
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/fix-public-data-ruff-pr.yml"
+      - "scripts/remote/evaluate_deform_dlo45_public.py"
+      - "scripts/remote/probe_public_realworld_datasets_gpuserver4090.py"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'science/tracking-cloth-task-observation-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact PR head branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          persist-credentials: true
+          clean: true
+
+      - name: Apply only Ruff's safe import fixes and push the two reported files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --no-input 'ruff==0.16.5'
+          python -m ruff check --fix-only \
+            scripts/remote/evaluate_deform_dlo45_public.py \
+            scripts/remote/probe_public_realworld_datasets_gpuserver4090.py
+          python -m ruff check \
+            scripts/remote/evaluate_deform_dlo45_public.py \
+            scripts/remote/probe_public_realworld_datasets_gpuserver4090.py
+          git diff --check
+          if git diff --quiet -- \
+            scripts/remote/evaluate_deform_dlo45_public.py \
+            scripts/remote/probe_public_realworld_datasets_gpuserver4090.py; then
+            echo 'Files already satisfy Ruff.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            scripts/remote/evaluate_deform_dlo45_public.py \
+            scripts/remote/probe_public_realworld_datasets_gpuserver4090.py
+          git commit -m 'Apply exact Ruff import cleanup to public-data helpers'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
