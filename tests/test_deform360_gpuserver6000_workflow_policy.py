@@ -56,7 +56,7 @@ def test_file_change_dispatcher_is_hosted_and_fixed() -> None:
     assert "workflow_dispatch" in text
 
 
-def test_request_is_bounded_to_one_exact_reproduction_object() -> None:
+def test_request_is_bounded_to_fixed_registered_public_objects() -> None:
     request = json.loads(REQUEST.read_text(encoding="utf-8"))
     assert request == {
         "schema_version": 1,
@@ -65,9 +65,9 @@ def test_request_is_bounded_to_one_exact_reproduction_object() -> None:
         "workflow": "deform360-public-holdings-gpuserver6000.yml",
         "ref": "main",
         "process_candidates": True,
-        "max_objects": "1",
+        "max_objects": "4",
         "hash_001_media": False,
-        "request_id": "2026-08-30-gpuserver6000-public-holdings-v1",
+        "request_id": "2026-08-31-gpuserver6000-public-holdings-expansion-v1",
     }
 
 
