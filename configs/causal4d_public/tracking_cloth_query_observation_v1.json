@@ -1,0 +1,61 @@
+{
+  "candidate_groups": [
+    "upper",
+    "lower",
+    "central",
+    "lateral",
+    "fast"
+  ],
+  "dataset_root": "/home/github-runner/.cache/datasets/tracking-cloth-deformation-v1-zenodo-14644526",
+  "expected_census": {
+    "by_material": {
+      "cotton": 30,
+      "denim": 30,
+      "polyester": 30,
+      "wool": 30
+    },
+    "classified_csv_count": 120
+  },
+  "horizon_seconds": [
+    0.1,
+    0.25,
+    0.5
+  ],
+  "information_boundary": {
+    "dataset_modified": false,
+    "paper_claim_authorized": false,
+    "physical_command_sent": false,
+    "rgb_or_depth_data_used": false,
+    "target_file_contents_opened_before_source_gate": false
+  },
+  "lag_seconds": 0.05,
+  "primary_scenarios": [
+    "shake",
+    "twist",
+    "table",
+    "self_collision"
+  ],
+  "request_id": "3e9f77bd804f91545dbdac1098c324b3b155167c938c186a2e9238c712cdeca0",
+  "ridge": 0.001,
+  "schema": "causal4d.tracking-cloth-query-observation-request",
+  "schema_version": 1,
+  "source_fit_materials": [
+    "cotton"
+  ],
+  "source_gate": {
+    "maximum_worst_scenario_ratio": 1.15,
+    "minimum_distinct_selection_rows": 1,
+    "minimum_improvement_vs_constant_velocity": 0.02,
+    "minimum_improvement_vs_generic": 0.02,
+    "minimum_recording_win_fraction": 0.55
+  },
+  "source_gate_materials": [
+    "denim"
+  ],
+  "stage": "source-gated-evaluation",
+  "stride_seconds": 0.1,
+  "target_materials": [
+    "wool",
+    "polyester"
+  ]
+}
