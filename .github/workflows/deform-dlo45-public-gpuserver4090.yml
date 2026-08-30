@@ -1,0 +1,188 @@
+name: DEFORM DLO4 and DLO5 public evaluation on gpuserver4090
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ops/deform-dlo45-public-gpuserver4090-request.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deform-dlo45-public-gpuserver4090
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    name: Target-closed DEFORM DLO4/DLO5 evaluation
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]
+    timeout-minutes: 180
+    env:
+      DATA_ROOT: /mnt/seagate10tb/florianpfaff/datasets/deform/data_set
+      OUTPUT_DIR: deform-dlo45-public-evaluation
+    steps:
+      - name: Check out exact reviewed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Validate request and repository state
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(
+              Path("ops/deform-dlo45-public-gpuserver4090-request.json").read_text()
+          )
+          assert request["schema_version"] == 1
+          assert request["enabled"] is True
+          assert request["runner"] == "gpuserver4090"
+          assert request["public_data_only"] is True
+          assert 0.15 <= float(request["prefix_fraction"]) <= 0.60
+          assert int(request["bootstrap_replicates"]) >= 1000
+          print(request["request_id"])
+          PY
+
+      - name: Select and provision an isolated numerical runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          selected=""
+          for candidate in python3.12 python3.11 python3.10 /usr/bin/python3 python3; do
+            command -v "${candidate}" >/dev/null 2>&1 || continue
+            if "${candidate}" - <<'PY'
+          import sys
+          if sys.version_info < (3, 10):
+              raise SystemExit(1)
+          import numpy
+          PY
+            then
+              selected="$(command -v "${candidate}")"
+              break
+            fi
+          done
+          test -n "${selected}"
+          runtime_site="${RUNNER_TEMP}/causal4d-deform-dlo45-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          rm -rf -- "${runtime_site}"
+          mkdir -p "${runtime_site}" "${OUTPUT_DIR}"
+          if ! "${selected}" -c 'import scipy, h5py' >/dev/null 2>&1; then
+            "${selected}" -m pip install \
+              --disable-pip-version-check \
+              --no-input \
+              --no-cache-dir \
+              --target "${runtime_site}" \
+              "scipy==1.13.1" "h5py==3.11.0" \
+              2>&1 | tee "${OUTPUT_DIR}/runtime-provision.log"
+          fi
+          export PYTHONPATH="${runtime_site}:${PYTHONPATH:-}"
+          echo "DLO_PYTHON=${selected}" >> "${GITHUB_ENV}"
+          echo "PYTHONPATH=${PYTHONPATH}" >> "${GITHUB_ENV}"
+          {
+            echo "python=${selected}"
+            echo "runtime_site=${runtime_site}"
+            "${selected}" --version
+            "${selected}" - <<'PY'
+          import numpy
+          print("numpy", numpy.__version__)
+          try:
+              import scipy
+              print("scipy", scipy.__version__)
+          except ImportError as error:
+              print("scipy unavailable", error)
+          try:
+              import h5py
+              print("h5py", h5py.__version__)
+          except ImportError as error:
+              print("h5py unavailable", error)
+          PY
+          } > "${OUTPUT_DIR}/runtime.txt"
+
+      - name: Run target-closed public-data evaluation
+        shell: bash
+        run: |
+          set -euo pipefail
+          request_id="$(${DLO_PYTHON} - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(
+              Path("ops/deform-dlo45-public-gpuserver4090-request.json").read_text()
+          )
+          print(request["request_id"])
+          PY
+          )"
+          prefix_fraction="$(${DLO_PYTHON} - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(
+              Path("ops/deform-dlo45-public-gpuserver4090-request.json").read_text()
+          )
+          print(request["prefix_fraction"])
+          PY
+          )"
+          bootstrap_replicates="$(${DLO_PYTHON} - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(
+              Path("ops/deform-dlo45-public-gpuserver4090-request.json").read_text()
+          )
+          print(request["bootstrap_replicates"])
+          PY
+          )"
+          "${DLO_PYTHON}" scripts/remote/evaluate_deform_dlo45_public.py \
+            --data-root "${DATA_ROOT}" \
+            --output-dir "${OUTPUT_DIR}" \
+            --prefix-fraction "${prefix_fraction}" \
+            --bootstrap-replicates "${bootstrap_replicates}" \
+            --request-id "${request_id}" \
+            2>&1 | tee "${OUTPUT_DIR}/run.log"
+
+      - name: Record runner and source provenance
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${OUTPUT_DIR}"
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "commit=${GITHUB_SHA}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            echo "data_root=${DATA_ROOT}"
+            readlink -f "${DATA_ROOT}" || true
+            find "${DATA_ROOT}" -maxdepth 3 -type f -printf '%P\t%s\n' | sort
+            uname -a
+            nvidia-smi -L || true
+            df -h /mnt/seagate10tb || true
+          } > "${OUTPUT_DIR}/provenance.txt"
+
+      - name: Publish scientific summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "${OUTPUT_DIR}/report.md" ]]; then
+            cat "${OUTPUT_DIR}/report.md" >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "Evaluation report was not produced; inspect run.log." \
+              >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Upload evaluation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: deform-dlo45-public-evaluation-${{ github.sha }}
+          path: deform-dlo45-public-evaluation/
+          if-no-files-found: error
+          retention-days: 30
