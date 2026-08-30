@@ -1,0 +1,67 @@
+{
+  "artifact_kind": "Deform360OfficialPointCloudSourcePilotConfig",
+  "config_sha256": "40da1d16b16f10726e8f0afb32ed83b5af3b2ea9f3365cd4755784434b10e437",
+  "dataset_repository": "brownu/deform360",
+  "dataset_revision": "7fea8e20231a47641d1d2bc8791920ec4e62ec5e",
+  "decision": {
+    "maximum_worst_episode_ratio": 1.1,
+    "minimum_episode_win_fraction": 0.6666666666666666,
+    "minimum_relative_improvement": 0.05,
+    "primary_horizon_frames": 6
+  },
+  "episode_actions": {
+    "0": "lift side",
+    "2": "drag side",
+    "5": "lift sides",
+    "6": "lift middle and side",
+    "7": "drag sides",
+    "9": "fold"
+  },
+  "forbidden_episode_ids": [
+    1,
+    3,
+    4,
+    8
+  ],
+  "guard": {
+    "maximum_worst_episode_ratio": 1.25,
+    "minimum_relative_improvement": 0.0,
+    "minimum_win_fraction": 0.6
+  },
+  "horizon_frames": [
+    1,
+    3,
+    6
+  ],
+  "information_boundary": {
+    "dataset_modified": false,
+    "forbidden_episode_payloads_read": false,
+    "new_physical_data_collected": false,
+    "official_velocity_arrays_used": false,
+    "paper_claim_authorized": false,
+    "source_future_positions_allowed_for_scoring": true,
+    "source_only": true
+  },
+  "likelihood_information_cap": 20,
+  "maximum_points": 256,
+  "minimum_frames": 24,
+  "object_id": "002-rope-silk",
+  "predictive_variance_floor_m2": 1e-08,
+  "prior_variance_floor": 0.0025,
+  "processed_root_suffix": "processed-repository/processed",
+  "protocol_id": "causal4d-deform360-official-pcd-source-pilot-v1",
+  "reset_count": 5,
+  "rho_grid_count": 71,
+  "rho_grid_max": 1.25,
+  "rho_grid_min": -0.5,
+  "schema_version": 1,
+  "source_episode_ids": [
+    0,
+    2,
+    5,
+    6,
+    7,
+    9
+  ],
+  "status": "source-only-real-data-pilot"
+}

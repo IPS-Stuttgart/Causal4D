@@ -1,0 +1,265 @@
+name: Deform360 official point-cloud source pilot
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/deform360-official-pcd-source-pilot.yml"
+      - "configs/causal4d_public/deform360_official_pcd_source_pilot_v1.json"
+      - "docs/causal4d_deform360_official_pcd_source_pilot.md"
+      - "ops/deform360-official-pcd-source-pilot-request.json"
+      - "scripts/remote/run_deform360_official_pcd_pilot.py"
+      - "src/causal4d_public/deform360_official_pcd_pilot.py"
+      - "tests/test_deform360_official_pcd_pilot.py"
+  push:
+    branches: [main]
+    paths:
+      - "ops/deform360-official-pcd-source-pilot-request.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deform360-official-pcd-source-pilot-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Validate source-pilot method and boundary
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install development environment
+        run: |
+          python -m pip install -e ".[dev]"
+          python -m pip check
+
+      - name: Validate implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            scripts/remote/run_deform360_official_pcd_pilot.py
+            src/causal4d_public/deform360_official_pcd_pilot.py
+            tests/test_deform360_official_pcd_pilot.py
+          )
+          python -m ruff check "${files[@]}"
+          python -m ruff format --check "${files[@]}"
+          python -m mypy --no-site-packages \
+            scripts/remote/run_deform360_official_pcd_pilot.py \
+            src/causal4d_public/deform360_official_pcd_pilot.py
+          python -m pytest -q tests/test_deform360_official_pcd_pilot.py
+
+  evaluate:
+    name: Evaluate official Deform360 point-cloud episodes
+    if: >-
+      github.event_name != 'pull_request' &&
+      github.ref == 'refs/heads/main'
+    needs: contract
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]
+    timeout-minutes: 120
+    env:
+      DATASET_ROOT: /mnt/seagate10tb/florianpfaff/datasets/deform360
+      PROCESSED_ROOT: /mnt/seagate10tb/florianpfaff/datasets/deform360/processed-repository/processed
+      CONFIG: configs/causal4d_public/deform360_official_pcd_source_pilot_v1.json
+      REQUEST: ops/deform360-official-pcd-source-pilot-request.json
+      EVIDENCE_DIR: deform360-official-pcd-source-pilot
+    steps:
+      - name: Check out exact reviewed main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Verify reviewed request and mounted inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+          /usr/bin/python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          request_path = Path(os.environ["REQUEST"])
+          request = json.loads(request_path.read_text(encoding="utf-8"))
+          expected = {
+              "schema_version": 1,
+              "request": "run-deform360-official-pcd-source-pilot",
+              "enabled": True,
+              "workflow": "deform360-official-pcd-source-pilot.yml",
+              "ref": "main",
+              "processed_root": (
+                  "/mnt/seagate10tb/florianpfaff/datasets/deform360/"
+                  "processed-repository/processed"
+              ),
+              "protocol_id": "causal4d-deform360-official-pcd-source-pilot-v1",
+              "request_id": "2026-08-30-gpuserver4090-official-pcd-source-pilot-v1",
+          }
+          if request != expected:
+              raise SystemExit("source-pilot request differs from the reviewed value")
+
+          dataset_root = Path(os.environ["DATASET_ROOT"]).resolve()
+          processed_root = Path(os.environ["PROCESSED_ROOT"]).resolve()
+          if not dataset_root.is_dir():
+              raise SystemExit(f"Deform360 mount is missing: {dataset_root}")
+          if not processed_root.is_dir():
+              raise SystemExit(f"processed root is missing: {processed_root}")
+          if not processed_root.is_relative_to(dataset_root):
+              raise SystemExit("processed root escaped the reviewed dataset mount")
+
+          config = json.loads(Path(os.environ["CONFIG"]).read_text(encoding="utf-8"))
+          object_root = processed_root / config["object_id"]
+          missing = [
+              str(object_root / f"episode_{episode_id}" / "pcd_clean.tar")
+              for episode_id in config["source_episode_ids"]
+              if not (
+                  object_root / f"episode_{episode_id}" / "pcd_clean.tar"
+              ).is_file()
+          ]
+          if missing:
+              raise SystemExit("registered source archives are missing: " + ", ".join(missing))
+          forbidden = [
+              object_root / f"episode_{episode_id}" / "pcd_clean.tar"
+              for episode_id in config["forbidden_episode_ids"]
+          ]
+          print(
+              json.dumps(
+                  {
+                      "dataset_root": str(dataset_root),
+                      "processed_root": str(processed_root),
+                      "object_root": str(object_root),
+                      "source_archive_count": len(config["source_episode_ids"]),
+                      "forbidden_archive_count": len(forbidden),
+                      "forbidden_archives_opened": False,
+                      "dataset_modified": False,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              )
+          )
+          PY
+
+      - name: Select installed Python runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          selected=""
+          for candidate in python3.13 python3.12 python3.11 python3.10 /usr/bin/python3 python3; do
+            command -v "${candidate}" >/dev/null 2>&1 || continue
+            if "${candidate}" - <<'PY'
+          import sys
+          if sys.version_info < (3, 10):
+              raise SystemExit(1)
+          import numpy
+          PY
+            then
+              selected="$(command -v "${candidate}")"
+              break
+            fi
+          done
+          test -n "${selected}"
+          echo "PILOT_PYTHON=${selected}" >> "${GITHUB_ENV}"
+          "${selected}" --version
+
+      - name: Run source-only real-data pilot
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${EVIDENCE_DIR}"
+          export PYTHONPATH="$PWD/src"
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "commit=${GITHUB_SHA}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            echo "python=${PILOT_PYTHON}"
+            uname -a
+            nvidia-smi -L || true
+            df -h "${DATASET_ROOT}"
+          } > "${EVIDENCE_DIR}/runner.txt"
+          "${PILOT_PYTHON}" scripts/remote/run_deform360_official_pcd_pilot.py \
+            --processed-root "${PROCESSED_ROOT}" \
+            --config "${CONFIG}" \
+            --output "${EVIDENCE_DIR}/result.json" \
+            2>&1 | tee "${EVIDENCE_DIR}/run.log"
+          sha256sum \
+            "${EVIDENCE_DIR}/result.json" \
+            "${EVIDENCE_DIR}/run.log" \
+            "${EVIDENCE_DIR}/runner.txt" \
+            > "${EVIDENCE_DIR}/SHA256SUMS"
+
+      - name: Publish metric-bearing summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Deform360 official point-cloud source pilot"
+            echo
+            echo "- Reviewed head: \`${GITHUB_SHA}\`"
+            echo "- Runner label: \`gpuserver4090\`"
+            echo "- Dataset: \`${PROCESSED_ROOT}\`"
+            if [[ -f "${EVIDENCE_DIR}/result.json" ]]; then
+              "${PILOT_PYTHON:-/usr/bin/python3}" - <<'PY'
+          import json
+          from pathlib import Path
+
+          result = json.loads(
+              Path("deform360-official-pcd-source-pilot/result.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          decision = result["decision"]
+          primary = result["horizon_summaries"][
+              str(decision["primary_horizon_frames"])
+          ]
+          comparison = primary["comparisons"]["guarded"]
+          print(f"- Classification: `{decision['classification']}`")
+          print(f"- Decision passed: `{decision['passed']}`")
+          print(f"- Source episodes: `{len(result['episode_records'])}`")
+          print(
+              "- Guarded relative RMSE improvement vs persistence: "
+              f"`{comparison['relative_improvement_vs_persistence']:.6f}`"
+          )
+          print(
+              "- Episode win fraction: "
+              f"`{comparison['episode_win_fraction_vs_persistence']:.6f}`"
+          )
+          print(
+              "- Worst episode ratio: "
+              f"`{comparison['worst_episode_ratio_vs_persistence']:.6f}`"
+          )
+          print(f"- Exact fallback fraction: `{primary['exact_fallback_fraction']:.6f}`")
+          print(f"- Result SHA-256: `{result['result_sha256']}`")
+          print("- Paper claim authorized: `false`")
+          PY
+            else
+              echo "- No metric-bearing result was produced; inspect the run log."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload metric-bearing evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: deform360-official-pcd-source-pilot-${{ github.sha }}
+          path: deform360-official-pcd-source-pilot/
+          if-no-files-found: error
+          retention-days: 30
