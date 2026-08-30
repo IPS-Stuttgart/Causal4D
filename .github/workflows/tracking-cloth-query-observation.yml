@@ -5,15 +5,18 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/tracking-cloth-query-observation.yml"
+      - ".github/workflows/tracking-cloth-query-observation-file-dispatch.yml"
       - ".github/self-hosted-jobs.json"
       - "configs/causal4d_public/tracking_cloth_query_observation_v1.json"
+      - "ops/tracking-cloth-query-observation-gpuserver4090-request.json"
       - "src/causal4d_public/tracking_cloth_query_observation.py"
       - "tests/test_tracking_cloth_query_observation.py"
-  push:
-    branches: [main]
-    paths:
-      - "configs/causal4d_public/tracking_cloth_query_observation_v1.json"
   workflow_dispatch:
+    inputs:
+      request_id:
+        description: Exact reviewed Tracking Cloth request identity
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -65,7 +68,6 @@ jobs:
           python - <<'PY'
           import hashlib
           import importlib.util
-          import json
           from pathlib import Path
           import sys
 
@@ -97,11 +99,13 @@ jobs:
   evaluate:
     name: Run source-gated real-cloth evaluation on gpuserver4090
     if: >-
-      github.event_name != 'pull_request' &&
+      github.event_name == 'workflow_dispatch' &&
       github.ref == 'refs/heads/main'
     needs: contract
     runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]
     timeout-minutes: 180
+    env:
+      DISPATCH_REQUEST_ID: ${{ inputs.request_id }}
     steps:
       - name: Check out exact reviewed main revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -136,6 +140,8 @@ jobs:
           sys.modules[module_name] = module
           spec.loader.exec_module(module)
           request = module.load_request(Path(os.environ["REQUEST"]))
+          if os.environ["DISPATCH_REQUEST_ID"] != request["request_id"]:
+              raise SystemExit("dispatch request identity differs from frozen protocol")
           root = Path(os.environ["DATASET_ROOT"]).resolve()
           if root != module.EXPECTED_ROOT.resolve():
               raise SystemExit("mounted root differs from the frozen protocol root")
