@@ -20,13 +20,13 @@ import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, TypeAlias
 
 import numpy as np
 from numpy.typing import NDArray
 
-FloatArray = NDArray[np.float64]
-IntArray = NDArray[np.int64]
+FloatArray: TypeAlias = NDArray[np.float64]
+IntArray: TypeAlias = NDArray[np.int64]
 
 PILOT_KIND = "TrackingClothTaskConditionedObservationV1"
 RESULT_SCHEMA = "causal4d.tracking-cloth-query-observation-result"
