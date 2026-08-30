@@ -1,0 +1,186 @@
+name: Complete deformable-dataset admission
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/complete-deformable-dataset-admission.yml"
+      - ".github/self-hosted-jobs.json"
+      - "scripts/remote/inventory_complete_deformable_datasets.py"
+      - "tests/test_complete_deformable_dataset_admission.py"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/complete-deformable-dataset-admission.yml"
+      - ".github/self-hosted-jobs.json"
+      - "scripts/remote/inventory_complete_deformable_datasets.py"
+      - "tests/test_complete_deformable_dataset_admission.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: complete-deformable-dataset-admission-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Source-only scanner contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install development checks
+        run: python -m pip install -e ".[dev]"
+
+      - name: Validate scanner and focused tests
+        run: |
+          python -m ruff check \
+            scripts/remote/inventory_complete_deformable_datasets.py \
+            tests/test_complete_deformable_dataset_admission.py
+          python -m ruff format --check \
+            scripts/remote/inventory_complete_deformable_datasets.py \
+            tests/test_complete_deformable_dataset_admission.py
+          python -m mypy \
+            scripts/remote/inventory_complete_deformable_datasets.py
+          python -m pytest -q \
+            tests/test_complete_deformable_dataset_admission.py
+
+  source-inventory:
+    name: Read-only DOT, cloth, and DEFORM admission
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: contract
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]
+    timeout-minutes: 120
+    env:
+      DOT_ROOT: /mnt/seagate10tb/florianpfaff/datasets/dot
+      TRACKING_CLOTH_ROOT: /home/github-runner/.cache/datasets/tracking-cloth-deformation-v1-zenodo-14644526
+      DEFORM_ROOT: /mnt/seagate10tb/florianpfaff/datasets/deform/data_set
+      OUTPUT_ROOT: complete-deformable-dataset-admission
+    steps:
+      - name: Check out exact reviewed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Verify immutable checkout and mounted roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+          test -d "${DOT_ROOT}"
+          test -d "${TRACKING_CLOTH_ROOT}"
+          test -d "${DEFORM_ROOT}/DLO4"
+          test -d "${DEFORM_ROOT}/DLO5"
+          mkdir -p "${OUTPUT_ROOT}"
+          {
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "revision=${GITHUB_SHA}"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            /usr/bin/python3 --version
+            uname -a
+            nvidia-smi -L
+            df -h "${DOT_ROOT}" "${TRACKING_CLOTH_ROOT}" "${DEFORM_ROOT}"
+          } > "${OUTPUT_ROOT}/runner.txt"
+
+      - name: Inventory source layouts without loading outcomes
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 \
+            scripts/remote/inventory_complete_deformable_datasets.py \
+            --dot-root "${DOT_ROOT}" \
+            --tracking-root "${TRACKING_CLOTH_ROOT}" \
+            --deform-root "${DEFORM_ROOT}" \
+            --output-dir "${OUTPUT_ROOT}" \
+            --expected-dot-archives 21 \
+            --expected-tracking-recordings 120 \
+            --expected-deform-units DLO4 DLO5 \
+            --expected-deform-files-per-unit 70 \
+            --strict
+
+      - name: Record artifact hashes and source boundary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["OUTPUT_ROOT"])
+          files = sorted(path for path in root.glob("*") if path.is_file())
+          manifest = {
+              "schema": "causal4d.complete-deformable-dataset-admission-manifest-v1",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "revision": os.environ["GITHUB_SHA"],
+              "workflow_run_id": os.environ["GITHUB_RUN_ID"],
+              "runner": os.environ["RUNNER_NAME"],
+              "source_only": True,
+              "future_or_target_outcomes_read": False,
+              "dataset_modified": False,
+              "files": {
+                  path.name: {
+                      "bytes": path.stat().st_size,
+                      "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                  }
+                  for path in files
+              },
+          }
+          (root / "manifest.json").write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Publish admission summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Complete deformable-dataset admission"
+            echo
+            echo "- Revision: \`${GITHUB_SHA}\`"
+            echo "- Runner: \`${RUNNER_NAME}\`"
+            echo "- Source-only metadata/layout scan: \`true\`"
+            echo "- Numeric trajectory/image/tactile/force payloads loaded: \`false\`"
+            echo
+            if [[ -f "${OUTPUT_ROOT}/admission.md" ]]; then
+              cat "${OUTPUT_ROOT}/admission.md"
+            else
+              echo "Admission report was not produced; inspect the retained artifact."
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload immutable admission evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
+        with:
+          name: complete-deformable-dataset-admission-${{ github.run_id }}-${{ github.run_attempt }}
+          path: complete-deformable-dataset-admission
+          if-no-files-found: error
+          retention-days: 30
