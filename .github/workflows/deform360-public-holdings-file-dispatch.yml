@@ -30,6 +30,8 @@ jobs:
 
       - name: Select and validate one fixed request
         id: request
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -37,6 +39,7 @@ jobs:
           /usr/bin/python3 - <<'PY' >> "${GITHUB_OUTPUT}"
           import json
           import os
+          import urllib.request
           from pathlib import Path
 
           holdings_path = "ops/deform360-gpuserver6000-request.json"
@@ -48,13 +51,47 @@ jobs:
           else:
               event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
               changed = set()
-              for commit in event.get("commits", []):
+              records = list(event.get("commits", []))
+              head_commit = event.get("head_commit")
+              if isinstance(head_commit, dict):
+                  records.append(head_commit)
+              for commit in records:
                   for field in ("added", "modified", "removed"):
                       changed.update(commit.get(field, []))
+
               changed_requests = sorted(changed & allowed_paths)
               if len(changed_requests) != 1:
+                  before = event.get("before")
+                  after = event.get("after", os.environ["GITHUB_SHA"])
+                  if not isinstance(before, str) or not isinstance(after, str):
+                      raise SystemExit("push payload lacks before/after revisions")
+                  if before == "0" * 40:
+                      raise SystemExit("initial-branch pushes are not dispatchable")
+                  compare_url = (
+                      f'{os.environ["GITHUB_API_URL"]}/repos/'
+                      f'{os.environ["GITHUB_REPOSITORY"]}/compare/{before}...{after}'
+                  )
+                  api_request = urllib.request.Request(
+                      compare_url,
+                      headers={
+                          "Accept": "application/vnd.github+json",
+                          "Authorization": f'Bearer {os.environ["GH_TOKEN"]}',
+                          "X-GitHub-Api-Version": "2022-11-28",
+                      },
+                  )
+                  with urllib.request.urlopen(api_request, timeout=30) as response:
+                      comparison = json.load(response)
+                  changed = {
+                      item["filename"]
+                      for item in comparison.get("files", [])
+                      if isinstance(item, dict) and isinstance(item.get("filename"), str)
+                  }
+                  changed_requests = sorted(changed & allowed_paths)
+
+              if len(changed_requests) != 1:
                   raise SystemExit(
-                      "push must change exactly one reviewed Deform360 request file"
+                      "push must change exactly one reviewed Deform360 request file; "
+                      f"found {changed_requests}"
                   )
               selected_path = changed_requests[0]
 

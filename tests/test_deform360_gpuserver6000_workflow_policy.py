@@ -50,6 +50,8 @@ def test_file_change_dispatcher_is_hosted_and_fixed() -> None:
     assert "deform360-public-holdings-gpuserver6000.yml" in text
     assert "deform360-reset-mechanics.yml" in text
     assert "GITHUB_EVENT_PATH" in text
+    assert 'event.get("head_commit")' in text
+    assert "/compare/{before}...{after}" in text
     assert "changed_requests" in text
     assert "workflow_dispatch" in text
 
@@ -79,7 +81,7 @@ def test_reset_request_is_source_only_on_gpuserver4090() -> None:
         "ref": "main",
         "data_root": "",
         "run_source_diagnostic": True,
-        "request_id": "2026-08-30-gpuserver4090-reset-mechanics-source-v1",
+        "request_id": "2026-08-30-gpuserver4090-reset-mechanics-source-v2",
     }
 
     workflow = RESET_WORKFLOW.read_text(encoding="utf-8")
