@@ -1,0 +1,269 @@
+# workflow-lifecycle: one-shot
+# workflow-owner: IPS-Stuttgart maintainers
+name: Deform360 processed action-schema census v1
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/deform360-processed-action-census-v1.yml"
+      - "configs/causal4d_public/deform360_processed_action_census_v1.json"
+      - "docs/causal4d_deform360_processed_action_census.md"
+      - "ops/deform360-processed-action-census-request.json"
+      - "scripts/remote/census_deform360_processed_actions.py"
+      - "tests/test_deform360_processed_action_census.py"
+  push:
+    branches:
+      - science/deform360-processed-action-census-v1
+    paths:
+      - "ops/deform360-processed-action-census-request.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deform360-processed-action-census-v1-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Validate target-blind census contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact candidate revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install development environment
+        run: |
+          python -m pip install -e ".[dev]"
+          python -m pip check
+
+      - name: Validate implementation and frozen config
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            scripts/remote/census_deform360_processed_actions.py
+            tests/test_deform360_processed_action_census.py
+          )
+          python -m ruff check "${files[@]}"
+          python -m ruff format --check "${files[@]}"
+          python -m py_compile \
+            scripts/remote/census_deform360_processed_actions.py
+          python scripts/remote/census_deform360_processed_actions.py \
+            --self-test
+          python -m pytest -q \
+            tests/test_deform360_processed_action_census.py
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import subprocess
+          import sys
+
+          config_path = Path(
+              "configs/causal4d_public/"
+              "deform360_processed_action_census_v1.json"
+          )
+          request_path = Path(
+              "ops/deform360-processed-action-census-request.json"
+          )
+          config = json.loads(config_path.read_text(encoding="utf-8"))
+          request = json.loads(request_path.read_text(encoding="utf-8"))
+          assert request["enabled"] is True
+          assert request["protocol_id"] == config["protocol_id"]
+          assert request["config_sha256"] == config["config_sha256"]
+          assert request["processed_root"] == config["processed_root"]
+          assert request["runner_label"] == config["runner_label"]
+          assert request["source_bundle_audit_id"] == (
+              config["source_bundle_audit_id"]
+          )
+          subprocess.run(
+              [
+                  sys.executable,
+                  "scripts/remote/census_deform360_processed_actions.py",
+                  "--self-test",
+              ],
+              check=True,
+          )
+          PY
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+  census:
+    name: Census processed metadata on gpuserver4090
+    if: github.event_name != 'pull_request'
+    needs: contract
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]
+    timeout-minutes: 30
+    env:
+      CONFIG_PATH: >-
+        configs/causal4d_public/deform360_processed_action_census_v1.json
+      REQUEST_PATH: ops/deform360-processed-action-census-request.json
+      PROCESSED_ROOT: >-
+        /mnt/seagate10tb/florianpfaff/datasets/deform360/processed-repository/processed
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONHASHSEED: "0"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Admit exact runner class before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${RUNNER_OS}" = "Linux"
+          test "${RUNNER_ARCH}" = "X64"
+          echo "runner=${RUNNER_NAME} os=${RUNNER_OS} arch=${RUNNER_ARCH}"
+
+      - name: Check out exact candidate revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Verify exact reviewed revision and request
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import os
+
+          request = json.loads(
+              Path(os.environ["REQUEST_PATH"]).read_text(encoding="utf-8")
+          )
+          config = json.loads(
+              Path(os.environ["CONFIG_PATH"]).read_text(encoding="utf-8")
+          )
+          assert request["enabled"] is True
+          assert request["protocol_id"] == config["protocol_id"]
+          assert request["config_sha256"] == config["config_sha256"]
+          assert request["processed_root"] == os.environ["PROCESSED_ROOT"]
+          assert request["processed_root"] == config["processed_root"]
+          assert request["runner_label"] == "gpuserver4090"
+          assert request["source_bundle_audit_id"] == (
+              config["source_bundle_audit_id"]
+          )
+          assert request["target_outcomes_authorized"] is False
+          assert request["dataset_mutation_authorized"] is False
+          PY
+
+      - name: Select dependency-free Python 3.10 or newer
+        shell: bash
+        run: |
+          set -euo pipefail
+          selected=""
+          for candidate in \
+            /usr/bin/python3.12 \
+            /usr/local/bin/python3.12 \
+            /usr/bin/python3.11 \
+            /usr/bin/python3.10 \
+            /usr/bin/python3 \
+            python3
+          do
+            if [[ -x "${candidate}" ]] || command -v "${candidate}" >/dev/null 2>&1
+            then
+              if "${candidate}" - <<'PY'
+          import sys
+          raise SystemExit(0 if sys.version_info >= (3, 10) else 1)
+          PY
+              then
+                selected="$(command -v "${candidate}" 2>/dev/null || echo "${candidate}")"
+                break
+              fi
+            fi
+          done
+          test -n "${selected}"
+          echo "CENSUS_PYTHON=${selected}" >> "${GITHUB_ENV}"
+          "${selected}" --version
+
+      - name: Run source-only action-schema census
+        id: census
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent="${RUNNER_TEMP}/deform360-action-census-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          output="${parent}/evidence"
+          rm -rf -- "${parent}"
+          mkdir -p -- "${parent}"
+          echo "EVIDENCE_DIR=${output}" >> "${GITHUB_ENV}"
+          "${CENSUS_PYTHON}" \
+            scripts/remote/census_deform360_processed_actions.py \
+            --processed-root "${PROCESSED_ROOT}" \
+            --config "${CONFIG_PATH}" \
+            --output-dir "${output}" \
+            | tee "${parent}/run.log"
+          cp "${parent}/run.log" "${output}/run.log"
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "revision=${GITHUB_SHA}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            "${CENSUS_PYTHON}" --version
+            uname -a
+            nvidia-smi -L || true
+          } > "${output}/runner.txt"
+          RESULT="${output}/result.json" \
+            "${CENSUS_PYTHON}" - <<'PY'
+          from pathlib import Path
+          import json
+          import os
+
+          result = json.loads(Path(os.environ["RESULT"]).read_text())
+          decision = result["decision"]
+          values = {
+              "classification": decision["classification"],
+              "objects": result["summary"]["object_count"],
+              "episodes": decision["parsed_episode_count"],
+              "actions": decision["resolved_action_episode_count"],
+              "eligible": decision["eligible_complete_object_count"],
+              "result_sha256": result["result_sha256"],
+          }
+          with Path(os.environ["GITHUB_OUTPUT"]).open(
+              "a", encoding="utf-8"
+          ) as stream:
+              for key, value in values.items():
+                  stream.write(f"{key}={value}\n")
+          PY
+
+      - name: Publish scientific disposition
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Deform360 processed action-schema census"
+            echo
+            if [[ -f "${EVIDENCE_DIR:-}/report.md" ]]; then
+              cat "${EVIDENCE_DIR}/report.md"
+            else
+              echo "No census report was produced; inspect the job log."
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload target-blind census evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: >-
+            deform360-action-census-${{ steps.census.outputs.classification }}-${{ github.sha }}
+          path: ${{ env.EVIDENCE_DIR }}
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 6
