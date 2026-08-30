@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "Deform360OfficialPointCloudHostedReplicationConfig",
+  "protocol_id": "causal4d-deform360-official-pcd-hosted-replication-v1",
+  "status": "source-only-public-hub-replication",
+  "method_protocol_id": "causal4d-deform360-official-pcd-source-pilot-v1",
+  "source_repository": "brownu/deform360_processed",
+  "source_revision_policy": "resolve-main-once-before-any-source-archive-download-and-pin-returned-sha",
+  "local_gpuserver4090_inventory": {
+    "github_run_id": 33322193007,
+    "artifact_id": 9735203992,
+    "artifact_digest": "sha256:eda811e372e460d437d2d4ceaf2b25c5c41d8af026b905f593d090c47cbe1ffe",
+    "inventory_file": "download-layout.json"
+  },
+  "object_id": "002-rope-silk",
+  "source_archives": [
+    {
+      "episode_id": 0,
+      "action": "lift side",
+      "path": "processed/002-rope-silk/episode_0/pcd_clean.tar",
+      "expected_size_bytes": 58900480
+    },
+    {
+      "episode_id": 2,
+      "action": "drag side",
+      "path": "processed/002-rope-silk/episode_2/pcd_clean.tar",
+      "expected_size_bytes": 70144000
+    },
+    {
+      "episode_id": 5,
+      "action": "lift sides",
+      "path": "processed/002-rope-silk/episode_5/pcd_clean.tar",
+      "expected_size_bytes": 61788160
+    },
+    {
+      "episode_id": 6,
+      "action": "lift middle and side",
+      "path": "processed/002-rope-silk/episode_6/pcd_clean.tar",
+      "expected_size_bytes": 52561920
+    },
+    {
+      "episode_id": 7,
+      "action": "drag sides",
+      "path": "processed/002-rope-silk/episode_7/pcd_clean.tar",
+      "expected_size_bytes": 55562240
+    },
+    {
+      "episode_id": 9,
+      "action": "fold",
+      "path": "processed/002-rope-silk/episode_9/pcd_clean.tar",
+      "expected_size_bytes": 70850560
+    }
+  ],
+  "forbidden_episode_ids": [
+    1,
+    3,
+    4,
+    8
+  ],
+  "expected_total_source_bytes": 369807360,
+  "information_boundary": {
+    "source_only": true,
+    "source_archives_downloaded": true,
+    "forbidden_episode_archives_downloaded": false,
+    "forbidden_episode_payloads_read": false,
+    "official_velocity_arrays_used": false,
+    "dataset_modified": false,
+    "new_physical_data_collected": false,
+    "paper_claim_authorized": false
+  },
+  "config_sha256": "801f856de3988161308b35b6fbf00aa617801d1928e7a7dc83b16bba89f32d92"
+}
