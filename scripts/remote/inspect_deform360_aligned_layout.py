@@ -5,32 +5,33 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections import Counter
 from pathlib import Path
 
 
-def _files(path: Path, suffix: str) -> int:
+def _entries(path: Path) -> list[Path]:
     try:
-        return sum(
-            child.is_file() and child.suffix.lower() == suffix
-            for child in path.iterdir()
-        )
-    except OSError:
-        return 0
-
-
-def _dirs(path: Path) -> list[Path]:
-    try:
-        return sorted(
-            (child for child in path.iterdir() if child.is_dir()),
-            key=lambda child: child.name,
-        )
+        return sorted(path.iterdir(), key=lambda child: child.name)
     except OSError:
         return []
 
 
+def _files(path: Path, suffix: str) -> int:
+    return sum(
+        child.is_file() and child.suffix.lower() == suffix
+        for child in _entries(path)
+    )
+
+
+def _dirs(path: Path) -> list[Path]:
+    return [child for child in _entries(path) if child.is_dir()]
+
+
 def summarize(root: Path) -> dict[str, object]:
     root = root.resolve()
-    children = _dirs(root)
+    entries = _entries(root)
+    direct_files = [child for child in entries if child.is_file()]
+    children = [child for child in entries if child.is_dir()]
     rows = []
     for child in children[:100]:
         grandchildren = _dirs(child)
@@ -55,9 +56,14 @@ def summarize(root: Path) -> dict[str, object]:
             }
         )
     return {
-        "schema": "causal4d.deform360-bounded-layout/v1",
+        "schema": "causal4d.deform360-bounded-layout/v2",
         "root": str(root),
         "exists": root.is_dir(),
+        "direct_file_count": len(direct_files),
+        "direct_file_suffix_counts": dict(
+            sorted(Counter(path.suffix.lower() or "<none>" for path in direct_files).items())
+        ),
+        "direct_file_names_sample": [path.name for path in direct_files[:120]],
         "child_directory_count": len(children),
         "children": rows,
         "source_only": True,
