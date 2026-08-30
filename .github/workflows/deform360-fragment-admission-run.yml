@@ -1,0 +1,156 @@
+name: Deform360 fragment admission run
+
+on:
+  push:
+    branches:
+      - science/deform360-fragment-admission-run-20260830
+    paths:
+      - ".github/workflows/deform360-fragment-admission-run.yml"
+      - "scripts/remote/audit_deform360_fragments.py"
+      - "scripts/remote/merge_deform360_fragment_audits.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deform360-fragment-admission-run-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Compile source-only audit
+        run: |
+          python3 -m compileall -q \
+            scripts/remote/audit_deform360_fragments.py \
+            scripts/remote/merge_deform360_fragment_audits.py
+
+  audit-6000:
+    needs: contract
+    runs-on: [self-hosted, gpuserver6000]
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+      - name: Verify clean exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+      - name: Inventory reported 6000 roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/deform360-fragment-audit
+          /usr/bin/python3 scripts/remote/audit_deform360_fragments.py \
+            --server-id gpuserver6000 \
+            --root main-raw=raw:/mnt/lexar4tb/datasets/deform360/data-7fea8e2/raw \
+            --root fresh-raw=raw:/mnt/lexar4tb/datasets/deform360/fresh-download-20260811-v1/raw \
+            --root official-slice=mixed:/mnt/lexar4tb/datasets/deform360-official-hub-visuotactile-v1 \
+            --output build/deform360-fragment-audit/gpuserver6000.json
+          {
+            echo "runner=${RUNNER_NAME}"
+            echo "revision=${GITHUB_SHA}"
+            uname -a
+            df -h /mnt/lexar4tb || true
+          } > build/deform360-fragment-audit/gpuserver6000-runner.txt
+      - name: Upload 6000 inventory
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: deform360-fragment-audit-6000-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/deform360-fragment-audit/
+          if-no-files-found: error
+          retention-days: 30
+
+  audit-4090:
+    needs: contract
+    runs-on: [self-hosted, gpuserver4090]
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+      - name: Verify clean exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+      - name: Inventory reported 4090 roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/deform360-fragment-audit
+          /usr/bin/python3 scripts/remote/audit_deform360_fragments.py \
+            --server-id gpuserver4090 \
+            --root reusable-aligned=aligned:/home/florianpfaff/deform360-reusable-sota-v1/aligned \
+            --root fresh-source=mixed:/home/florianpfaff/deform360-fresh-source-processed-v1-1a3f9b1 \
+            --output build/deform360-fragment-audit/gpuserver4090.json
+          {
+            echo "runner=${RUNNER_NAME}"
+            echo "revision=${GITHUB_SHA}"
+            uname -a
+            df -h /home/florianpfaff || true
+          } > build/deform360-fragment-audit/gpuserver4090-runner.txt
+      - name: Upload 4090 inventory
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: deform360-fragment-audit-4090-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/deform360-fragment-audit/
+          if-no-files-found: error
+          retention-days: 30
+
+  aggregate:
+    needs: [audit-6000, audit-4090]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Download exact-run inventories
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: deform360-fragment-audit-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/deform360-fragment-audit-inputs
+      - name: Merge source-only admission evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t reports < <(
+            find build/deform360-fragment-audit-inputs \
+              -type f -name 'gpuserver*.json' -print | sort
+          )
+          test "${#reports[@]}" -eq 2
+          mkdir -p build/deform360-fragment-admission
+          python3 scripts/remote/merge_deform360_fragment_audits.py \
+            "${reports[@]}" \
+            --output-json build/deform360-fragment-admission/admission.json \
+            --output-markdown build/deform360-fragment-admission/admission.md
+          cat build/deform360-fragment-admission/admission.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload combined admission report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: deform360-fragment-admission-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/deform360-fragment-admission/
+          if-no-files-found: error
+          retention-days: 30
