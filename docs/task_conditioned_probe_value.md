@@ -154,6 +154,40 @@ verification checks the source-before-target gate, exact analytic values,
 policy ordering, risk rejection, dependence collapse, and predefined target
 effect margins.
 
+## Prior work and novelty boundary
+
+Goal-oriented experimental design is established. Attia, Alexanderian, and
+Saibaba minimize posterior uncertainty in a downstream quantity of interest
+rather than in the inferred parameter itself for Bayesian inverse problems:
+https://arxiv.org/abs/1802.06517. Kandasamy et al. formulate adaptive design
+around user-specified goal rewards:
+https://proceedings.mlr.press/v97/kandasamy19a.html. Chakraborty, Huan, and
+Catanach extend goal-oriented Bayesian design to nonlinear implicit models with
+a likelihood-free estimator: https://arxiv.org/abs/2408.09582. Cheng, Huan, and
+Pan treat mixed discrete--continuous quantities of interest in probabilistic
+mechanics: https://arxiv.org/abs/2608.19631.
+
+Accordingly, this work must not claim to invent task-oriented acquisition,
+Bayesian value of information, expected risk reduction, or quantity-of-interest
+experimental design. The candidate contribution is narrower and
+physical-twin-specific:
+
+1. the probe outcome and held-out physical query are coupled through one
+   dependence-bearing uncertain twin rather than treated as separate marginal
+   predictions;
+2. generic latent information, query risk, finite decision risk, intervention
+   cost, and prospective physical risk remain separate registered quantities;
+3. an unsafe high-value probe is rejected before outcome access;
+4. zero safe net value returns the exact no-probe physical fallback; and
+5. a marginal-preserving dependence control tests whether any gain actually
+   comes from the probe--query coupling.
+
+The controlled benchmark establishes only that this composition behaves as
+intended under known finite likelihoods. A substantial paper claim requires an
+end-to-end physical-twin study showing that the preserved dependencies change a
+probe choice and improve a held-out query or decision on independent real or
+high-fidelity physical instances.
+
 ## Relation to the broader paper program
 
 This controlled study addresses the conceptual failure exposed by the existing
