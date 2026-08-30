@@ -25,6 +25,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
           clean: true
 
@@ -37,6 +38,8 @@ jobs:
           /usr/bin/python3 - <<'PY' >> "${GITHUB_OUTPUT}"
           import json
           import os
+          import re
+          import subprocess
           from pathlib import Path
 
           holdings_path = "ops/deform360-gpuserver6000-request.json"
@@ -47,10 +50,31 @@ jobs:
               selected_path = holdings_path
           else:
               event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
-              changed = set()
-              for commit in event.get("commits", []):
-                  for field in ("added", "modified", "removed"):
-                      changed.update(commit.get(field, []))
+              if event.get("forced") is True:
+                  raise SystemExit(
+                      "forced pushes cannot dispatch reviewed Deform360 jobs"
+                  )
+              before = event.get("before")
+              after = event.get("after")
+              revision_pattern = re.compile(r"[0-9a-f]{40}")
+              if not isinstance(before, str) or revision_pattern.fullmatch(before) is None:
+                  raise SystemExit("push before revision is missing or malformed")
+              if before == "0" * 40:
+                  raise SystemExit(
+                      "initial pushes cannot dispatch reviewed Deform360 jobs"
+                  )
+              if not isinstance(after, str) or revision_pattern.fullmatch(after) is None:
+                  raise SystemExit("push after revision is missing or malformed")
+              if after != os.environ["GITHUB_SHA"]:
+                  raise SystemExit(
+                      "push after revision does not match the checked-out head"
+                  )
+              changed = set(
+                  subprocess.check_output(
+                      ["git", "diff", "--name-only", before, after],
+                      text=True,
+                  ).splitlines()
+              )
               changed_requests = sorted(changed & allowed_paths)
               if len(changed_requests) != 1:
                   raise SystemExit(
