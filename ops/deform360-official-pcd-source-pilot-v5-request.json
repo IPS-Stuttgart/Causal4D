@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "request": "run-deform360-official-pcd-source-pilot-v5",
+  "enabled": true,
+  "workflow": "deform360-official-pcd-source-pilot-v5.yml",
+  "ref": "main",
+  "processed_root": "/mnt/seagate10tb/florianpfaff/datasets/deform360/processed-repository/processed",
+  "protocol_id": "causal4d-deform360-official-pcd-source-pilot-v1",
+  "request_id": "2026-08-31-gpuserver4090-official-pcd-source-pilot-v5"
+}
