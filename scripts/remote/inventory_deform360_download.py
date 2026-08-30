@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter, deque
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -70,7 +70,9 @@ def _relative(path: Path, root: Path) -> str:
 def _iso_utc(mtime_ns: int | None) -> str | None:
     if mtime_ns is None:
         return None
-    return datetime.fromtimestamp(mtime_ns / 1_000_000_000, tz=UTC).isoformat()
+    return datetime.fromtimestamp(
+        mtime_ns / 1_000_000_000, tz=timezone.utc
+    ).isoformat()
 
 
 def _is_archive(name: str) -> bool:
