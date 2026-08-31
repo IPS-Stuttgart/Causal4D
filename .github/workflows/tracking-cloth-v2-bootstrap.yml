@@ -1,4 +1,4 @@
-name: Bootstrap final Tracking Cloth V2 files
+name: Export validated Tracking Cloth V2 files
 
 on:
   pull_request:
@@ -8,14 +8,14 @@ on:
       - ".github/bootstrap/tracking-cloth-v2-final.tar.gz.b64.part-*"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: tracking-cloth-v2-bootstrap-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
+  group: tracking-cloth-v2-export-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
-  bootstrap:
+  export:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: true
+          persist-credentials: false
           clean: true
 
       - name: Set up Python 3.12
@@ -33,7 +33,7 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install the checksummed V2 archive and validate it
+      - name: Install and validate the checksummed V2 archive
         shell: bash
         run: |
           set -euo pipefail
@@ -60,7 +60,6 @@ jobs:
           sort -o /tmp/expected-paths.txt /tmp/expected-paths.txt
           diff -u /tmp/expected-paths.txt /tmp/archive-paths.txt
           tar -xzf /tmp/tracking-cloth-v2-final.tar.gz
-          rm -f "${parts[@]}" .github/workflows/tracking-cloth-v2-bootstrap.yml
 
           python -m pip install -e ".[dev]"
           python -m pip check
@@ -83,7 +82,7 @@ jobs:
           module_path = Path(
               "src/causal4d_public/tracking_cloth_query_observation_v2.py"
           ).resolve()
-          module_name = "tracking_cloth_query_observation_v2_bootstrap"
+          module_name = "tracking_cloth_query_observation_v2_export"
           spec = importlib.util.spec_from_file_location(module_name, module_path)
           if spec is None or spec.loader is None:
               raise SystemExit("failed to create V2 module specification")
@@ -107,15 +106,16 @@ jobs:
               raise SystemExit("target refit boundary changed")
           PY
 
-      - name: Commit only the final reviewed V2 files
-        env:
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          test -n "$(git status --porcelain=v1)"
-          git commit -m "Install final Tracking Cloth V2 protocol"
-          git push origin "HEAD:${HEAD_REF}"
+      - name: Upload the exact validated V2 files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tracking-cloth-v2-validated-${{ github.event.pull_request.head.sha }}
+          path: |
+            .github/workflows/tracking-cloth-query-observation-v2-file-dispatch.yml
+            .github/workflows/tracking-cloth-query-observation-v2.yml
+            configs/causal4d_public/tracking_cloth_query_observation_v2.json
+            ops/tracking-cloth-query-observation-v2-gpuserver4090-request.json
+            src/causal4d_public/tracking_cloth_query_observation_v2.py
+            tests/test_tracking_cloth_query_observation_v2.py
+          if-no-files-found: error
+          retention-days: 3
