@@ -101,9 +101,9 @@ jobs:
           )
           if request["request_id"] != expected:
               raise SystemExit("unexpected frozen V2 request identity")
-          if request["primary_target_statistical_unit"] != "material_size_specimen":
+          if request["primary_statistical_unit"] != "material_size_physical_specimen":
               raise SystemExit("target statistical unit changed")
-          if request["target_models_refit_after_gate"] is not False:
+          if request["information_boundary"]["target_models_refit_after_gate"] is not False:
               raise SystemExit("target refit boundary changed")
           PY
 
