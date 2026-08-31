@@ -37,8 +37,7 @@ def test_terminal_tracking_cloth_request_is_disabled() -> None:
         "schema_version": 1,
         "supersedes_run_id": 33363286850,
         "terminal_record": (
-            "evidence/negative/"
-            "tracking-cloth-shake-to-twist-20260830/result.json"
+            "evidence/negative/tracking-cloth-shake-to-twist-20260830/result.json"
         ),
         "workflow": "tracking-cloth-query-observation.yml",
     }
