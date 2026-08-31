@@ -9,11 +9,10 @@ Causal4D/BayesianPhysTwin evaluation path.
 from __future__ import annotations
 
 import argparse
-from collections import Counter, defaultdict
+from collections import Counter
 import csv
 import hashlib
 import json
-import math
 import os
 from pathlib import Path
 import re

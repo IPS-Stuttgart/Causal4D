@@ -11,6 +11,9 @@
     },
     "v5-checkout-reprovision-issue-main": {
       "description": "Exact registered-maintainer issue trigger on reviewed refs/heads/main for the pre-freeze atomic v5 checkout replacement, exact GITHUB_SHA checkout, clean-tree verification, byte-verified dataset noninterference, read-only self-hosted token, no issue text execution, and no secrets."
+    },
+    "reviewed-file-main": {
+      "description": "Exact frozen public-data workflow triggered only by a reviewed main-branch request-file change or manual main dispatch; exact GITHUB_SHA checkout, clean-tree verification, read-only token, no issue/PR payload execution, and no secrets."
     }
   },
   "documentation": "docs/self_hosted_runner_security.md",
@@ -132,6 +135,21 @@
       "workflow": "correct-operator-registry-self-hosted.yml"
     },
     {
+      "authorization_model": "reviewed-file-main",
+      "dataset_access": "verified-public-deform-dlo45-source-gate-and-conditional-target",
+      "job": "evaluate",
+      "purpose": "Target-closed DEFORM DLO4/DLO5 public evaluation",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi",
+        "gpuserver4090"
+      ],
+      "secrets_allowed": false,
+      "workflow": "deform-dlo45-public-gpuserver4090.yml"
+    },
+    {
       "authorization_model": "main-only",
       "dataset_access": "approved-source-only-deform360",
       "job": "source-diagnostic",
@@ -160,6 +178,66 @@
       ],
       "secrets_allowed": false,
       "workflow": "deform360-filament-support.yml"
+    },
+    {
+      "authorization_model": "reviewed-file-main",
+      "dataset_access": "approved-source-only-deform360-official-pcd",
+      "job": "evaluate",
+      "purpose": "V3 Deform360 official point-cloud source pilot",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi",
+        "gpuserver4090"
+      ],
+      "secrets_allowed": false,
+      "workflow": "deform360-official-pcd-source-pilot-v3.yml"
+    },
+    {
+      "authorization_model": "reviewed-file-main",
+      "dataset_access": "approved-source-only-deform360-official-pcd",
+      "job": "evaluate",
+      "purpose": "V4 Deform360 official point-cloud source pilot",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi",
+        "gpuserver4090"
+      ],
+      "secrets_allowed": false,
+      "workflow": "deform360-official-pcd-source-pilot-v4.yml"
+    },
+    {
+      "authorization_model": "reviewed-file-main",
+      "dataset_access": "approved-source-only-deform360-official-pcd",
+      "job": "evaluate",
+      "purpose": "V5 standalone Deform360 official point-cloud source pilot",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi",
+        "gpuserver4090"
+      ],
+      "secrets_allowed": false,
+      "workflow": "deform360-official-pcd-source-pilot-v5.yml"
+    },
+    {
+      "authorization_model": "reviewed-file-main",
+      "dataset_access": "approved-source-only-deform360-official-pcd",
+      "job": "evaluate",
+      "purpose": "Original Deform360 official point-cloud source pilot",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi",
+        "gpuserver4090"
+      ],
+      "secrets_allowed": false,
+      "workflow": "deform360-official-pcd-source-pilot.yml"
     },
     {
       "authorization_model": "main-only",
@@ -235,6 +313,21 @@
       "workflow": "prepared-joint-observation-self-hosted.yml"
     },
     {
+      "authorization_model": "reviewed-file-main",
+      "dataset_access": "verified-public-dataset-read-only-probe",
+      "job": "probe",
+      "purpose": "Read-only inventory of complete public real-world holdings",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi",
+        "gpuserver4090"
+      ],
+      "secrets_allowed": false,
+      "workflow": "public-realworld-probe-gpuserver4090.yml"
+    },
+    {
       "authorization_model": "v5-checkout-reprovision-issue-main",
       "dataset_access": "registered-local-preacquisition-v5-checkout-replacement-with-byte-verification",
       "job": "reprovision",
@@ -262,6 +355,21 @@
       ],
       "secrets_allowed": false,
       "workflow": "self-hosted-evaluation.yml"
+    },
+    {
+      "authorization_model": "main-only",
+      "dataset_access": "verified-public-tracking-cloth-source-gate-and-conditional-target",
+      "job": "evaluate",
+      "purpose": "Source-gated task-conditioned sparse-marker evaluation on real cloth recordings",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi",
+        "gpuserver4090"
+      ],
+      "secrets_allowed": false,
+      "workflow": "tracking-cloth-query-observation.yml"
     },
     {
       "authorization_model": "main-only",

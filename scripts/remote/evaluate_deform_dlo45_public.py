@@ -18,7 +18,6 @@ import math
 import os
 from pathlib import Path
 import re
-import sys
 from typing import Any, Iterable, Mapping, Sequence
 
 import numpy as np
