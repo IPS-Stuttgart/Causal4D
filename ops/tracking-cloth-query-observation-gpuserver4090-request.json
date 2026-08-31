@@ -1,8 +1,8 @@
 {
+  "schema_version": 1,
   "enabled": true,
+  "workflow": "tracking-cloth-query-observation.yml",
   "ref": "main",
   "request": "run-tracking-cloth-query-observation-gpuserver4090",
-  "request_id": "3e9f77bd804f91545dbdac1098c324b3b155167c938c186a2e9238c712cdeca0",
-  "schema_version": 1,
-  "workflow": "tracking-cloth-query-observation.yml"
+  "request_id": "3e9f77bd804f91545dbdac1098c324b3b155167c938c186a2e9238c712cdeca0"
 }
