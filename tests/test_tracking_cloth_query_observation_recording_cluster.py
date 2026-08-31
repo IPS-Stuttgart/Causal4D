@@ -7,7 +7,9 @@ from typing import Any
 
 import pytest
 
-from causal4d_public import tracking_cloth_query_observation_recording_cluster as cluster
+from causal4d_public import (
+    tracking_cloth_query_observation_recording_cluster as cluster,
+)
 
 
 def _row(
@@ -124,7 +126,9 @@ def test_duplicate_horizon_and_inconsistent_selection_fail_closed() -> None:
         cluster.source_gate(inconsistent, request)
 
 
-def test_run_evaluation_refreshes_result_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_evaluation_refreshes_result_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         cluster,
         "_ORIGINAL_RUN_EVALUATION",
