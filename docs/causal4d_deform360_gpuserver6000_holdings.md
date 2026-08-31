@@ -72,10 +72,11 @@ ops/deform360-gpuserver6000-request.json
 ```
 
 runs a GitHub-hosted dispatcher that invokes the reviewed main workflow. The
-request currently preprocesses at most one object, so the first run attempts
-only the exact completed `001-rope` case. Increasing the bound to at most four
-would additionally admit the fixed exploratory candidates only when the actual
-inventory passes the ten-episode qualification.
+current request permits at most four objects: the exact `001-rope` reproduction
+plus the fixed exploratory candidates `003-cable`, `086-cotton-scarf-cloth`, and
+`171-penguin`. Each object is processed only when the live inventory independently
+passes the registered ten-episode qualification. The six protected locked-cohort
+objects remain excluded before any preprocessing payload is opened.
 
 ## Interpretation
 
