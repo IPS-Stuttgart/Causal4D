@@ -8,7 +8,7 @@ on:
       - ".github/bootstrap/tracking-cloth-v2-final.tar.gz.b64.part-*"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: tracking-cloth-v2-export-${{ github.event.pull_request.number }}
@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
+          persist-credentials: true
           clean: true
 
       - name: Set up Python 3.12
@@ -119,3 +119,19 @@ jobs:
             tests/test_tracking_cloth_query_observation_v2.py
           if-no-files-found: error
           retention-days: 3
+
+      - name: Commit the validated non-workflow files
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            configs/causal4d_public/tracking_cloth_query_observation_v2.json \
+            ops/tracking-cloth-query-observation-v2-gpuserver4090-request.json \
+            src/causal4d_public/tracking_cloth_query_observation_v2.py \
+            tests/test_tracking_cloth_query_observation_v2.py
+          git commit -m "Install validated Tracking Cloth V2 implementation"
+          git push origin "HEAD:${HEAD_REF}"
