@@ -81,9 +81,7 @@ def _specimen_metric(
 ) -> float:
     recordings = _group_recordings(rows)
     return float(
-        np.mean(
-            [_cluster_metric(group, arm, metric) for group in recordings.values()]
-        )
+        np.mean([_cluster_metric(group, arm, metric) for group in recordings.values()])
     )
 
 
@@ -177,10 +175,7 @@ def aggregate_specimens(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "equal_specimen_rmse_mm": 1000.0 * float(np.sqrt(np.mean(mse))),
             "equal_specimen_gaussian_nll": float(
                 np.mean(
-                    [
-                        row["arms"][arm]["gaussian_nll"]
-                        for row in by_specimen.values()
-                    ]
+                    [row["arms"][arm]["gaussian_nll"] for row in by_specimen.values()]
                 )
             ),
             "equal_specimen_marginal_90_coverage": float(
