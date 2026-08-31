@@ -80,6 +80,13 @@
       "role": "source_locked_public_diagnostics",
       "lifecycle": "diagnostic",
       "local_contract_module": null
+    },
+    {
+      "module": "bayesian_phystwin.query_decision_certificate_v1",
+      "api_version": 1,
+      "role": "exact_query_quotient_decision_certificate",
+      "lifecycle": "production_additive",
+      "local_contract_module": "causal4d.decision_identifiable_intervention"
     }
   ]
 }
