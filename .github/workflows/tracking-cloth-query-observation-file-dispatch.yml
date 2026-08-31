@@ -1,4 +1,4 @@
-name: Dispatch reviewed Tracking Cloth evaluation from file change
+name: Retire completed Tracking Cloth evaluation
 
 on:
   push:
@@ -8,16 +8,18 @@ on:
   workflow_dispatch:
 
 permissions:
-  actions: write
   contents: read
 
+# This intentionally shares the primary workflow's concurrency group. Once the
+# terminal request reaches main, this hosted run cancels any obsolete queued or
+# running Tracking Cloth evaluation before a self-hosted runner is allocated.
 concurrency:
-  group: tracking-cloth-reviewed-file-dispatch
-  cancel-in-progress: false
+  group: tracking-cloth-query-observation-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  dispatch:
-    name: Validate request and dispatch reviewed main
+  terminalize:
+    name: Validate terminal evidence and retire the reviewed request
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -28,10 +30,8 @@ jobs:
           persist-credentials: false
           clean: true
 
-      - name: Validate the exact reviewed request and frozen protocol
+      - name: Validate the exact terminal request and evidence record
         id: request
-        env:
-          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -40,71 +40,37 @@ jobs:
           /usr/bin/python3 - <<'PY' >> "${GITHUB_OUTPUT}"
           import hashlib
           import json
-          import os
-          import urllib.request
           from pathlib import Path
 
-          request_path = (
+          request_path = Path(
               "ops/tracking-cloth-query-observation-gpuserver4090-request.json"
           )
-          protocol_path = (
+          protocol_path = Path(
               "configs/causal4d_public/"
               "tracking_cloth_query_observation_v1.json"
           )
+          terminal_path = Path(
+              "evidence/negative/"
+              "tracking-cloth-shake-to-twist-20260830/result.json"
+          )
 
-          if os.environ["GITHUB_EVENT_NAME"] == "push":
-              event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
-              changed: set[str] = set()
-              records = list(event.get("commits", []))
-              head_commit = event.get("head_commit")
-              if isinstance(head_commit, dict):
-                  records.append(head_commit)
-              for commit in records:
-                  for field in ("added", "modified", "removed"):
-                      changed.update(commit.get(field, []))
-              if request_path not in changed:
-                  before = event.get("before")
-                  after = event.get("after", os.environ["GITHUB_SHA"])
-                  if not isinstance(before, str) or not isinstance(after, str):
-                      raise SystemExit("push payload lacks before/after revisions")
-                  if before == "0" * 40:
-                      raise SystemExit("initial-branch pushes are not dispatchable")
-                  compare_url = (
-                      f'{os.environ["GITHUB_API_URL"]}/repos/'
-                      f'{os.environ["GITHUB_REPOSITORY"]}/compare/{before}...{after}'
-                  )
-                  api_request = urllib.request.Request(
-                      compare_url,
-                      headers={
-                          "Accept": "application/vnd.github+json",
-                          "Authorization": f'Bearer {os.environ["GH_TOKEN"]}',
-                          "X-GitHub-Api-Version": "2022-11-28",
-                      },
-                  )
-                  with urllib.request.urlopen(api_request, timeout=30) as response:
-                      comparison = json.load(response)
-                  changed = {
-                      item["filename"]
-                      for item in comparison.get("files", [])
-                      if isinstance(item, dict)
-                      and isinstance(item.get("filename"), str)
-                  }
-              if request_path not in changed:
-                  raise SystemExit("reviewed Tracking Cloth request file did not change")
-
-          request = json.loads(Path(request_path).read_text(encoding="utf-8"))
+          request = json.loads(request_path.read_text(encoding="utf-8"))
           expected_request = {
-              "enabled": True,
+              "enabled": False,
               "ref": "main",
-              "request": "run-tracking-cloth-query-observation-gpuserver4090",
-              "request_id": "3e9f77bd804f91545dbdac1098c324b3b155167c938c186a2e9238c712cdeca0",
+              "request": "record-terminal-tracking-cloth-negative-result",
+              "request_id": (
+                  "3e9f77bd804f91545dbdac1098c324b3b155167c938c186a2e9238c712cdeca0"
+              ),
               "schema_version": 1,
+              "supersedes_run_id": 33363286850,
+              "terminal_record": str(terminal_path),
               "workflow": "tracking-cloth-query-observation.yml",
           }
           if request != expected_request:
-              raise SystemExit("execution request differs from the reviewed value")
+              raise SystemExit("terminal request differs from the reviewed value")
 
-          protocol = json.loads(Path(protocol_path).read_text(encoding="utf-8"))
+          protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
           supplied = protocol.get("request_id")
           unhashed = dict(protocol)
           unhashed.pop("request_id", None)
@@ -119,55 +85,60 @@ jobs:
           if supplied != calculated:
               raise SystemExit("frozen protocol request_id is invalid")
           if request["request_id"] != supplied:
-              raise SystemExit("execution request does not bind the frozen protocol")
+              raise SystemExit("terminal request does not bind the frozen protocol")
+
+          record_bytes = terminal_path.read_bytes()
+          record = json.loads(record_bytes)
+          required_record = {
+              "artifact_kind": "Causal4DNegativeEvidenceRecordV1",
+              "record_id": "tracking-cloth-shake-to-twist-20260830",
+              "status": "completed_negative_result",
+              "terminal_for_registered_protocol": True,
+              "creates_new_experiment_requirement": False,
+              "paper_claim_authorized": False,
+          }
+          for key, expected in required_record.items():
+              if record.get(key) != expected:
+                  raise SystemExit(f"terminal evidence field changed: {key}")
+
+          primary = record.get("primary_evaluation")
+          active = record.get("active_probe_replay")
+          if not isinstance(primary, dict) or not isinstance(active, dict):
+              raise SystemExit("terminal evidence lacks registered evaluations")
+          if primary.get("study_id") != "tracking-cloth-shake-to-twist-pilot-v1":
+              raise SystemExit("unexpected primary Tracking Cloth study")
+          if primary.get("github_run_id") != 33302686759:
+              raise SystemExit("unexpected primary Tracking Cloth run")
+          if primary.get("decision", {}).get("physics_transfer_beats_persistence") is not False:
+              raise SystemExit("negative primary decision was not retained")
+          if active.get("study_id") != "tracking-cloth-task-directed-active-probe-v1":
+              raise SystemExit("unexpected active-probe study")
+          if active.get("github_run_id") != 33319276977:
+              raise SystemExit("unexpected active-probe run")
 
           print("workflow=" + request["workflow"])
           print("ref=" + request["ref"])
           print("request_id=" + request["request_id"])
-          print("request_path=" + request_path)
-          print("protocol_path=" + protocol_path)
+          print("request_path=" + str(request_path))
+          print("protocol_path=" + str(protocol_path))
+          print("terminal_record=" + str(terminal_path))
+          print("terminal_record_sha256=" + hashlib.sha256(record_bytes).hexdigest())
+          print("supersedes_run_id=" + str(request["supersedes_run_id"]))
+          print("dispatch_performed=false")
+          print("terminal_reason=completed_negative_result")
           PY
 
-      - name: Dispatch the reviewed main-only self-hosted workflow
-        env:
-          GH_TOKEN: ${{ github.token }}
-          WORKFLOW: ${{ steps.request.outputs.workflow }}
-          REF: ${{ steps.request.outputs.ref }}
-          REQUEST_ID: ${{ steps.request.outputs.request_id }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          payload="$(/usr/bin/python3 - <<'PY'
-          import json
-          import os
-
-          print(
-              json.dumps(
-                  {
-                      "ref": os.environ["REF"],
-                      "inputs": {"request_id": os.environ["REQUEST_ID"]},
-                  },
-                  separators=(",", ":"),
-              )
-          )
-          PY
-          )"
-          endpoint="${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW}/dispatches"
-          curl --fail-with-body --silent --show-error \
-            --request POST \
-            --header "Accept: application/vnd.github+json" \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            "${endpoint}" \
-            --data "${payload}"
-
-      - name: Write dispatch receipt
+      - name: Write terminalization receipt
         env:
           WORKFLOW: ${{ steps.request.outputs.workflow }}
           REF: ${{ steps.request.outputs.ref }}
           REQUEST_ID: ${{ steps.request.outputs.request_id }}
           REQUEST_PATH: ${{ steps.request.outputs.request_path }}
           PROTOCOL_PATH: ${{ steps.request.outputs.protocol_path }}
+          TERMINAL_RECORD: ${{ steps.request.outputs.terminal_record }}
+          TERMINAL_RECORD_SHA256: ${{ steps.request.outputs.terminal_record_sha256 }}
+          SUPERSEDES_RUN_ID: ${{ steps.request.outputs.supersedes_run_id }}
+          TERMINAL_REASON: ${{ steps.request.outputs.terminal_reason }}
         shell: bash
         run: |
           set -euo pipefail
@@ -176,34 +147,45 @@ jobs:
           import os
           from pathlib import Path
 
-          Path("tracking-cloth-dispatch-receipt.json").write_text(
-              json.dumps(
-                  {
-                      "schema_version": 1,
-                      "request_id": os.environ["REQUEST_ID"],
-                      "request_path": os.environ["REQUEST_PATH"],
-                      "protocol_path": os.environ["PROTOCOL_PATH"],
-                      "source_sha": os.environ["GITHUB_SHA"],
-                      "source_run_id": os.environ["GITHUB_RUN_ID"],
-                      "workflow": os.environ["WORKFLOW"],
-                      "ref": os.environ["REF"],
-                      "runner_class": "github-hosted-dispatcher",
-                      "public_data_only": True,
-                      "target_contents_opened": False,
-                      "new_physical_data_collected": False,
-                  },
-                  indent=2,
-                  sort_keys=True,
-              )
-              + "\n",
+          receipt = {
+              "schema_version": 2,
+              "request_id": os.environ["REQUEST_ID"],
+              "request_path": os.environ["REQUEST_PATH"],
+              "protocol_path": os.environ["PROTOCOL_PATH"],
+              "terminal_record": os.environ["TERMINAL_RECORD"],
+              "terminal_record_sha256": os.environ["TERMINAL_RECORD_SHA256"],
+              "terminal_reason": os.environ["TERMINAL_REASON"],
+              "supersedes_run_id": int(os.environ["SUPERSEDES_RUN_ID"]),
+              "source_sha": os.environ["GITHUB_SHA"],
+              "source_run_id": os.environ["GITHUB_RUN_ID"],
+              "workflow": os.environ["WORKFLOW"],
+              "ref": os.environ["REF"],
+              "runner_class": "github-hosted-terminalizer",
+              "dispatch_performed": False,
+              "self_hosted_runner_allocated": False,
+              "public_data_only": True,
+              "target_contents_opened": False,
+              "new_physical_data_collected": False,
+              "new_experiment_required": False,
+          }
+          Path("tracking-cloth-terminalization-receipt.json").write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n",
               encoding="utf-8",
           )
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open(
+              "a", encoding="utf-8"
+          ) as summary:
+              summary.write("## Tracking Cloth protocol retired\n\n")
+              summary.write(
+                  "The completed negative result is terminal for the registered "
+                  "protocol. No self-hosted workflow was dispatched.\n"
+              )
           PY
 
-      - name: Upload dispatch receipt
+      - name: Upload terminalization receipt
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
-          name: tracking-cloth-reviewed-dispatch-${{ github.sha }}
-          path: tracking-cloth-dispatch-receipt.json
+          name: tracking-cloth-terminalization-${{ github.sha }}
+          path: tracking-cloth-terminalization-receipt.json
           if-no-files-found: error
           retention-days: 30
