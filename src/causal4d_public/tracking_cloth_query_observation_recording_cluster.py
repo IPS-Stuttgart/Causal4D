@@ -77,10 +77,7 @@ def aggregate_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
             dtype=np.float64,
         )
         nll = np.asarray(
-            [
-                _cluster_metric(group, arm, "gaussian_nll")
-                for group in grouped.values()
-            ],
+            [_cluster_metric(group, arm, "gaussian_nll") for group in grouped.values()],
             dtype=np.float64,
         )
         coverage = np.asarray(
@@ -162,7 +159,9 @@ def source_gate(rows: list[dict[str, Any]], request: dict[str, Any]) -> dict[str
         previous = selections.setdefault(key, pair)
         if previous != pair:
             raise ValueError(f"selection changed across recordings for {key}")
-    distinct = sum(task_group != generic_group for task_group, generic_group in selections.values())
+    distinct = sum(
+        task_group != generic_group for task_group, generic_group in selections.values()
+    )
 
     thresholds = request["source_gate"]
     checks = {
@@ -206,8 +205,7 @@ def _bootstrap_difference(
         difference = float(
             np.mean(
                 [
-                    row["arms"][arm_a]["mse_m2"]
-                    - row["arms"][arm_b]["mse_m2"]
+                    row["arms"][arm_a]["mse_m2"] - row["arms"][arm_b]["mse_m2"]
                     for row in group
                 ]
             )
