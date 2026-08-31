@@ -1,8 +1,10 @@
 {
-  "enabled": true,
+  "enabled": false,
   "ref": "main",
+  "request": "record-terminal-tracking-cloth-negative-result",
   "request_id": "3e9f77bd804f91545dbdac1098c324b3b155167c938c186a2e9238c712cdeca0",
-  "request": "run-tracking-cloth-query-observation-gpuserver4090",
   "schema_version": 1,
+  "supersedes_run_id": 33363286850,
+  "terminal_record": "evidence/negative/tracking-cloth-shake-to-twist-20260830/result.json",
   "workflow": "tracking-cloth-query-observation.yml"
 }
