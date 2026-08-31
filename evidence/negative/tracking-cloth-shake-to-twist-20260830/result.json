@@ -118,7 +118,7 @@
     "primary_probe_budget": 1,
     "primary_task_directed_rmse_mm": 119.86533281968697,
     "primary_task_directed_minus_persistence_rmse_mm": 44.72019889063222,
-    "primary_task_directed_relative_regret_percent": 59.51181711059778,
+    "primary_task_directed_relative_regret_percent": 59.51176949508532,
     "primary_task_directed_specimen_bootstrap_95_interval_for_regret_mm": [
       39.60574216793094,
       49.79349911894488
