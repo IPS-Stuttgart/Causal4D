@@ -32,6 +32,9 @@ jobs:
           set -euo pipefail
           python tools/apply_reviewed_file_trigger_scope_fix.py
           python -m pip install -e ".[dev]"
+          python -m ruff format \
+            tests/test_self_hosted_workflow_policy.py \
+            tests/test_deform360_gpuserver6000_workflow_policy.py
           python -m ruff check \
             tests/test_self_hosted_workflow_policy.py \
             tests/test_deform360_gpuserver6000_workflow_policy.py
