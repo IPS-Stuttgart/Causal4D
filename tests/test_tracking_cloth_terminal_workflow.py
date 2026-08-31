@@ -46,11 +46,8 @@ def test_terminal_tracking_cloth_request_is_disabled() -> None:
     assert record["terminal_for_registered_protocol"] is True
     assert record["creates_new_experiment_requirement"] is False
     assert record["paper_claim_authorized"] is False
-    assert (
-        record["primary_evaluation"]["decision"]
-        ["physics_transfer_beats_persistence"]
-        is False
-    )
+    decision = record["primary_evaluation"]["decision"]
+    assert decision["physics_transfer_beats_persistence"] is False
 
 
 def test_terminalizer_cancels_obsolete_run_without_dispatch() -> None:
