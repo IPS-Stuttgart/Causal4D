@@ -56,8 +56,10 @@ def test_file_change_dispatcher_is_hosted_and_fixed() -> None:
     assert "workflow_dispatch" in text
 
 
-def test_request_is_bounded_to_one_exact_reproduction_object() -> None:
+def test_request_is_bounded_to_registered_four_object_processing_roster() -> None:
     request = json.loads(REQUEST.read_text(encoding="utf-8"))
+    request_id = request.pop("request_id")
+    assert isinstance(request_id, str) and request_id.strip()
     assert request == {
         "schema_version": 1,
         "request": "run-deform360-public-holdings-gpuserver6000",
@@ -65,10 +67,25 @@ def test_request_is_bounded_to_one_exact_reproduction_object() -> None:
         "workflow": "deform360-public-holdings-gpuserver6000.yml",
         "ref": "main",
         "process_candidates": True,
-        "max_objects": "1",
+        "max_objects": "4",
         "hash_001_media": False,
-        "request_id": "2026-08-30-gpuserver6000-public-holdings-v1",
     }
+
+    config = json.loads(CONFIG.read_text(encoding="utf-8"))
+    exact = tuple(config["exact_reproduction_object_ids"])
+    exploratory = tuple(config["exploratory_preprocessing_object_ids"])
+    protected = set(config["protected_locked_cohort_object_ids"])
+    eligible = exact + exploratory
+
+    assert exact == ("001-rope",)
+    assert eligible == (
+        "001-rope",
+        "003-cable",
+        "086-cotton-scarf-cloth",
+        "171-penguin",
+    )
+    assert len(set(eligible)) == int(request["max_objects"])
+    assert not set(eligible) & protected
 
 
 def test_reset_request_is_source_only_on_gpuserver4090() -> None:
