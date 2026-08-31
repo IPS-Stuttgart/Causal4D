@@ -110,6 +110,24 @@ def _single_event_workflow(text: str, event: str) -> bool:
     )
 
 
+def _trigger_event_block(text: str, event: str) -> str:
+    prefix = text.split("permissions:", maxsplit=1)[0]
+    lines = prefix.splitlines(keepends=True)
+    marker = f"  {event}:"
+    try:
+        start = next(
+            index for index, line in enumerate(lines) if line.rstrip() == marker
+        )
+    except StopIteration:
+        return ""
+    collected = [lines[start]]
+    for line in lines[start + 1 :]:
+        if re.match(r"^  [A-Za-z0-9_-]+:\s*$", line):
+            break
+        collected.append(line)
+    return "".join(collected)
+
+
 def _dispatch_only_workflow(text: str) -> bool:
     return _single_event_workflow(text, "workflow_dispatch")
 
@@ -186,12 +204,18 @@ def _reviewed_file_main_errors(
     for fragment, message in required.items():
         if fragment not in prefix:
             errors.append(message)
-    if prefix.count(request_path) != 1:
-        errors.append("reviewed request path must occur exactly once in trigger block")
+    push_block = _trigger_event_block(workflow_text, "push")
+    if push_block.count(request_path) != 1:
+        errors.append("reviewed request path must occur exactly once in push trigger")
     for forbidden_event in ("  issues:", "  schedule:", "  workflow_call:"):
         if forbidden_event in prefix:
-            errors.append(f"reviewed-file workflow also exposes {forbidden_event.strip()}")
-    if "  pull_request:" in prefix and "github.event_name != 'pull_request'" not in block:
+            errors.append(
+                f"reviewed-file workflow also exposes {forbidden_event.strip()}"
+            )
+    if (
+        "  pull_request:" in prefix
+        and "github.event_name != 'pull_request'" not in block
+    ):
         errors.append("self-hosted job is not excluded from pull requests")
     for forbidden_payload in (
         "github.event.head_commit.message",
