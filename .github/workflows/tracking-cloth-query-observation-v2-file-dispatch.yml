@@ -1,0 +1,209 @@
+name: Dispatch reviewed Tracking Cloth V2 evaluation from file change
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ops/tracking-cloth-query-observation-v2-gpuserver4090-request.json"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: tracking-cloth-v2-reviewed-file-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Validate V2 request and dispatch reviewed main
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+
+      - name: Validate the exact reviewed request and frozen V2 protocol
+        id: request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+          /usr/bin/python3 - <<'PY' >> "${GITHUB_OUTPUT}"
+          import hashlib
+          import json
+          import os
+          import urllib.request
+          from pathlib import Path
+
+          request_path = (
+              "ops/tracking-cloth-query-observation-v2-gpuserver4090-request.json"
+          )
+          protocol_path = (
+              "configs/causal4d_public/"
+              "tracking_cloth_query_observation_v2.json"
+          )
+
+          if os.environ["GITHUB_EVENT_NAME"] == "push":
+              event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
+              changed: set[str] = set()
+              records = list(event.get("commits", []))
+              head_commit = event.get("head_commit")
+              if isinstance(head_commit, dict):
+                  records.append(head_commit)
+              for commit in records:
+                  for field in ("added", "modified", "removed"):
+                      changed.update(commit.get(field, []))
+              if request_path not in changed:
+                  before = event.get("before")
+                  after = event.get("after", os.environ["GITHUB_SHA"])
+                  if not isinstance(before, str) or not isinstance(after, str):
+                      raise SystemExit("push payload lacks before/after revisions")
+                  if before == "0" * 40:
+                      raise SystemExit("initial-branch pushes are not dispatchable")
+                  compare_url = (
+                      f'{os.environ["GITHUB_API_URL"]}/repos/'
+                      f'{os.environ["GITHUB_REPOSITORY"]}/compare/{before}...{after}'
+                  )
+                  api_request = urllib.request.Request(
+                      compare_url,
+                      headers={
+                          "Accept": "application/vnd.github+json",
+                          "Authorization": f'Bearer {os.environ["GH_TOKEN"]}',
+                          "X-GitHub-Api-Version": "2022-11-28",
+                      },
+                  )
+                  with urllib.request.urlopen(api_request, timeout=30) as response:
+                      comparison = json.load(response)
+                  changed = {
+                      item["filename"]
+                      for item in comparison.get("files", [])
+                      if isinstance(item, dict)
+                      and isinstance(item.get("filename"), str)
+                  }
+              if request_path not in changed:
+                  raise SystemExit("reviewed Tracking Cloth V2 request file did not change")
+
+          request = json.loads(Path(request_path).read_text(encoding="utf-8"))
+          expected_request = {
+              "enabled": True,
+              "ref": "main",
+              "request": "run-tracking-cloth-query-observation-v2-gpuserver4090",
+              "request_id": "328737f73b038c81f0a9b7d4d1ed9a40e40d5cbad214e85812b69c6405f0277e",
+              "schema_version": 2,
+              "workflow": "tracking-cloth-query-observation-v2.yml",
+          }
+          if request != expected_request:
+              raise SystemExit("execution request differs from the reviewed V2 value")
+
+          protocol = json.loads(Path(protocol_path).read_text(encoding="utf-8"))
+          supplied = protocol.get("request_id")
+          unhashed = dict(protocol)
+          unhashed.pop("request_id", None)
+          canonical = json.dumps(
+              unhashed,
+              sort_keys=True,
+              separators=(",", ":"),
+              ensure_ascii=False,
+              allow_nan=False,
+          ).encode("utf-8")
+          calculated = hashlib.sha256(canonical).hexdigest()
+          if supplied != calculated:
+              raise SystemExit("frozen V2 protocol request_id is invalid")
+          if request["request_id"] != supplied:
+              raise SystemExit("execution request does not bind the frozen V2 protocol")
+
+          print("workflow=" + request["workflow"])
+          print("ref=" + request["ref"])
+          print("request_id=" + request["request_id"])
+          print("request_path=" + request_path)
+          print("protocol_path=" + protocol_path)
+          PY
+
+      - name: Dispatch the reviewed main-only V2 self-hosted workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW: ${{ steps.request.outputs.workflow }}
+          REF: ${{ steps.request.outputs.ref }}
+          REQUEST_ID: ${{ steps.request.outputs.request_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(/usr/bin/python3 - <<'PY'
+          import json
+          import os
+
+          print(
+              json.dumps(
+                  {
+                      "ref": os.environ["REF"],
+                      "inputs": {"request_id": os.environ["REQUEST_ID"]},
+                  },
+                  separators=(",", ":"),
+              )
+          )
+          PY
+          )"
+          endpoint="${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW}/dispatches"
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "${endpoint}" \
+            --data "${payload}"
+
+      - name: Write V2 dispatch receipt
+        env:
+          WORKFLOW: ${{ steps.request.outputs.workflow }}
+          REF: ${{ steps.request.outputs.ref }}
+          REQUEST_ID: ${{ steps.request.outputs.request_id }}
+          REQUEST_PATH: ${{ steps.request.outputs.request_path }}
+          PROTOCOL_PATH: ${{ steps.request.outputs.protocol_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          Path("tracking-cloth-v2-dispatch-receipt.json").write_text(
+              json.dumps(
+                  {
+                      "schema_version": 2,
+                      "request_id": os.environ["REQUEST_ID"],
+                      "request_path": os.environ["REQUEST_PATH"],
+                      "protocol_path": os.environ["PROTOCOL_PATH"],
+                      "source_sha": os.environ["GITHUB_SHA"],
+                      "source_run_id": os.environ["GITHUB_RUN_ID"],
+                      "workflow": os.environ["WORKFLOW"],
+                      "ref": os.environ["REF"],
+                      "runner_class": "github-hosted-dispatcher",
+                      "public_data_only": True,
+                      "target_contents_opened": False,
+                      "new_physical_data_collected": False,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Upload V2 dispatch receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: tracking-cloth-v2-reviewed-dispatch-${{ github.sha }}
+          path: tracking-cloth-v2-dispatch-receipt.json
+          if-no-files-found: error
+          retention-days: 30
