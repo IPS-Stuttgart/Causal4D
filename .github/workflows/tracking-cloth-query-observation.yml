@@ -125,29 +125,51 @@ jobs:
           test -f "${REQUEST}"
           test -f "${MODULE_PATH}"
           /usr/bin/python3 - <<'PY'
-          import importlib.util
+          import hashlib
           import json
           import os
           from pathlib import Path
-          import sys
 
-          module_path = Path(os.environ["MODULE_PATH"]).resolve()
-          module_name = "tracking_cloth_query_observation_request_check"
-          spec = importlib.util.spec_from_file_location(module_name, module_path)
-          if spec is None or spec.loader is None:
-              raise SystemExit("failed to create standalone module specification")
-          module = importlib.util.module_from_spec(spec)
-          sys.modules[module_name] = module
-          spec.loader.exec_module(module)
-          request = module.load_request(Path(os.environ["REQUEST"]))
-          if os.environ["DISPATCH_REQUEST_ID"] != request["request_id"]:
+          request_path = Path(os.environ["REQUEST"])
+          request = json.loads(request_path.read_text(encoding="utf-8"))
+          if not isinstance(request, dict):
+              raise SystemExit("frozen request must be a JSON object")
+          supplied = request.get("request_id")
+          unhashed = dict(request)
+          unhashed.pop("request_id", None)
+          canonical = json.dumps(
+              unhashed,
+              sort_keys=True,
+              separators=(",", ":"),
+              ensure_ascii=False,
+              allow_nan=False,
+          ).encode("utf-8")
+          if supplied != hashlib.sha256(canonical).hexdigest():
+              raise SystemExit("frozen request identity is invalid")
+          expected = {
+              "schema": "causal4d.tracking-cloth-query-observation-request",
+              "schema_version": 1,
+              "stage": "source-gated-evaluation",
+              "dataset_root": os.environ["DATASET_ROOT"],
+              "source_fit_materials": ["cotton"],
+              "source_gate_materials": ["denim"],
+              "target_materials": ["wool", "polyester"],
+          }
+          for key, value in expected.items():
+              if request.get(key) != value:
+                  raise SystemExit(f"frozen request field changed: {key}")
+          if os.environ["DISPATCH_REQUEST_ID"] != supplied:
               raise SystemExit("dispatch request identity differs from frozen protocol")
           root = Path(os.environ["DATASET_ROOT"]).resolve()
-          if root != module.EXPECTED_ROOT.resolve():
+          expected_root = Path(
+              "/home/github-runner/.cache/datasets/"
+              "tracking-cloth-deformation-v1-zenodo-14644526"
+          ).resolve()
+          if root != expected_root:
               raise SystemExit("mounted root differs from the frozen protocol root")
           csv_count = sum(1 for _ in root.rglob("*.csv"))
           print(json.dumps({
-              "request_id": request["request_id"],
+              "request_id": supplied,
               "dataset_root": str(root),
               "csv_name_count_before_payload_access": csv_count,
               "target_file_contents_opened": False,
