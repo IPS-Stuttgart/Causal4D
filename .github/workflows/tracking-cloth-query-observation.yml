@@ -10,7 +10,9 @@ on:
       - "configs/causal4d_public/tracking_cloth_query_observation_v1.json"
       - "ops/tracking-cloth-query-observation-gpuserver4090-request.json"
       - "src/causal4d_public/tracking_cloth_query_observation.py"
+      - "src/causal4d_public/tracking_cloth_query_observation_recording_cluster.py"
       - "tests/test_tracking_cloth_query_observation.py"
+      - "tests/test_tracking_cloth_query_observation_recording_cluster.py"
   workflow_dispatch:
     inputs:
       request_id:
@@ -23,12 +25,12 @@ permissions:
 
 concurrency:
   group: tracking-cloth-query-observation-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   DATASET_ROOT: /home/github-runner/.cache/datasets/tracking-cloth-deformation-v1-zenodo-14644526
   REQUEST: configs/causal4d_public/tracking_cloth_query_observation_v1.json
-  MODULE_PATH: src/causal4d_public/tracking_cloth_query_observation.py
+  MODULE_PATH: src/causal4d_public/tracking_cloth_query_observation_recording_cluster.py
   EVIDENCE_DIR: tracking-cloth-query-observation-v1
   NUMPY_VERSION: 2.2.6
 
@@ -58,13 +60,18 @@ jobs:
           python -m pip check
           files=(
             src/causal4d_public/tracking_cloth_query_observation.py
+            src/causal4d_public/tracking_cloth_query_observation_recording_cluster.py
             tests/test_tracking_cloth_query_observation.py
+            tests/test_tracking_cloth_query_observation_recording_cluster.py
           )
           python -m ruff check "${files[@]}"
           python -m ruff format --check "${files[@]}"
           python -m mypy --no-site-packages \
-            src/causal4d_public/tracking_cloth_query_observation.py
-          python -m pytest -q tests/test_tracking_cloth_query_observation.py
+            src/causal4d_public/tracking_cloth_query_observation.py \
+            src/causal4d_public/tracking_cloth_query_observation_recording_cluster.py
+          python -m pytest -q \
+            tests/test_tracking_cloth_query_observation.py \
+            tests/test_tracking_cloth_query_observation_recording_cluster.py
           python - <<'PY'
           import hashlib
           import importlib.util
@@ -72,7 +79,8 @@ jobs:
           import sys
 
           module_path = Path(
-              "src/causal4d_public/tracking_cloth_query_observation.py"
+              "src/causal4d_public/"
+              "tracking_cloth_query_observation_recording_cluster.py"
           ).resolve()
           module_name = "tracking_cloth_query_observation_contract"
           spec = importlib.util.spec_from_file_location(module_name, module_path)
