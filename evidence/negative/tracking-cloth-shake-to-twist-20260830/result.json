@@ -1,0 +1,166 @@
+{
+  "artifact_kind": "Causal4DNegativeEvidenceRecordV1",
+  "record_id": "tracking-cloth-shake-to-twist-20260830",
+  "recorded_at": "2026-09-01",
+  "status": "completed_negative_result",
+  "terminal_for_registered_protocol": true,
+  "creates_new_experiment_requirement": false,
+  "paper_claim_authorized": false,
+  "dataset": {
+    "name": "Tracking Cloth Deformation",
+    "public_record_id": "14644526",
+    "archive_md5": "b4868b702f8a42b2ea1069d0f1a3b8f6",
+    "recordings_total": 120,
+    "source_shake_recordings": 32,
+    "target_twist_recordings": 32,
+    "reserved_collision_recordings": 56,
+    "materials": [
+      "cotton",
+      "denim",
+      "polyester",
+      "wool"
+    ],
+    "sizes": [
+      "A2",
+      "A3"
+    ],
+    "license_policy": "CC-BY-NC-SA-4.0 pending author clarification of conflicting CC-BY-SA-4.0 metadata",
+    "raw_data_uploaded": false
+  },
+  "primary_evaluation": {
+    "study_id": "tracking-cloth-shake-to-twist-pilot-v1",
+    "evidence_class": "public-real-data-pilot; prior exposure not assumed absent",
+    "information_regime": "measured-corner-boundary-conditioned; all-marker initialization prefix only",
+    "source_motion": "shake",
+    "target_motion": "twist",
+    "prefix_seconds": 1.0,
+    "forecast_seconds": 5.0,
+    "inferential_unit": "8 material-size specimens; equal recordings within specimen, then equal specimens",
+    "github_repository": "IPS-Stuttgart/Causal4D",
+    "github_run_id": 33302686759,
+    "github_commit_sha": "0cd567b7b640f5e0b73eba8c1eeb1acb1f09f4c1",
+    "protocol_id": "4dfcabe6cca23b07244676441e61cc13d113ea7631a2af32707f69af55e00515",
+    "prediction_seal_sha256": "db6156a5bbf6fdf536e8b37cef00e80b5b68b20833fa19001ea97ea6dba97e77",
+    "metrics_sha256": "496cd70ab4221985897b8a768510ff5ccf3691aae2099895cadc034867af38c1",
+    "target_recordings": 32,
+    "arms": {
+      "persistence": {
+        "rmse_mm": 75.14513392905475,
+        "coordinate_nll": -1.7339515574197684,
+        "coordinate_90_coverage": 0.9272461846611654,
+        "mean_full_90_width_mm": 171.1983601064278
+      },
+      "map_physics": {
+        "rmse_mm": 119.16811826823869,
+        "coordinate_nll": -0.7878542652071743,
+        "coordinate_90_coverage": 0.7612916503733536,
+        "mean_full_90_width_mm": 134.1261836730478
+      },
+      "bayesian_physics": {
+        "rmse_mm": 132.29049200912868,
+        "coordinate_nll": -0.5454162990675424,
+        "coordinate_90_coverage": 0.7041387074693761,
+        "mean_full_90_width_mm": 123.31240567384623
+      },
+      "last_residual": {
+        "rmse_mm": 141.06742610829883,
+        "coordinate_nll": -0.5660645958248509,
+        "coordinate_90_coverage": 0.8003425559731366,
+        "mean_full_90_width_mm": 148.90046498604272
+      },
+      "guarded_bayesian_physics": {
+        "rmse_mm": 156.46258254135427,
+        "coordinate_nll": -0.4849315083896348,
+        "coordinate_90_coverage": 0.7082499371064404,
+        "mean_full_90_width_mm": 178.19184672134622
+      },
+      "nominal_physics": {
+        "rmse_mm": 208.7977533551574,
+        "coordinate_nll": -0.6191863948449721,
+        "coordinate_90_coverage": 0.7575408611705596,
+        "mean_full_90_width_mm": 299.3240752179182
+      },
+      "nominal_state_injection": {
+        "rmse_mm": 210.05271630590065,
+        "coordinate_nll": -0.6143129103346336,
+        "coordinate_90_coverage": 0.7635925339083205,
+        "mean_full_90_width_mm": 301.906883000486
+      }
+    },
+    "decision": {
+      "comparator": "persistence",
+      "best_physics_arm": "map_physics",
+      "persistence_rmse_mm": 75.14513392905475,
+      "best_physics_rmse_mm": 119.16811826823869,
+      "best_physics_minus_persistence_rmse_mm": 44.022984339183935,
+      "best_physics_relative_regret_percent": 58.583945542962844,
+      "physics_transfer_beats_persistence": false,
+      "source_guard_accepted_specimens": 6,
+      "source_guard_total_specimens": 8,
+      "accepted_recordings": 24,
+      "fallback_recordings": 8,
+      "harmful_accepted_recordings_vs_nominal_physics": 0,
+      "exact_fallback_violations": 0,
+      "interpretation": "The reduced spring-mesh shake-to-twist transfer failed against persistence. The guard protected accepted cases relative to nominal physics, but not relative to persistence."
+    }
+  },
+  "active_probe_replay": {
+    "study_id": "tracking-cloth-task-directed-active-probe-v1",
+    "evidence_class": "cross-validated public-real-data active-probe pilot; prior exposure not assumed absent",
+    "status": "completed_retrospective_diagnostic_not_fresh_confirmation",
+    "github_repository": "IPS-Stuttgart/Causal4D",
+    "github_run_id": 33319276977,
+    "github_commit_sha": "f8d5f16aa1b104108e6876db40bf2ed9c2e526fa",
+    "protocol_id": "ad01b8abc081999b7e042fb2563aaad84197ecbb48f1d9f5e09d322206c4af1c",
+    "prediction_seal_sha256": "8dc08bd35dc434b98d103db94454bfad19957273a1a34131948cb4bf6310e8f2",
+    "metrics_sha256": "2692d907558b520ed38f65807aece60f4827656057d449326cd65d7e83ec5898",
+    "prior_target_run_id": 33302686759,
+    "primary_probe_budget": 1,
+    "primary_task_directed_rmse_mm": 119.86533281968697,
+    "primary_task_directed_minus_persistence_rmse_mm": 44.72019889063222,
+    "primary_task_directed_relative_regret_percent": 59.51176949508532,
+    "primary_task_directed_specimen_bootstrap_95_interval_for_regret_mm": [
+      39.60574216793094,
+      49.79349911894488
+    ],
+    "primary_task_directed_specimen_wins_vs_persistence": 0,
+    "primary_task_directed_specimen_losses_vs_persistence": 8,
+    "best_exploratory_probe_budget": 2,
+    "best_exploratory_probe_rmse_mm": 119.66661341830303,
+    "best_exploratory_probe_relative_regret_percent": 59.24732203056746,
+    "task_vs_parameter_policy_disagreement_count": 0,
+    "task_vs_parameter_policy_disagreement_total": 8,
+    "mechanism_gate": {
+      "policies_make_different_k1_choices": false,
+      "task_directed_beats_parameter_information_overall": false,
+      "task_directed_beats_parameter_on_disagreements": false,
+      "task_directed_beats_persistence": false
+    },
+    "decision": "The retrospective logged active-probe replay did not rescue the negative transfer result and did not differentiate task-directed from parameter-information probe selection."
+  },
+  "claim_boundary": {
+    "supported": [
+      "For this completed public-data protocol, the registered reduced spring-mesh physics transfer from shaking to twisting did not beat persistence.",
+      "The registered source guard prevented accepted updates from worsening nominal physics, but did not make them competitive with persistence.",
+      "A retrospective logged active-probe replay did not rescue performance and selected the same one-probe condition as the parameter-information policy for all eight specimens."
+    ],
+    "not_supported": [
+      "Causal4D fails in general.",
+      "Physics-informed deformable-object prediction is universally inferior to persistence.",
+      "The experiment is command-conditioned, fully online, or a full PhysTwin/FEM reproduction.",
+      "The diagonal Gaussian scores validate joint trajectory covariance.",
+      "The result supports online control, safety, material identification, unseen-object generalization, or state-of-the-art claims."
+    ],
+    "paper_use": "Retain as a negative real-world transfer result, limitation, or failure-mode study. Do not silently promote it to positive evidence or erase it when later protocols differ."
+  },
+  "downloaded_evidence_archives": [
+    {
+      "filename": "tracking-cloth-evaluate.zip",
+      "sha256": "44156a6adcef956c88508cb53b013add462bab248ad79905bf73a19ec7151ec8"
+    },
+    {
+      "filename": "tracking-cloth-active-evaluate.zip",
+      "sha256": "51ea6d6b39cd2a41f75c0ba4d734535c2e2c043f0bc1d83a38033f074f22d1ce"
+    }
+  ]
+}
