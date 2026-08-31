@@ -23,6 +23,7 @@ records, and `superseded` documents remain available for provenance.
 - [Action-conditioned discrepancy](action_conditioned_discrepancy.md)
 - [Interventional contrasts](interventional_contrast.md)
 - [Query-space variance decomposition](query_variance_decomposition.md)
+- [Decision-identifiable intervention consumption](decision_identifiable_intervention.md)
 - [Paper scope](causal4d_paper_scope.md)
 
 ## Integration
