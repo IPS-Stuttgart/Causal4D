@@ -60,4 +60,5 @@ def test_terminalizer_cancels_obsolete_run_without_dispatch() -> None:
     assert '"dispatch_performed": False' in workflow
     assert '"self_hosted_runner_allocated": False' in workflow
     assert "33363286850" in workflow
-    assert str(TERMINAL_PATH.relative_to(ROOT)) in workflow
+    assert '"evidence/negative/"' in workflow
+    assert '"tracking-cloth-shake-to-twist-20260830/result.json"' in workflow
