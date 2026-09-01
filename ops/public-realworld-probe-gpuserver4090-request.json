@@ -3,5 +3,19 @@
   "enabled": true,
   "runner": "gpuserver4090",
   "public_data_only": true,
-  "request_id": "2026-09-01-public-realworld-probe-v2-deform-dlo45-present"
+  "request_id": "2026-09-01-public-realworld-probe-v3-pokeflex-development-replica",
+  "pokeflex_replica_discovery": {
+    "cache_root": "/home/github-runner/.cache/datasets/pokeflex-causal4d-realized-load-v1",
+    "calibration_take_data_allowed": false,
+    "development_take_ids": [
+      "3dPrintedBunny_T1",
+      "3dPrintedBunny_T3",
+      "3dPrintedBunny_T4",
+      "3dPrintedBunny_T6",
+      "3dPrintedBunny_T7"
+    ],
+    "enabled": true,
+    "source_qa_result_sha256": "e09d36db4e1ba8a38c70e112c3af9ab95516ee245302f71a853f36cd2dd0e0e7",
+    "target_take_data_allowed": false
+  }
 }
