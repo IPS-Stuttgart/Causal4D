@@ -88,13 +88,11 @@ def test_owner_fallback_reads_only_exact_development_members(
     monkeypatch.setattr(owner_stage.subprocess, "run", fake_run)
     archive_root = tmp_path / "pokeflex" / "poking"
     destination = tmp_path / "stage"
-    result = (
-        owner_stage.stage_pokeflex_development_robot_records_with_owner_fallback(
-            archive_root,
-            _source_qa(config, content),
-            destination,
-            config,
-        )
+    result = owner_stage.stage_pokeflex_development_robot_records_with_owner_fallback(
+        archive_root,
+        _source_qa(config, content),
+        destination,
+        config,
     )
 
     assert validate_pokeflex_robot_stage(result)["passed"] is True
@@ -115,7 +113,9 @@ def test_owner_fallback_reads_only_exact_development_members(
             archive_root / config.expected_object_id / f"{take_id}.zip"
         )
         assert command[-1] == f"{take_id}/robot_data.json"
-        assert not any(forbidden in " ".join(command) for forbidden in config.forbidden_take_ids)
+        assert not any(
+            forbidden in " ".join(command) for forbidden in config.forbidden_take_ids
+        )
         staged = destination / config.expected_object_id / take_id / "robot_data.json"
         assert staged.read_bytes() == content[take_id]
     assert result["information_boundary"]["owner_delegated_read"] is True
