@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "enabled": true,
   "runner": "gpuserver4090",
   "public_data_only": true,
@@ -13,6 +13,7 @@
   "expected_eval_files_per_object": 14,
   "prefix_fraction": 0.30,
   "regret_tolerance_m": 0.001,
+  "exploratory_delay_sign_regret_tolerance_m": 0.010,
   "ambiguity_threshold_m": 0.001,
   "bootstrap_replicates": 20000,
   "seed": 20260901,
@@ -21,5 +22,7 @@
   "gain_max": 1.25,
   "gain_count": 11,
   "bayesian_phystwin_revision": "754a2a97a4a10369ad15236d84f4d2a81c454055",
-  "request_id": "2026-09-01-deform-dlo45-decision-official-split-v1"
+  "primary_analysis_status": "frozen_strict_primary",
+  "exploratory_analysis_status": "post-primary-retrospective-exploratory",
+  "request_id": "2026-09-01-deform-dlo45-decision-official-split-v2"
 }
