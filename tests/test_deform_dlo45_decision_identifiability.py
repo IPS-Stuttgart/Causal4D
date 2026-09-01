@@ -10,6 +10,7 @@ import pytest
 from causal4d_public import deform_dlo45_decision_common as common
 from causal4d_public import deform_dlo45_decision_core as core
 from causal4d_public import deform_dlo45_decision_data as data
+from causal4d_public import deform_dlo45_decision_exploratory as exploratory
 from causal4d_public import deform_dlo45_official_split as official_split
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -123,6 +124,21 @@ def test_fallback_and_retain_predictions_are_identical() -> None:
     assert score["used_exact_fallback"] is True
 
 
+def test_delay_sign_quotient_is_prefix_only_and_contiguous() -> None:
+    alignment = [
+        {"delay_frames": -4},
+        {"delay_frames": -1},
+        {"delay_frames": 0},
+        {"delay_frames": 2},
+        {"delay_frames": 4},
+    ]
+
+    classes = exploratory.delay_sign_classes(alignment)
+
+    np.testing.assert_array_equal(classes, [0, 0, 1, 2, 2])
+    np.testing.assert_array_equal(np.unique(classes), [0, 1, 2])
+
+
 def test_official_split_recovers_fifty_six_train_and_fourteen_eval() -> None:
     records = [
         data.LoadedTrajectory(
@@ -164,10 +180,10 @@ def test_official_split_rejects_paths_without_unique_split() -> None:
         official_split.official_split_label("DLO4/train/eval/1.pkl")
 
 
-def test_frozen_request_uses_publisher_defined_split() -> None:
+def test_frozen_request_separates_primary_and_exploratory_arms() -> None:
     request = json.loads(REQUEST.read_text(encoding="utf-8"))
 
-    assert request["schema_version"] == 2
+    assert request["schema_version"] == 3
     assert request["expected_objects"] == ["DLO4", "DLO5"]
     assert request["expected_files_per_object"] == 70
     assert request["expected_train_files_per_object"] == 56
@@ -177,16 +193,24 @@ def test_frozen_request_uses_publisher_defined_split() -> None:
         + request["expected_eval_files_per_object"]
         == request["expected_files_per_object"]
     )
+    assert request["regret_tolerance_m"] == 0.001
+    assert request["primary_analysis_status"] == "frozen_strict_primary"
+    assert request["exploratory_delay_sign_regret_tolerance_m"] == 0.010
+    assert request["exploratory_analysis_status"] == (
+        "post-primary-retrospective-exploratory"
+    )
     assert request["bayesian_phystwin_revision"] == (
         ROOT / "requirements" / "ci" / "bayesian-phystwin-guarded-provider.sha"
     ).read_text(encoding="utf-8").strip()
 
 
-def test_workflow_passes_official_split_counts_to_evaluator() -> None:
+def test_workflow_passes_both_arm_tolerances_to_evaluator() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
     assert 'int(request["expected_train_files_per_object"]) == 56' in workflow
     assert 'int(request["expected_eval_files_per_object"]) == 14' in workflow
     assert "--expected-train-files-per-object" in workflow
     assert "--expected-eval-files-per-object" in workflow
+    assert "--exploratory-delay-sign-regret-tolerance-m" in workflow
+    assert "post-primary-retrospective-exploratory" in workflow
     assert "runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]" in workflow
