@@ -20,29 +20,41 @@ def percentile_interval(values: np.ndarray) -> dict[str, float]:
     }
 
 
-def cluster_bootstrap_mean(
+def trajectory_bootstrap_mean(
     rows: Sequence[Mapping[str, Any]],
     value_key: str,
     *,
     replicates: int,
     seed: int,
 ) -> dict[str, Any]:
+    """Stratified descriptive bootstrap over official eval trajectories.
+
+    Sampling is performed separately within each DLO so both physical objects
+    retain equal target counts. It does not turn the two DLOs into 28 independent
+    physical objects; that limitation is recorded in every result artifact.
+    """
     grouped: dict[str, list[float]] = defaultdict(list)
     for row in rows:
-        grouped[str(row["cluster_id"])].append(float(row[value_key]))
-    clusters = sorted(grouped)
-    require(bool(clusters), "no bootstrap clusters")
-    cluster_values = [np.asarray(grouped[key], dtype=float) for key in clusters]
+        grouped[str(row["object_id"])].append(float(row[value_key]))
+    objects = sorted(grouped)
+    require(objects == ["DLO4", "DLO5"], "expected DLO4 and DLO5 strata")
+    arrays = [np.asarray(grouped[object_id], dtype=float) for object_id in objects]
     rng = np.random.default_rng(seed)
     estimates = np.empty(replicates, dtype=float)
     for index in range(replicates):
-        selected = rng.integers(0, len(cluster_values), size=len(cluster_values))
-        sample = np.concatenate([cluster_values[int(item)] for item in selected])
-        estimates[index] = float(sample.mean())
+        samples = [
+            values[rng.integers(0, values.size, size=values.size)] for values in arrays
+        ]
+        estimates[index] = float(np.concatenate(samples).mean())
     return {
-        "cluster_count": len(clusters),
+        "object_strata": objects,
+        "trajectory_count": int(sum(values.size for values in arrays)),
         "replicates": replicates,
         "seed": seed,
+        "interpretation": (
+            "Descriptive official-eval-trajectory bootstrap stratified by DLO; "
+            "not population-level object inference."
+        ),
         **percentile_interval(estimates),
     }
 
@@ -69,6 +81,29 @@ def wilson_interval(
     }
 
 
+def object_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    improvements = np.asarray(
+        [float(row["selected_improvement_over_retain_m"]) for row in rows]
+    )
+    return {
+        "case_count": len(rows),
+        "certified_count": sum(bool(row["certified"]) for row in rows),
+        "certified_update_count": sum(bool(row["certified_update"]) for row in rows),
+        "certified_retain_count": sum(bool(row["certified_retain"]) for row in rows),
+        "fallback_count": sum(bool(row["used_exact_fallback"]) for row in rows),
+        "selected_rmse_mm": 1_000.0
+        * float(np.mean([float(row["selected_rmse_m"]) for row in rows])),
+        "always_retain_rmse_mm": 1_000.0
+        * float(np.mean([float(row["always_retain_rmse_m"]) for row in rows])),
+        "mean_improvement_over_retain_mm": 1_000.0 * float(improvements.mean()),
+        "wins_ties_losses_vs_retain": {
+            "wins": int(np.sum(improvements > 1e-12)),
+            "ties": int(np.sum(np.abs(improvements) <= 1e-12)),
+            "losses": int(np.sum(improvements < -1e-12)),
+        },
+    }
+
+
 def aggregate_rows(
     rows: Sequence[Mapping[str, Any]],
     *,
@@ -86,7 +121,8 @@ def aggregate_rows(
     ambiguous = [
         row
         for row in rows
-        if float(row["source_supported_ambiguity_max_rmse_m"]) > ambiguity_threshold_m
+        if float(row["source_supported_ambiguity_max_rmse_m"])
+        > ambiguity_threshold_m
     ]
     ambiguous_certified = sum(bool(row["certified"]) for row in ambiguous)
 
@@ -96,6 +132,12 @@ def aggregate_rows(
     improvements = np.asarray(
         [float(row["selected_improvement_over_retain_m"]) for row in rows]
     )
+    by_object = {
+        object_id: object_summary(
+            [row for row in rows if str(row["object_id"]) == object_id]
+        )
+        for object_id in ("DLO4", "DLO5")
+    }
     return {
         "case_count": count,
         "certified_count": certified,
@@ -135,7 +177,8 @@ def aggregate_rows(
             "ties": int(np.sum(np.abs(improvements) <= 1e-12)),
             "losses": int(np.sum(improvements < -1e-12)),
         },
-        "group_cluster_bootstrap_improvement_over_retain_m": cluster_bootstrap_mean(
+        "by_object": by_object,
+        "trajectory_bootstrap_improvement_over_retain_m": trajectory_bootstrap_mean(
             rows,
             "selected_improvement_over_retain_m",
             replicates=bootstrap_replicates,
@@ -146,7 +189,7 @@ def aggregate_rows(
 
 def report_markdown(evidence: Mapping[str, Any]) -> str:
     aggregate = evidence["aggregate"]
-    bootstrap = aggregate["group_cluster_bootstrap_improvement_over_retain_m"]
+    bootstrap = aggregate["trajectory_bootstrap_improvement_over_retain_m"]
     harm = aggregate["harmful_certified_update_rate"]
     lines = [
         "# DEFORM DLO4/DLO5 decision-identifiability evaluation",
@@ -157,7 +200,7 @@ def report_markdown(evidence: Mapping[str, Any]) -> str:
         "",
         "## Primary real-data results",
         "",
-        f"- Cases: {aggregate['case_count']}",
+        f"- Official eval trajectories: {aggregate['case_count']}",
         (
             "- Certified finite actions: "
             f"{aggregate['certified_count']} "
@@ -184,7 +227,7 @@ def report_markdown(evidence: Mapping[str, Any]) -> str:
             f"{aggregate['mean_selected_improvement_over_retain_mm']:.3f} mm"
         ),
         (
-            "- Group-cluster bootstrap 95% interval: "
+            "- DLO-stratified trajectory bootstrap 95% interval: "
             f"[{1000.0 * bootstrap['lower95']:.3f}, "
             f"{1000.0 * bootstrap['upper95']:.3f}] mm"
         ),
@@ -195,19 +238,44 @@ def report_markdown(evidence: Mapping[str, Any]) -> str:
             f"(Wilson upper 95% {100.0 * harm['upper95']:.1f}%)"
         ),
         "",
-        "## Information boundary",
-        "",
-        "- Public checksum-verified DEFORM DLO4/DLO5 recordings only.",
-        "- Leave-one-recording-out within released repeated-action groups.",
-        (
-            "- Held-out suffix is absent from alignment, predictions, losses, "
-            "certificate, and action selection."
-        ),
-        "- Decision records and prediction hashes are persisted before suffix scoring.",
-        (
-            "- This is retrospective mechanism evidence, not prospective "
-            "intervention confirmation."
-        ),
+        "## Per-DLO results",
         "",
     ]
+    for object_id, summary in aggregate["by_object"].items():
+        lines.append(
+            f"- {object_id}: {summary['selected_rmse_mm']:.3f} mm selected, "
+            f"{summary['always_retain_rmse_mm']:.3f} mm retain, "
+            f"{summary['mean_improvement_over_retain_mm']:.3f} mm mean gain; "
+            f"updates/retains/fallbacks "
+            f"{summary['certified_update_count']}/"
+            f"{summary['certified_retain_count']}/"
+            f"{summary['fallback_count']}."
+        )
+    lines.extend(
+        [
+            "",
+            "## Information boundary",
+            "",
+            "- Public checksum-verified DEFORM DLO4/DLO5 recordings only.",
+            "- The publisher's 56-file train split supplies hypotheses.",
+            "- The publisher's 14-file eval split supplies held-out targets.",
+            (
+                "- Held-out suffix is absent from alignment, predictions, losses, "
+                "certificate, and action selection."
+            ),
+            (
+                "- Decision records and prediction hashes are persisted before "
+                "suffix scoring."
+            ),
+            (
+                "- Trajectories are nested within two physical DLOs; the bootstrap "
+                "is descriptive, not population-level object inference."
+            ),
+            (
+                "- This is retrospective mechanism evidence, not prospective "
+                "intervention confirmation."
+            ),
+            "",
+        ]
+    )
     return "\n".join(lines)
