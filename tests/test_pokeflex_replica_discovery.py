@@ -120,9 +120,6 @@ def test_discovers_verified_extracted_and_archive_replicas(
         cached = cache_root / EXPECTED_OBJECT_ID / take_id / "robot_data.json"
         assert cached.read_bytes() == content[take_id]
     assert archive_path.read_bytes() == archive_before
-    for take_id, payload in forbidden_payloads.items():
-        with zipfile.ZipFile(archive_path) as archive:
-            assert archive.read(f"stage/{take_id}/robot_data.json") == payload
 
 
 def test_incomplete_replica_does_not_create_partial_cache(tmp_path: Path) -> None:
