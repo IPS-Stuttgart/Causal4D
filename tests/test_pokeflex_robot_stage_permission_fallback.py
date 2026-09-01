@@ -74,20 +74,22 @@ def test_permission_denied_direct_files_fall_back_to_verified_archives(
         raise PermissionError(13, "Permission denied", str(path))
 
     monkeypatch.setattr(robot_stage, "_read_bytes_no_follow", deny_direct_read)
+    destination = tmp_path / "stage"
     result = robot_stage.stage_pokeflex_development_robot_records(
         tmp_path,
         _source_qa(config, content),
-        tmp_path / "stage",
+        destination,
         config,
     )
 
     assert [record["source_kind"] for record in result["records"]] == [
         "verified-zip-member"
     ] * len(config.expected_development_take_ids)
-    assert all(
-        record["candidate_failures"][0]["error"] == "PermissionError"
-        for record in result["records"]
-    )
+    for record in result["records"]:
+        take_id = record["take_id"]
+        assert record["archive_member"] == f"{take_id}/robot_data.json"
+        staged = destination / record["staged_path"]
+        assert staged.read_bytes() == content[take_id]
     assert result["information_boundary"] == {
         "development_robot_records_only": True,
         "development_meshes_read": False,
