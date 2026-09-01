@@ -29,8 +29,7 @@ DEFAULT_SEARCH_ROOTS = (
     Path("/tmp"),
 )
 DEFAULT_CACHE_ROOT = Path(
-    "/home/github-runner/.cache/datasets/"
-    "pokeflex-causal4d-realized-load-v1"
+    "/home/github-runner/.cache/datasets/pokeflex-causal4d-realized-load-v1"
 )
 DEFAULT_SOURCE_QA = ROOT / (
     "milestones/pokeflex-001-source-warp-gate-v1/artifacts/"

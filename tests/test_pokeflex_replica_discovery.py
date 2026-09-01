@@ -129,10 +129,7 @@ def test_incomplete_replica_does_not_create_partial_cache(tmp_path: Path) -> Non
     content = {take_id: _robot_bytes(take_id) for take_id in DEVELOPMENT_TAKE_IDS}
     source_root = tmp_path / "source"
     path = (
-        source_root
-        / EXPECTED_OBJECT_ID
-        / DEVELOPMENT_TAKE_IDS[0]
-        / "robot_data.json"
+        source_root / EXPECTED_OBJECT_ID / DEVELOPMENT_TAKE_IDS[0] / "robot_data.json"
     )
     path.parent.mkdir(parents=True)
     path.write_bytes(content[DEVELOPMENT_TAKE_IDS[0]])

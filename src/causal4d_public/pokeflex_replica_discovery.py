@@ -126,7 +126,9 @@ def _safe_member_path(name: str) -> PurePosixPath:
 
 def _take_from_parts(parts: Sequence[str]) -> str | None:
     normalized = {part.lower() for part in parts}
-    matches = [take_id for take_id in DEVELOPMENT_TAKE_IDS if take_id.lower() in normalized]
+    matches = [
+        take_id for take_id in DEVELOPMENT_TAKE_IDS if take_id.lower() in normalized
+    ]
     return matches[0] if len(matches) == 1 else None
 
 
@@ -175,14 +177,18 @@ def _scan_candidates(
                 if entry.is_file(follow_symlinks=False):
                     file_count += 1
                     if file_count > MAX_FILE_COUNT:
-                        errors.append({"path": str(path), "error": "file-bound-reached"})
+                        errors.append(
+                            {"path": str(path), "error": "file-bound-reached"}
+                        )
                         stack.clear()
                         break
                     if entry.name == "robot_data.json":
                         take_id = _take_from_parts(path.parts[:-1])
                         if take_id is not None:
                             direct_files.append(path)
-                    elif entry.name.lower().endswith(".zip") and _should_inspect_archive(path):
+                    elif entry.name.lower().endswith(
+                        ".zip"
+                    ) and _should_inspect_archive(path):
                         archives.append(path)
                         if len(archives) >= MAX_ARCHIVE_COUNT:
                             stack.clear()
@@ -276,7 +282,11 @@ def _read_matches(
                         member = _safe_member_path(info.filename)
                     except ValueError as error:
                         errors.append(
-                            {"path": str(path), "error": "unsafe-member", "detail": str(error)}
+                            {
+                                "path": str(path),
+                                "error": "unsafe-member",
+                                "detail": str(error),
+                            }
                         )
                         break
                     if info.is_dir() or member.name != "robot_data.json":
@@ -404,11 +414,7 @@ def discover_pokeflex_development_replica(
         cache_written, cache_status = _write_cache(cache, selected, expected_hashes)
 
     public_selected = {
-        take_id: {
-            key: value
-            for key, value in record.items()
-            if key != "content"
-        }
+        take_id: {key: value for key, value in record.items() if key != "content"}
         for take_id, record in selected.items()
     }
     result: dict[str, Any] = {
@@ -433,10 +439,9 @@ def discover_pokeflex_development_replica(
         "reads": reads,
         "information_boundary": {
             "filesystem_metadata_scanned": True,
-            "archive_central_directories_read": reads["archive_metadata_read_count"] > 0,
-            "development_robot_payloads_read": reads[
-                "development_payload_read_count"
-            ],
+            "archive_central_directories_read": reads["archive_metadata_read_count"]
+            > 0,
+            "development_robot_payloads_read": reads["development_payload_read_count"],
             "nondevelopment_payloads_read": 0,
             "calibration_take_data_read": False,
             "target_take_data_read": False,
