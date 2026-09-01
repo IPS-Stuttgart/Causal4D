@@ -21,9 +21,7 @@ def main() -> int:
     parser.add_argument("--policy", required=True)
     args = parser.parse_args()
     try:
-        source_qa = json.loads(
-            Path(args.source_qa_json).read_text(encoding="utf-8")
-        )
+        source_qa = json.loads(Path(args.source_qa_json).read_text(encoding="utf-8"))
         config = load_realized_load_policy(args.policy)
         result = stage_pokeflex_development_robot_records(
             args.dataset_root,
