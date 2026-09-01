@@ -108,10 +108,17 @@ class PokeFlexRealizedLoadSourceConfig:
     bootstrap_seed: int = 20260901
 
     def __post_init__(self) -> None:
-        _require(self.policy_id == POKEFLEX_REALIZED_LOAD_POLICY_ID, "policy id changed")
-        _require(bool(self.expected_source_qa_result_sha256), "source QA identity is empty")
+        _require(
+            self.policy_id == POKEFLEX_REALIZED_LOAD_POLICY_ID, "policy id changed"
+        )
+        _require(
+            bool(self.expected_source_qa_result_sha256), "source QA identity is empty"
+        )
         _require(bool(self.expected_object_id), "object id is empty")
-        _require(len(self.expected_development_take_ids) == 5, "expected five development takes")
+        _require(
+            len(self.expected_development_take_ids) == 5,
+            "expected five development takes",
+        )
         _require(
             len(set(self.expected_development_take_ids))
             == len(self.expected_development_take_ids),
@@ -130,7 +137,9 @@ class PokeFlexRealizedLoadSourceConfig:
         gains = np.asarray(self.gain_grid, dtype=np.float64)
         delays = np.asarray(self.delay_grid_frames, dtype=np.int64)
         _require(gains.ndim == 1 and gains.size >= 3, "gain grid is too small")
-        _require(np.all(np.isfinite(gains)) and np.all(gains > 0.0), "gain grid is invalid")
+        _require(
+            np.all(np.isfinite(gains)) and np.all(gains > 0.0), "gain grid is invalid"
+        )
         _require(delays.ndim == 1 and delays.size >= 1, "delay grid is empty")
         _require(len(set(map(int, delays))) == len(delays), "delay grid repeats")
         _require(self.gain_prior_std > 0.0, "gain prior scale is invalid")
@@ -191,7 +200,10 @@ def validate_realized_load_policy(payload: Mapping[str, Any]) -> dict[str, Any]:
         "unexpected realized-load policy kind",
     )
     observed = realized_load_policy_sha256(payload)
-    _require(payload.get("config_sha256") == observed, "realized-load policy checksum mismatch")
+    _require(
+        payload.get("config_sha256") == observed,
+        "realized-load policy checksum mismatch",
+    )
     if CANONICAL_POKEFLEX_REALIZED_LOAD_POLICY_SHA256:
         _require(
             observed == CANONICAL_POKEFLEX_REALIZED_LOAD_POLICY_SHA256,
@@ -224,24 +236,39 @@ def validate_source_qa_binding(
     payload: Mapping[str, Any],
     config: PokeFlexRealizedLoadSourceConfig,
 ) -> dict[str, Any]:
-    _require(payload.get("artifact_kind") == "PublicPokeFlexSourceQa", "unexpected source QA kind")
+    _require(
+        payload.get("artifact_kind") == "PublicPokeFlexSourceQa",
+        "unexpected source QA kind",
+    )
     _require(payload.get("schema_version") == 1, "unsupported source QA schema")
     _require(
         payload.get("result_sha256") == config.expected_source_qa_result_sha256,
         "source QA identity changed",
     )
     _require(payload.get("source_qa_passed") is True, "source QA did not pass")
-    _require(payload.get("object_id") == config.expected_object_id, "source QA object changed")
+    _require(
+        payload.get("object_id") == config.expected_object_id,
+        "source QA object changed",
+    )
     boundary = payload.get("information_boundary", {})
     opened = tuple(sorted(map(str, boundary.get("opened_take_ids", ()))))
     expected = tuple(sorted(config.expected_development_take_ids))
     _require(opened == expected, "source QA development roster changed")
-    _require(boundary.get("calibration_take_data_read") is False, "source QA opened calibration")
+    _require(
+        boundary.get("calibration_take_data_read") is False,
+        "source QA opened calibration",
+    )
     _require(boundary.get("target_take_data_read") is False, "source QA opened target")
     unopened = set(map(str, boundary.get("unopened_take_ids", ())))
-    _require(set(config.forbidden_take_ids).issubset(unopened), "source QA forbidden roster changed")
+    _require(
+        set(config.forbidden_take_ids).issubset(unopened),
+        "source QA forbidden roster changed",
+    )
     gates = payload.get("capability_gates", {})
-    _require(gates.get("pose_wrench_contact_candidate_ready") is True, "pose/wrench gate failed")
+    _require(
+        gates.get("pose_wrench_contact_candidate_ready") is True,
+        "pose/wrench gate failed",
+    )
     return {
         "passed": True,
         "result_sha256": payload["result_sha256"],
