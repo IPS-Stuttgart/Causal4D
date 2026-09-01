@@ -170,10 +170,21 @@ def test_source_gate_is_deterministic_and_does_not_open_forbidden_takes(
         "mean"
     ]
     assert proposed < persistence
-    assert all(
-        (tmp_path / "first" / f"prediction_seal_{take_id}.json").is_file()
-        for take_id in config.expected_development_take_ids
-    )
+    for take_id in config.expected_development_take_ids:
+        seal_path = tmp_path / "first" / f"prediction_seal_{take_id}.json"
+        assert seal_path.is_file()
+        seal = json.loads(seal_path.read_text(encoding="utf-8"))
+        metadata = seal["metadata"]
+        assert (
+            metadata["dependence_control_component_prediction_marginal_preserved"]
+            is True
+        )
+        assert (
+            metadata["posterior"]["component_prediction_multiset_sha256"]
+            == metadata["dependence_destroyed"][
+                "component_prediction_multiset_sha256"
+            ]
+        )
 
 
 def test_policy_rejects_target_access() -> None:

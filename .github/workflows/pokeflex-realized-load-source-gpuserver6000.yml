@@ -5,14 +5,24 @@ on:
     branches: [main]
     paths:
       - ".github/self-hosted-jobs.json"
+      - ".github/workflows/dispatch-pokeflex-realized-load-source.yml"
       - ".github/workflows/pokeflex-realized-load-source-gpuserver6000.yml"
       - "configs/causal4d_public/pokeflex_realized_load_source_v1.json"
       - "docs/causal4d_pokeflex_realized_load.md"
       - "ops/pokeflex-realized-load-source-gpuserver6000-request.json"
+      - "src/causal4d_public/_pokeflex_realized_load_common.py"
+      - "src/causal4d_public/_pokeflex_realized_load_model.py"
+      - "src/causal4d_public/_pokeflex_realized_load_scoring.py"
       - "src/causal4d_public/pokeflex_realized_load.py"
       - "src/causal4d_public/cli/pokeflex_realized_load_source.py"
       - "tests/test_pokeflex_realized_load.py"
+      - "tests/test_self_hosted_workflow_policy.py"
   workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact reviewed main commit authorized for execution
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -34,7 +44,20 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
+          clean: true
+      - name: Validate exact dispatch revision
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$EXPECTED_SHA" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain=v1)"
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -153,9 +176,12 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' &&
       github.ref == 'refs/heads/main' &&
+      inputs.expected_sha == github.sha &&
       needs.validate.result == 'success'
     runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver6000]
     timeout-minutes: 90
+    env:
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
     steps:
       - name: Check out exact reviewed revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -169,6 +195,7 @@ jobs:
         run: |
           set -euo pipefail
           test "${GITHUB_REF}" = "refs/heads/main"
+          test "${EXPECTED_SHA}" = "${GITHUB_SHA}"
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
           test -z "$(git status --porcelain=v1)"
       - name: Select an isolated compatible Python
