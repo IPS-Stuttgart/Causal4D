@@ -13,6 +13,7 @@ from .deform_dlo45_decision_common import hash_array, require
 ACTION_NAMES = ("apply_bayesian_update", "retain_observed_state")
 FALLBACK_ACTION_NAME = "fallback_retain_observed_state"
 
+
 @dataclass(frozen=True)
 class AlignmentResult:
     """One source trajectory aligned using the target prefix only."""
@@ -144,9 +145,7 @@ def certificate_record(certificate: Any) -> dict[str, Any]:
             dtype=bool,
         ),
         "minimax_action_index": int(certificate.minimax_action_index),
-        "minimax_worst_case_regret": float(
-            certificate.minimax_worst_case_regret
-        ),
+        "minimax_worst_case_regret": float(certificate.minimax_worst_case_regret),
         "summary": summary,
     }
 
@@ -288,11 +287,7 @@ def build_preoutcome_case(
 
 
 def public_preoutcome_record(case: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        key: value
-        for key, value in case.items()
-        if not key.startswith("_")
-    }
+    return {key: value for key, value in case.items() if not key.startswith("_")}
 
 
 def score_case(
@@ -343,5 +338,3 @@ def score_case(
         ),
         "target_suffix_hash": hash_array(target_suffix),
     }
-
-
