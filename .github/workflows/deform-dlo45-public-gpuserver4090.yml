@@ -46,7 +46,7 @@ jobs:
           request = json.loads(
               Path("ops/deform-dlo45-public-gpuserver4090-request.json").read_text()
           )
-          assert request["schema_version"] == 2
+          assert request["schema_version"] == 3
           assert request["enabled"] is True
           assert request["runner"] == "gpuserver4090"
           assert request["public_data_only"] is True
@@ -61,7 +61,15 @@ jobs:
               == int(request["expected_files_per_object"])
           )
           assert 0.15 <= float(request["prefix_fraction"]) <= 0.60
-          assert float(request["regret_tolerance_m"]) >= 0.0
+          assert float(request["regret_tolerance_m"]) == 0.001
+          assert (
+              float(request["exploratory_delay_sign_regret_tolerance_m"])
+              == 0.010
+          )
+          assert request["primary_analysis_status"] == "frozen_strict_primary"
+          assert request["exploratory_analysis_status"] == (
+              "post-primary-retrospective-exploratory"
+          )
           assert float(request["ambiguity_threshold_m"]) >= 0.0
           assert int(request["bootstrap_replicates"]) >= 1000
           assert int(request["max_delay_frames"]) >= 0
@@ -73,6 +81,9 @@ jobs:
               "REQUEST_ID": request["request_id"],
               "PREFIX_FRACTION": request["prefix_fraction"],
               "REGRET_TOLERANCE_M": request["regret_tolerance_m"],
+              "EXPLORATORY_DELAY_SIGN_REGRET_TOLERANCE_M": request[
+                  "exploratory_delay_sign_regret_tolerance_m"
+              ],
               "AMBIGUITY_THRESHOLD_M": request["ambiguity_threshold_m"],
               "BOOTSTRAP_REPLICATES": request["bootstrap_replicates"],
               "SEED": request["seed"],
@@ -183,6 +194,8 @@ jobs:
             --output-dir "${OUTPUT_DIR}" \
             --prefix-fraction "${PREFIX_FRACTION}" \
             --regret-tolerance-m "${REGRET_TOLERANCE_M}" \
+            --exploratory-delay-sign-regret-tolerance-m \
+              "${EXPLORATORY_DELAY_SIGN_REGRET_TOLERANCE_M}" \
             --ambiguity-threshold-m "${AMBIGUITY_THRESHOLD_M}" \
             --bootstrap-replicates "${BOOTSTRAP_REPLICATES}" \
             --seed "${SEED}" \
