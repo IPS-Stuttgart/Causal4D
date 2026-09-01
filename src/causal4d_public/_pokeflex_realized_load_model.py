@@ -93,7 +93,10 @@ def _discover_take_root(dataset_root: Path, take_id: str) -> Path:
         )
         _require(not candidate.is_symlink(), f"take root is a symlink: {take_id}")
         unique[str(resolved)] = resolved
-    _require(len(unique) == 1, f"expected exactly one root for {take_id}, found {len(unique)}")
+    _require(
+        len(unique) == 1,
+        f"expected exactly one root for {take_id}, found {len(unique)}",
+    )
     return next(iter(unique.values()))
 
 
@@ -104,7 +107,9 @@ def _first_persistent_true(values: BoolArray, count: int) -> int:
     raise ValueError("no persistent contact onset found")
 
 
-def _phase_and_speed(positions: FloatArray, path_phase_weight: float) -> tuple[FloatArray, FloatArray]:
+def _phase_and_speed(
+    positions: FloatArray, path_phase_weight: float
+) -> tuple[FloatArray, FloatArray]:
     steps = np.linalg.norm(np.diff(positions, axis=0), axis=1)
     speed = np.concatenate(([0.0], steps))
     cumulative = np.concatenate(([0.0], np.cumsum(steps)))
@@ -207,7 +212,9 @@ def _robust_scale(profiles: FloatArray, floor: float) -> FloatArray:
     return np.maximum(scale, floor).astype(np.float64)
 
 
-def _student_log_likelihood(residual: FloatArray, scale: FloatArray, degrees: float) -> float:
+def _student_log_likelihood(
+    residual: FloatArray, scale: FloatArray, degrees: float
+) -> float:
     standardized = residual / scale
     terms = -0.5 * (degrees + 1.0) * np.log1p((standardized**2) / degrees)
     terms -= np.log(scale)
@@ -219,7 +226,9 @@ def _normal_cdf(values: FloatArray) -> FloatArray:
     return 0.5 * (1.0 + erf(values / math.sqrt(2.0)))
 
 
-def _contact_probability(mean: FloatArray, variance: FloatArray, threshold: float) -> FloatArray:
+def _contact_probability(
+    mean: FloatArray, variance: FloatArray, threshold: float
+) -> FloatArray:
     standard_deviation = np.sqrt(np.maximum(variance, 1e-12))
     probability = 1.0 - _normal_cdf((threshold - mean) / standard_deviation)
     return np.clip(probability, 1e-6, 1.0 - 1e-6)
@@ -230,7 +239,9 @@ def _kinematic_features(
     speed_m_per_frame: FloatArray,
 ) -> FloatArray:
     length = len(phase)
-    _require(speed_m_per_frame.shape == (length,), "kinematic speed has the wrong shape")
+    _require(
+        speed_m_per_frame.shape == (length,), "kinematic speed has the wrong shape"
+    )
     time = np.linspace(0.0, 1.0, length)
     speed_scale = max(float(np.median(speed_m_per_frame)), 1e-8)
     speed = speed_m_per_frame / speed_scale
@@ -265,10 +276,13 @@ def _ridge_prediction(
     penalty = config.ridge_penalty * np.eye(design.shape[1])
     penalty[0, 0] = 0.0
     beta = np.linalg.solve(design.T @ design + penalty, design.T @ response)
-    prediction = _kinematic_features(
-        target.window_phase,
-        target.window_speed_m_per_frame,
-    ) @ beta
+    prediction = (
+        _kinematic_features(
+            target.window_phase,
+            target.window_speed_m_per_frame,
+        )
+        @ beta
+    )
     prefix = config.prefix_frame_count
     prediction += float(np.median(target_prefix - prediction[:prefix]))
     return prediction.astype(np.float64)
@@ -290,7 +304,9 @@ def _posterior_from_profiles(
     config: PokeFlexRealizedLoadSourceConfig,
 ) -> tuple[FloatArray, FloatArray, FloatArray, dict[str, Any]]:
     prefix = config.prefix_frame_count
-    scale = _robust_scale(evidence_profiles[:, :prefix], config.likelihood_scale_floor_n)
+    scale = _robust_scale(
+        evidence_profiles[:, :prefix], config.likelihood_scale_floor_n
+    )
     predictions: list[FloatArray] = []
     probabilities: list[FloatArray] = []
     metadata: list[dict[str, Any]] = []
@@ -300,7 +316,9 @@ def _posterior_from_profiles(
             evidence = _shift(evidence_profiles[template_index], int(delay))
             outcome = _shift(outcome_profiles[template_index], int(delay))
             for gain in config.gain_grid:
-                offset = float(np.median(target_prefix - float(gain) * evidence[:prefix]))
+                offset = float(
+                    np.median(target_prefix - float(gain) * evidence[:prefix])
+                )
                 evidence_prediction = float(gain) * evidence + offset
                 outcome_prediction = float(gain) * outcome + offset
                 residual = target_prefix - evidence_prediction[:prefix]
@@ -383,18 +401,22 @@ def build_forecast_bundle(
     _require(target.take_id not in source_ids, "target appears in source roster")
     _require(len(set(source_ids)) == len(source_ids), "source take ids repeat")
 
-    profiles = np.stack([_warp_profile(source, target.window_phase) for source in sources])
+    profiles = np.stack(
+        [_warp_profile(source, target.window_phase) for source in sources]
+    )
     template_variance = np.var(profiles, axis=0, ddof=1)
     template_variance = np.maximum(
         template_variance,
         config.predictive_variance_floor_n2,
     )
-    proposed_mean, proposed_variance, proposed_contact, posterior = _posterior_from_profiles(
-        target_prefix,
-        profiles,
-        profiles,
-        template_variance,
-        config,
+    proposed_mean, proposed_variance, proposed_contact, posterior = (
+        _posterior_from_profiles(
+            target_prefix,
+            profiles,
+            profiles,
+            template_variance,
+            config,
+        )
     )
     permutation = np.roll(np.arange(len(profiles)), -1)
     destroyed_profiles = profiles[permutation]
