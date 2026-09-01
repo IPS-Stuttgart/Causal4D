@@ -17,7 +17,11 @@ from typing import Any
 
 import numpy as np
 
-from causal4d_public.deform_dlo45_decision_common import hash_bytes, write_json
+from causal4d_public.deform_dlo45_decision_common import (
+    hash_bytes,
+    require,
+    write_json,
+)
 from causal4d_public.deform_dlo45_decision_core import (
     ACTION_NAMES,
     FALLBACK_ACTION_NAME,
@@ -39,6 +43,7 @@ from causal4d_public.deform_dlo45_decision_reporting import (
 
 ARTIFACT_KIND = "Causal4DDeformDLO45DecisionIdentifiabilityV1"
 OBJECT_IDS = ("DLO4", "DLO5")
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -168,11 +173,7 @@ def main() -> None:
         }
 
     preoutcome_records = [
-        {
-            key: value
-            for key, value in case.items()
-            if not key.startswith("_")
-        }
+        {key: value for key, value in case.items() if not key.startswith("_")}
         for case in prepared
     ]
     sealed_json = output_dir / "sealed_decisions_preoutcome.json"
@@ -199,11 +200,7 @@ def main() -> None:
         prefix = int(case["prefix_steps"])
         target_suffix = np.asarray(case["_target_values"], dtype=float)[prefix:]
         score = score_case(case, target_suffix)
-        row = {
-            key: value
-            for key, value in case.items()
-            if not key.startswith("_")
-        }
+        row = {key: value for key, value in case.items() if not key.startswith("_")}
         row.update(score)
         rows.append(row)
 
@@ -256,7 +253,7 @@ def main() -> None:
             "expected_files_per_object": args.expected_files_per_object,
         },
         "action_contract": {
-            "candidate_actions": list(ACTIOO_NAMES),
+            "candidate_actions": list(ACTION_NAMES),
             "fallback_action": FALLBACK_ACTION_NAME,
             "fallback_prediction_is_exact_retain_prediction": True,
             "loss": "held-out-source-hypothesis suffix RMSE in metres",
