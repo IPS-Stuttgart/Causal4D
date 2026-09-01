@@ -119,7 +119,9 @@ def test_source_gate_is_deterministic_and_does_not_open_forbidden_takes(
 ) -> None:
     config = _synthetic_config()
     shapes = (0.05, 0.20, 0.40, 0.65, 0.90)
-    for take_id, shape in zip(config.expected_development_take_ids, shapes, strict=True):
+    for take_id, shape in zip(
+        config.expected_development_take_ids, shapes, strict=True
+    ):
         _write_take(
             tmp_path,
             take_id,
@@ -161,12 +163,12 @@ def test_source_gate_is_deterministic_and_does_not_open_forbidden_takes(
         path = tmp_path / "3dPrintedBunny" / take_id / "robot_data.json"
         assert path.read_bytes() == expected
 
-    proposed = first["aggregate_equal_take_results"]["posterior_mean"][
-        "force_rmse_n"
-    ]["mean"]
-    persistence = first["aggregate_equal_take_results"]["persistence"][
-        "force_rmse_n"
-    ]["mean"]
+    proposed = first["aggregate_equal_take_results"]["posterior_mean"]["force_rmse_n"][
+        "mean"
+    ]
+    persistence = first["aggregate_equal_take_results"]["persistence"]["force_rmse_n"][
+        "mean"
+    ]
     assert proposed < persistence
     assert all(
         (tmp_path / "first" / f"prediction_seal_{take_id}.json").is_file()
