@@ -81,9 +81,14 @@ jobs:
           request = json.loads(
               Path("ops/deform-dlo45-public-gpuserver4090-request.json").read_text()
           )
-          assert request["schema_version"] == 2
+          assert request["schema_version"] == 3
           assert request["expected_train_files_per_object"] == 56
           assert request["expected_eval_files_per_object"] == 14
+          assert request["regret_tolerance_m"] == 0.001
+          assert request["exploratory_delay_sign_regret_tolerance_m"] == 0.010
+          assert request["exploratory_analysis_status"] == (
+              "post-primary-retrospective-exploratory"
+          )
           assert request["bayesian_phystwin_revision"] == (
               Path("requirements/ci/bayesian-phystwin-guarded-provider.sha")
               .read_text()
@@ -102,6 +107,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/_bpt/src
           GITHUB_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
+          mkdir -p "${OUTPUT_DIR}"
           python - <<'PY' > "${RUNNER_TEMP}/request.env"
           import json
           from pathlib import Path
@@ -114,6 +120,7 @@ jobs:
               "request_id",
               "prefix_fraction",
               "regret_tolerance_m",
+              "exploratory_delay_sign_regret_tolerance_m",
               "ambiguity_threshold_m",
               "bootstrap_replicates",
               "seed",
@@ -133,6 +140,8 @@ jobs:
             --output-dir "${OUTPUT_DIR}" \
             --prefix-fraction "${PREFIX_FRACTION}" \
             --regret-tolerance-m "${REGRET_TOLERANCE_M}" \
+            --exploratory-delay-sign-regret-tolerance-m \
+              "${EXPLORATORY_DELAY_SIGN_REGRET_TOLERANCE_M}" \
             --ambiguity-threshold-m "${AMBIGUITY_THRESHOLD_M}" \
             --bootstrap-replicates "${BOOTSTRAP_REPLICATES}" \
             --seed "${SEED}" \
@@ -158,12 +167,19 @@ jobs:
           evidence = json.loads(
               Path("deform-dlo45-hosted-control/evidence.json").read_text()
           )
-          assert evidence["schema_version"] == 2
+          assert evidence["schema_version"] == 3
           assert evidence["claim_eligible"] is True
           assert evidence["aggregate"]["case_count"] == 28
+          assert set(evidence["arms"]) == {
+              "strict_one_class_primary",
+              "exploratory_prefix_timing",
+          }
+          assert evidence["arms"]["exploratory_prefix_timing"][
+              "confirmatory_claim_eligible"
+          ] is False
           assert evidence["object_reports"]["DLO4"]["official_split"]["verified"]
           assert evidence["object_reports"]["DLO5"]["official_split"]["verified"]
-          print(json.dumps(evidence["aggregate"], indent=2, sort_keys=True))
+          print(json.dumps(evidence["arms"], indent=2, sort_keys=True))
           PY
           cat "${OUTPUT_DIR}/report.md" >> "${GITHUB_STEP_SUMMARY}"
 
