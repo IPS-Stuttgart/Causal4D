@@ -1,0 +1,111 @@
+name: PR 472 one-shot repair
+
+on:
+  push:
+    branches:
+      - feature/decision-identifiable-intervention-v1
+    paths:
+      - ".github/workflows/pr472-one-shot-repair.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pr-472-one-shot-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feature/decision-identifiable-intervention-v1
+          fetch-depth: 0
+          persist-credentials: true
+          clean: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Check out compatible BayesianPhysTwin revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: IPS-Stuttgart/BayesianPhysTwin
+          ref: 754a2a97a4a10369ad15236d84f4d2a81c454055
+          path: _repair_bpt
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Apply deterministic repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'ruff==0.16.5'
+          python -m ruff format \
+            src/causal4d/decision_identifiable_intervention.py \
+            tests/test_decision_identifiable_intervention.py
+          python - <<'PY'
+          from pathlib import Path
+
+          old = "d3b60dc306635a629f0a7c58c4ceea1d0cd61353"
+          new = "754a2a97a4a10369ad15236d84f4d2a81c454055"
+          workflow = Path(".github/workflows/tree-block-query-provider-integration.yml")
+          text = workflow.read_text(encoding="utf-8")
+          if text.count(old) != 3:
+              raise SystemExit("unexpected number of stale provider-pin occurrences")
+          workflow.write_text(text.replace(old, new), encoding="utf-8")
+          Path("requirements/ci/bayesian-phystwin-tree-block-query-v1.sha").write_text(
+              new + "\n",
+              encoding="utf-8",
+          )
+          PY
+          test "$(git -C _repair_bpt rev-parse HEAD)" = \
+            "754a2a97a4a10369ad15236d84f4d2a81c454055"
+          test -f _repair_bpt/src/bayesian_phystwin/causal4d_tree_block_provider_v1.py
+          test -f _repair_bpt/src/bayesian_phystwin/query_decision_certificate_v1.py
+
+      - name: Validate repaired contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            -e '.[dev]' -e ./_repair_bpt
+          python -m ruff format --check --diff \
+            src/causal4d/decision_identifiable_intervention.py \
+            tests/test_decision_identifiable_intervention.py
+          python -m ruff check \
+            src/causal4d/decision_identifiable_intervention.py \
+            tests/test_decision_identifiable_intervention.py
+          python -m pytest -q \
+            tests/test_decision_identifiable_intervention.py \
+            tests/test_bpt_provider_registry.py \
+            tests/test_bpt_provider_import_boundary.py \
+            tests/test_tree_block_query_provider_workflow_policy.py
+
+      - name: Commit repair to PR branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf _repair_bpt
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add \
+            .github/workflows/tree-block-query-provider-integration.yml \
+            requirements/ci/bayesian-phystwin-tree-block-query-v1.sha \
+            src/causal4d/decision_identifiable_intervention.py \
+            tests/test_decision_identifiable_intervention.py
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "Repair produced no changes" >&2
+            exit 1
+          fi
+          git commit -m "Repair decision-identifiability provider integration"
+          git push origin HEAD:feature/decision-identifiable-intervention-v1
