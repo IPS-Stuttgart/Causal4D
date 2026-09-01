@@ -11,6 +11,7 @@ from typing import Any
 
 import numpy as np
 
+
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise ValueError(message)
@@ -56,5 +57,3 @@ def hash_array(value: np.ndarray) -> str:
     digest.update(str(array.dtype).encode("ascii"))
     digest.update(array.tobytes())
     return digest.hexdigest()
-
-
