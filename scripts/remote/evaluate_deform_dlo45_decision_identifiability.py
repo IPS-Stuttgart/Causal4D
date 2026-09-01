@@ -119,9 +119,7 @@ def main() -> None:
             for target_index in indices:
                 source_indices = [index for index in indices if index != target_index]
                 target_prefix = records[target_index].values[:prefix_steps].copy()
-                sources = np.stack(
-                    [records[index].values for index in source_indices]
-                )
+                sources = np.stack([records[index].values for index in source_indices])
                 case = build_preoutcome_case(
                     target_prefix,
                     sources,
@@ -239,9 +237,7 @@ def main() -> None:
         "request_id": args.request_id,
         "repository_revision": os.environ.get("GITHUB_SHA"),
         "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
-        "bayesian_phystwin_revision": os.environ.get(
-            "BAYESIAN_PHYSTWIN_REVISION"
-        ),
+        "bayesian_phystwin_revision": os.environ.get("BAYESIAN_PHYSTWIN_REVISION"),
         "parameters": {
             "prefix_fraction": args.prefix_fraction,
             "regret_tolerance_m": args.regret_tolerance_m,
