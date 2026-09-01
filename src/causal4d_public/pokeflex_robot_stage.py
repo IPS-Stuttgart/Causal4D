@@ -56,6 +56,15 @@ def _source_qa_robot_hashes(
     return hashes
 
 
+def _safe_component(value: str, name: str) -> str:
+    path = PurePosixPath(value)
+    _require(
+        len(path.parts) == 1 and path.parts[0] not in {"", ".", ".."},
+        f"{name} is not one path component",
+    )
+    return value
+
+
 def _inside_root(path: Path, root: Path) -> Path:
     resolved = path.resolve()
     _require(
@@ -70,27 +79,36 @@ def _direct_robot_candidates(
     object_id: str,
     take_id: str,
 ) -> tuple[Path, ...]:
-    candidates = (
-        root / take_id / "robot_data.json",
-        root / object_id / take_id / "robot_data.json",
+    """Return trusted lexical paths without touching an unreadable source file."""
+
+    object_component = _safe_component(object_id, "object id")
+    take_component = _safe_component(take_id, "take id")
+    return (
+        root / take_component / "robot_data.json",
+        root / object_component / take_component / "robot_data.json",
     )
-    unique: dict[str, Path] = {}
-    for candidate in candidates:
-        resolved = _inside_root(candidate, root)
-        if resolved.is_file() and not candidate.is_symlink():
-            unique[str(resolved)] = resolved
-    return tuple(unique[key] for key in sorted(unique))
+
+
+def _bounded_archive_paths(root: Path) -> tuple[Path, ...]:
+    paths = []
+    for pattern in ("*.zip", "*.ZIP", "*/*.zip", "*/*.ZIP", "*/*/*.zip", "*/*/*.ZIP"):
+        paths.extend(root.glob(pattern))
+    return tuple(paths)
 
 
 def _archive_candidates(root: Path, take_id: str) -> tuple[Path, ...]:
+    take_component = _safe_component(take_id, "take id")
     unique: dict[str, Path] = {}
-    patterns = (f"*{take_id}*.zip", f"*{take_id}*.ZIP")
-    for pattern in patterns:
-        for candidate in root.rglob(pattern):
+    for candidate in _bounded_archive_paths(root):
+        if take_component not in candidate.name:
+            continue
+        try:
             if candidate.is_symlink() or not candidate.is_file():
                 continue
-            resolved = _inside_root(candidate, root)
-            unique[str(resolved)] = resolved
+        except OSError:
+            continue
+        resolved = _inside_root(candidate, root)
+        unique[str(resolved)] = resolved
     return tuple(unique[key] for key in sorted(unique))
 
 
@@ -118,6 +136,14 @@ def _robot_member_candidates(
     return tuple(selected)
 
 
+def _read_bytes_no_follow(path: Path) -> bytes:
+    flags = os.O_RDONLY
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags)
+    with os.fdopen(descriptor, "rb") as handle:
+        return handle.read()
+
+
 def _read_verified_direct(
     candidates: Sequence[Path],
     expected_sha256: str,
@@ -125,7 +151,7 @@ def _read_verified_direct(
     failures = []
     for candidate in candidates:
         try:
-            content = candidate.read_bytes()
+            content = _read_bytes_no_follow(candidate)
         except OSError as error:
             failures.append({"path": str(candidate), "error": type(error).__name__})
             continue
