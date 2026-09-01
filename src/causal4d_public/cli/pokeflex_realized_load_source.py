@@ -4,26 +4,28 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import tempfile
 from pathlib import Path
 
 import numpy as np
 
+from causal4d_public.pokeflex_owner_stage import (
+    stage_pokeflex_development_robot_records_with_owner_fallback,
+)
 from causal4d_public.pokeflex_realized_load import (
     load_realized_load_policy,
     run_pokeflex_realized_load_source_gate,
     validate_realized_load_artifact,
 )
-from causal4d_public.pokeflex_robot_stage import (
-    stage_pokeflex_development_robot_records,
-    validate_pokeflex_robot_stage,
-)
+from causal4d_public.pokeflex_robot_stage import validate_pokeflex_robot_stage
 
 
 def _official_public_archive_root(dataset_root: str | Path) -> Path:
     """Return the frozen public poking-archive root below the mounted dataset."""
 
-    return Path(dataset_root).resolve() / "poking"
+    mounted = Path(os.path.abspath(os.fspath(dataset_root)))
+    return mounted / "poking"
 
 
 def main() -> int:
@@ -43,7 +45,7 @@ def main() -> int:
             prefix="causal4d-pokeflex-robot-stage-"
         ) as temporary:
             stage_root = Path(temporary) / "dataset"
-            stage = stage_pokeflex_development_robot_records(
+            stage = stage_pokeflex_development_robot_records_with_owner_fallback(
                 archive_root,
                 source_qa,
                 stage_root,
