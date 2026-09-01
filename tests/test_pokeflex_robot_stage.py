@@ -106,14 +106,66 @@ def test_stages_only_verified_development_robot_members(tmp_path: Path) -> None:
         config.expected_development_take_ids
     )
     assert all(row["source_kind"] == "verified-zip-member" for row in result["records"])
-    assert result["information_boundary"]["calibration_take_data_read"] is False
-    assert result["information_boundary"]["target_take_data_read"] is False
-    assert result["information_boundary"]["dataset_modified"] is False
+    assert result["carrier_index"]["archive_count"] == 7
+    boundary = result["information_boundary"]
+    assert boundary["archive_central_directory_metadata_read"] is True
+    assert boundary["nondevelopment_member_payloads_read"] is False
+    assert boundary["calibration_take_data_read"] is False
+    assert boundary["target_take_data_read"] is False
+    assert boundary["dataset_modified"] is False
     for take_id in config.expected_development_take_ids:
         staged = destination / config.expected_object_id / take_id / "robot_data.json"
         assert staged.read_bytes() == content[take_id]
         archive = tmp_path / "poking" / config.expected_object_id / f"{take_id}.zip"
         assert archive.read_bytes() == archive_bytes[take_id]
+
+
+def test_archive_index_does_not_depend_on_archive_filename(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    config = PokeFlexRealizedLoadSourceConfig()
+    content = {
+        take_id: _robot_bytes(take_id)
+        for take_id in config.expected_development_take_ids
+    }
+    archive_path = tmp_path / "downloads" / "release-part-042.zip"
+    archive_path.parent.mkdir()
+    with zipfile.ZipFile(archive_path, mode="w") as archive:
+        for take_id, payload in content.items():
+            archive.writestr(f"poking/{take_id}/robot_data.json", payload)
+        for take_id in config.forbidden_take_ids:
+            archive.writestr(
+                f"poking/{take_id}/robot_data.json",
+                b"FORBIDDEN PAYLOAD MUST NOT BE READ",
+            )
+
+    original_read = zipfile.ZipFile.read
+    read_names: list[str] = []
+
+    def tracked_read(archive, name, *args, **kwargs):
+        filename = name.filename if isinstance(name, zipfile.ZipInfo) else str(name)
+        read_names.append(filename)
+        assert not any(take_id in filename for take_id in config.forbidden_take_ids)
+        return original_read(archive, name, *args, **kwargs)
+
+    monkeypatch.setattr(zipfile.ZipFile, "read", tracked_read)
+    result = stage_pokeflex_development_robot_records(
+        tmp_path,
+        _source_qa(config, content),
+        tmp_path / "stage",
+        config,
+    )
+
+    assert set(read_names) == {
+        f"poking/{take_id}/robot_data.json"
+        for take_id in config.expected_development_take_ids
+    }
+    assert all(
+        Path(record["source_path"]).name == "release-part-042.zip"
+        for record in result["records"]
+    )
+    assert result["carrier_index"]["nondevelopment_member_payloads_read"] is False
 
 
 def test_prefers_a_readable_source_qa_bound_extracted_file(tmp_path: Path) -> None:
@@ -137,6 +189,7 @@ def test_prefers_a_readable_source_qa_bound_extracted_file(tmp_path: Path) -> No
     assert all(
         row["source_kind"] == "verified-extracted-file" for row in result["records"]
     )
+    assert result["carrier_index"]["archive_scan_required"] is False
 
 
 def test_rejects_a_robot_member_that_differs_from_source_qa(tmp_path: Path) -> None:
@@ -151,7 +204,7 @@ def test_rejects_a_robot_member_that_differs_from_source_qa(tmp_path: Path) -> N
     with zipfile.ZipFile(archive_path, mode="w") as archive:
         archive.writestr(f"{first}/robot_data.json", b"changed")
 
-    with pytest.raises(ValueError, match="no verified readable robot record"):
+    with pytest.raises(ValueError, match="no source-QA-verified archive member"):
         stage_pokeflex_development_robot_records(
             tmp_path,
             _source_qa(config, content),

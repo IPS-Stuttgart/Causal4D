@@ -93,6 +93,8 @@ def test_permission_denied_direct_files_fall_back_to_verified_archives(
     assert result["information_boundary"] == {
         "development_robot_records_only": True,
         "development_meshes_read": False,
+        "archive_central_directory_metadata_read": True,
+        "nondevelopment_member_payloads_read": False,
         "calibration_take_data_read": False,
         "target_take_data_read": False,
         "dataset_modified": False,
