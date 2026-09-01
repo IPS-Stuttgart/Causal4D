@@ -58,8 +58,7 @@ def main() -> int:
                 )
                 stage_validation = validate_pokeflex_robot_stage(stage)
                 (output / "input_stage_manifest.json").write_text(
-                    json.dumps(stage, indent=2, sort_keys=True, allow_nan=False)
-                    + "\n",
+                    json.dumps(stage, indent=2, sort_keys=True, allow_nan=False) + "\n",
                     encoding="utf-8",
                 )
                 result = run_pokeflex_realized_load_source_gate(
@@ -80,9 +79,7 @@ def main() -> int:
             )
             technical_result = {
                 "passed": False,
-                "technical_status": (
-                    "source-evaluation-blocked-before-payload-access"
-                ),
+                "technical_status": ("source-evaluation-blocked-before-payload-access"),
                 "source_gate_executed": False,
                 "source_backend_admitted": False,
                 "diagnostic_file": diagnostic_path.name,
