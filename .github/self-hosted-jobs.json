@@ -299,6 +299,21 @@
       "workflow": "optional-integrations.yml"
     },
     {
+      "authorization_model": "main-only",
+      "dataset_access": "verified-public-pokeflex-development-robot-records-only",
+      "job": "evaluate",
+      "purpose": "Development-only PokeFlex realized-load and contact-state source gate",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi",
+        "gpuserver6000"
+      ],
+      "secrets_allowed": false,
+      "workflow": "pokeflex-realized-load-source-gpuserver6000.yml"
+    },
+    {
       "authorization_model": "maintainer-issue-main",
       "dataset_access": "none",
       "job": "validate",
