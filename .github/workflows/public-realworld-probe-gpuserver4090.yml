@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: public-realworld-probe-gpuserver4090
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   probe:
@@ -46,6 +46,10 @@ jobs:
           assert request["enabled"] is True
           assert request["runner"] == "gpuserver4090"
           assert request["public_data_only"] is True
+          assert request["request_id"] == (
+              "2026-09-01-public-realworld-probe-v4-"
+              "pokeflex-cache-source-gate"
+          )
           discovery = request["pokeflex_replica_discovery"]
           assert discovery == {
               "cache_root": (
@@ -63,6 +67,22 @@ jobs:
               "enabled": True,
               "source_qa_result_sha256": (
                   "e09d36db4e1ba8a38c70e112c3af9ab95516ee245302f71a853f36cd2dd0e0e7"
+              ),
+              "target_take_data_allowed": False,
+          }
+          cached_gate = request["pokeflex_cached_source_gate"]
+          assert cached_gate == {
+              "automatic_follow_on_allowed": False,
+              "calibration_take_data_allowed": False,
+              "enabled": True,
+              "policy_path": (
+                  "configs/causal4d_public/"
+                  "pokeflex_realized_load_source_v1.json"
+              ),
+              "run_only_when_cache_verified": True,
+              "source_qa_artifact_path": (
+                  "milestones/pokeflex-001-source-warp-gate-v1/artifacts/"
+                  "3dPrintedBunny_source_qa_v1.json"
               ),
               "target_take_data_allowed": False,
           }
@@ -130,6 +150,74 @@ jobs:
             2>&1 | tee \
               public-realworld-probe/pokeflex-development-replica.log
 
+      - name: Select numerical runtime only for a verified complete cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          readarray -t fields < <("${PROBE_PYTHON}" - <<'PY'
+          import json
+          from pathlib import Path
+
+          result = json.loads(
+              Path(
+                  "public-realworld-probe/pokeflex-development-replica.json"
+              ).read_text()
+          )
+          ready = result.get("complete") is True and result.get("cache_verified") is True
+          print("1" if ready else "0")
+          print(result.get("cache_root", ""))
+          PY
+          )
+          ready="${fields[0]}"
+          cache_root="${fields[1]}"
+          echo "POKEFLEX_CACHE_READY=${ready}" >> "${GITHUB_ENV}"
+          echo "POKEFLEX_CACHE_ROOT=${cache_root}" >> "${GITHUB_ENV}"
+          if [[ "${ready}" != "1" ]]; then
+            echo "Exact five-log cache is incomplete; source gate remains closed."
+            exit 0
+          fi
+          selected=""
+          for candidate in \
+            /opt/pyvenv/bin/python python3.12 python3.11 python3.10 \
+            /usr/bin/python3 python3; do
+            command -v "${candidate}" >/dev/null 2>&1 || continue
+            if "${candidate}" - <<'PY'
+          import sys
+          if sys.version_info < (3, 10):
+              raise SystemExit(1)
+          import numpy
+          major, minor = map(int, numpy.__version__.split(".")[:2])
+          if (major, minor) < (1, 24):
+              raise SystemExit(1)
+          PY
+            then
+              selected="$(command -v "${candidate}")"
+              break
+            fi
+          done
+          test -n "${selected}"
+          echo "POKEFLEX_EVAL_PYTHON=${selected}" >> "${GITHUB_ENV}"
+          "${selected}" --version
+          "${selected}" -c 'import numpy; print("numpy", numpy.__version__)'
+
+      - name: Run frozen realized-load source gate from verified cache
+        if: env.POKEFLEX_CACHE_READY == '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="public-realworld-probe/pokeflex-realized-load-source-v1"
+          mkdir -p "${output}"
+          PYTHONPATH=src "${POKEFLEX_EVAL_PYTHON}" \
+            scripts/remote/evaluate_pokeflex_cached_source_gpuserver4090.py \
+            --discovery \
+              public-realworld-probe/pokeflex-development-replica.json \
+            --source-qa \
+              milestones/pokeflex-001-source-warp-gate-v1/artifacts/3dPrintedBunny_source_qa_v1.json \
+            --policy \
+              configs/causal4d_public/pokeflex_realized_load_source_v1.json \
+            --output-dir "${output}" \
+            2>&1 | tee "${output}/run.log"
+
       - name: Record runner provenance
         if: always()
         shell: bash
@@ -143,6 +231,9 @@ jobs:
             echo "repository=${GITHUB_REPOSITORY}"
             echo "commit=${GITHUB_SHA}"
             echo "workflow_run_id=${GITHUB_RUN_ID}"
+            echo "pokeflex_cache_ready=${POKEFLEX_CACHE_READY:-unknown}"
+            echo "pokeflex_cache_root=${POKEFLEX_CACHE_ROOT:-unknown}"
+            echo "pokeflex_eval_python=${POKEFLEX_EVAL_PYTHON:-not-selected}"
             uname -a
             nvidia-smi -L || true
             df -h /mnt/seagate10tb || true
@@ -174,6 +265,24 @@ jobs:
           print(f"- Missing: `{', '.join(result.get('missing_take_ids', [])) or 'none'}`")
           print(f"- Cache verified: `{result.get('cache_verified')}`")
           print("- Calibration T5 and target T2 payloads were not read.")
+          PY
+          fi
+          decision="public-realworld-probe/pokeflex-realized-load-source-v1/cached_source_gate_decision.json"
+          if [[ -f "${decision}" ]]; then
+            DECISION_PATH="${decision}" \
+              "${POKEFLEX_EVAL_PYTHON:-${PROBE_PYTHON:-python3}}" \
+              - <<'PY' >> "${GITHUB_STEP_SUMMARY}"
+          import json
+          import os
+          from pathlib import Path
+
+          result = json.loads(Path(os.environ["DECISION_PATH"]).read_text())
+          print("\n### PokeFlex realized-load source gate")
+          print()
+          print(f"- Executed: `{result['source_gate_executed']}`")
+          print(f"- Decision: `{result['status']}`")
+          print(f"- Backend admitted: `{result['source_backend_admitted']}`")
+          print("- Automatic calibration and target follow-on remain disabled.")
           PY
           fi
 
