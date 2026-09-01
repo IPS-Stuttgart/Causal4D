@@ -26,12 +26,18 @@ modules:
   correspondence artifacts without importing experiment internals;
 - `bayesian_phystwin.causal4d_public_provider_v1` for source-locked public-data
   diagnostics that still reuse BPT experiment semantics.
+- `bayesian_phystwin.query_decision_certificate_v1` for exact finite-action
+  worst-case-regret certificates over registered query quotients and prior
+  support.
 
 The graph module is explicitly parented to Bayesian-PhysTwin's immutable
 `causal4d_provider_v2` contract. Causal4D's belief exporter validates the
 separate belief-provider manifest and invokes only its fixed-anchor operation.
 Registered tree-block covariance queries use their own additive provider and
-local validation contract. Guarded handoff v2 imports runtime and complete-belief
+local validation contract. The decision-certificate module is an additive,
+versioned constructor owned by BayesianPhysTwin; Causal4D validates and
+consumes its output through `causal4d.decision_identifiable_intervention`
+without selecting an unsupported within-class physical representative. Guarded handoff v2 imports runtime and complete-belief
 selection contracts only through its dedicated versioned facade; an older pinned
 wheel may omit that additive module unless the paired compatibility lane sets
 `CAUSAL4D_REQUIRE_GUARDED_BPT_PROVIDER=1`. The additive v3 belief provider is

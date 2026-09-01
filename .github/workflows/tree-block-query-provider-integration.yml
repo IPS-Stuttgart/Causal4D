@@ -47,7 +47,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: IPS-Stuttgart/BayesianPhysTwin
-          ref: d3b60dc306635a629f0a7c58c4ceea1d0cd61353
+          ref: 754a2a97a4a10369ad15236d84f4d2a81c454055
           path: _bpt
           persist-credentials: false
           clean: true
@@ -57,7 +57,7 @@ jobs:
           set -euo pipefail
           expected=$(tr -d '[:space:]' \
             < requirements/ci/bayesian-phystwin-tree-block-query-v1.sha)
-          test "$expected" = "d3b60dc306635a629f0a7c58c4ceea1d0cd61353"
+          test "$expected" = "754a2a97a4a10369ad15236d84f4d2a81c454055"
           test "$(git -C _bpt rev-parse HEAD)" = "$expected"
 
       - name: Set up Python 3.12
@@ -108,7 +108,7 @@ jobs:
 
       - name: Validate the installed provider boundary
         env:
-          BAYESIAN_PHYSTWIN_REVISION: d3b60dc306635a629f0a7c58c4ceea1d0cd61353
+          BAYESIAN_PHYSTWIN_REVISION: 754a2a97a4a10369ad15236d84f4d2a81c454055
           CAUSAL4D_REQUIRE_TREE_BLOCK_QUERY_PROVIDER: "1"
         run: |
           set -euo pipefail
