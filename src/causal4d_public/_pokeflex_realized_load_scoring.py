@@ -51,11 +51,7 @@ def _method_metrics(
         "force_mae_n": float(np.mean(np.abs(error))),
         "force_gaussian_nll": float(
             np.mean(
-                0.5
-                * (
-                    np.log(2.0 * math.pi * safe_variance)
-                    + error**2 / safe_variance
-                )
+                0.5 * (np.log(2.0 * math.pi * safe_variance) + error**2 / safe_variance)
             )
         ),
         "force_90pct_coverage": float(np.mean(np.abs(error) <= half_width)),
@@ -93,9 +89,7 @@ def _bootstrap_mean_ci(
 def _one_sided_sign_pvalue(wins: int, non_ties: int) -> float:
     if non_ties == 0:
         return 1.0
-    numerator = sum(
-        math.comb(non_ties, value) for value in range(wins, non_ties + 1)
-    )
+    numerator = sum(math.comb(non_ties, value) for value in range(wins, non_ties + 1))
     return float(numerator / (2**non_ties))
 
 
@@ -117,9 +111,7 @@ def _write_prediction_bundle(
 ) -> dict[str, Any]:
     arrays: dict[str, FloatArray] = {}
     for method in sorted(bundle.means):
-        arrays[f"{method}__mean"] = np.asarray(
-            bundle.means[method], dtype=np.float64
-        )
+        arrays[f"{method}__mean"] = np.asarray(bundle.means[method], dtype=np.float64)
         arrays[f"{method}__variance"] = np.asarray(
             bundle.variances[method], dtype=np.float64
         )
@@ -144,8 +136,7 @@ def _write_prediction_bundle(
         .astype(int)
         .tolist(),
         "forecast_frame_ids": target.frame_ids[
-            target.onset_index
-            + prefix : target.onset_index
+            target.onset_index + prefix : target.onset_index
             + prefix
             + config.forecast_horizon_frames
         ]
@@ -238,9 +229,7 @@ def run_pokeflex_realized_load_source_gate(
                 "take_id": target_id,
                 "robot_sha256": target.robot_sha256,
                 "contact_onset_index": target.onset_index,
-                "contact_onset_frame_id": int(
-                    target.frame_ids[target.onset_index]
-                ),
+                "contact_onset_frame_id": int(target.frame_ids[target.onset_index]),
                 "prediction_seal_sha256": seals[target_id]["seal_sha256"],
                 "metrics": metrics,
             }
@@ -288,9 +277,7 @@ def run_pokeflex_realized_load_source_gate(
             "ties": len(rows) - wins - losses,
             "losses": losses,
             "win_fraction": wins / len(rows),
-            "one_sided_sign_pvalue": _one_sided_sign_pvalue(
-                wins, wins + losses
-            ),
+            "one_sided_sign_pvalue": _one_sided_sign_pvalue(wins, wins + losses),
             "mean_difference_bootstrap": _bootstrap_mean_ci(
                 differences,
                 config,
@@ -317,15 +304,11 @@ def run_pokeflex_realized_load_source_gate(
         ),
         "mean_rmse_improvement_vs_persistence": (
             proposed_rmse
-            <= (
-                1.0
-                - config.minimum_mean_rmse_improvement_fraction_vs_persistence
-            )
+            <= (1.0 - config.minimum_mean_rmse_improvement_fraction_vs_persistence)
             * persistence_rmse
         ),
         "take_win_fraction_vs_persistence": (
-            persistence_win_fraction
-            >= config.minimum_take_win_fraction_vs_persistence
+            persistence_win_fraction >= config.minimum_take_win_fraction_vs_persistence
         ),
         "mean_rmse_improvement_vs_dependence_destroyed": (
             proposed_rmse
@@ -381,9 +364,7 @@ def run_pokeflex_realized_load_source_gate(
         "comparisons": comparisons,
         "source_gate_criteria": criteria,
         "source_backend_admitted": admitted,
-        "decision": "source-positive"
-        if admitted
-        else "source-negative-or-bounded",
+        "decision": "source-positive" if admitted else "source-negative-or-bounded",
         "next_stage_authorization": {
             "automatic_calibration_open": False,
             "automatic_target_open": False,
@@ -419,8 +400,7 @@ def validate_realized_load_artifact(payload: Mapping[str, Any]) -> dict[str, Any
         "unexpected realized-load artifact kind",
     )
     _require(
-        payload.get("schema_version")
-        == POKEFLEX_REALIZED_LOAD_ARTIFACT_SCHEMA_VERSION,
+        payload.get("schema_version") == POKEFLEX_REALIZED_LOAD_ARTIFACT_SCHEMA_VERSION,
         "unsupported realized-load artifact schema",
     )
     _require(
