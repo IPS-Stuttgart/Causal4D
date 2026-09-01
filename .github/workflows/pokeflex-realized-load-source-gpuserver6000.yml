@@ -220,7 +220,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          "$PYTHON_BIN" - <<'PY' >> "$GITHUB_ENV"
+          request_env="$RUNNER_TEMP/pokeflex-realized-load-request.env"
+          "$PYTHON_BIN" - <<'PY' > "$request_env"
           import hashlib
           import json
           from pathlib import Path
@@ -254,6 +255,10 @@ jobs:
           print(f"POLICY_PATH={request['policy_path']}")
           print(f"SOURCE_QA_PATH={request['source_qa_artifact_path']}")
           PY
+          cat "$request_env" >> "$GITHUB_ENV"
+          set -a
+          source "$request_env"
+          set +a
           test "$DATASET_ROOT" = "/mnt/lexar4tb/pokeflex"
           test -d "$DATASET_ROOT"
       - name: Run development-only realized-load source gate
