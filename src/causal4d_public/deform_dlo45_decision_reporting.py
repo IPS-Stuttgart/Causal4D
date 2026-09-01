@@ -11,6 +11,7 @@ import numpy as np
 
 from .deform_dlo45_decision_common import require
 
+
 def percentile_interval(values: np.ndarray) -> dict[str, float]:
     return {
         "lower95": float(np.quantile(values, 0.025)),
@@ -58,10 +59,7 @@ def wilson_interval(
     center = (proportion + z**2 / (2.0 * total)) / denominator
     radius = (
         z
-        * math.sqrt(
-            proportion * (1.0 - proportion) / total
-            + z**2 / (4.0 * total**2)
-        )
+        * math.sqrt(proportion * (1.0 - proportion) / total + z**2 / (4.0 * total**2))
         / denominator
     )
     return {
@@ -88,8 +86,7 @@ def aggregate_rows(
     ambiguous = [
         row
         for row in rows
-        if float(row["source_supported_ambiguity_max_rmse_m"])
-        > ambiguity_threshold_m
+        if float(row["source_supported_ambiguity_max_rmse_m"]) > ambiguity_threshold_m
     ]
     ambiguous_certified = sum(bool(row["certified"]) for row in ambiguous)
 
@@ -214,5 +211,3 @@ def report_markdown(evidence: Mapping[str, Any]) -> str:
         "",
     ]
     return "\n".join(lines)
-
-
