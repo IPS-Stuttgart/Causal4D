@@ -98,7 +98,6 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add \
-            .github/workflows/tree-block-query-provider-integration.yml \
             requirements/ci/bayesian-phystwin-tree-block-query-v1.sha \
             src/causal4d/decision_identifiable_intervention.py \
             tests/test_decision_identifiable_intervention.py
