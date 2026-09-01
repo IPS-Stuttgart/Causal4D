@@ -1,0 +1,282 @@
+name: PokeFlex realized-load source gate on gpuserver6000
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/self-hosted-jobs.json"
+      - ".github/workflows/pokeflex-realized-load-source-gpuserver6000.yml"
+      - "configs/causal4d_public/pokeflex_realized_load_source_v1.json"
+      - "docs/causal4d_pokeflex_realized_load.md"
+      - "ops/pokeflex-realized-load-source-gpuserver6000-request.json"
+      - "src/causal4d_public/pokeflex_realized_load.py"
+      - "src/causal4d_public/cli/pokeflex_realized_load_source.py"
+      - "tests/test_pokeflex_realized_load.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pokeflex-realized-load-source-gpuserver6000-v1
+  cancel-in-progress: false
+
+env:
+  PYTHONUNBUFFERED: "1"
+  REQUEST_PATH: ops/pokeflex-realized-load-source-gpuserver6000-request.json
+
+jobs:
+  validate:
+    name: Validate frozen source-gate contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install focused test dependencies
+        run: |
+          python -m pip install -e ".[dev]"
+          python -m pip check
+      - name: Validate request and policy identities
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          request_path = Path("ops/pokeflex-realized-load-source-gpuserver6000-request.json")
+          request = json.loads(request_path.read_text(encoding="utf-8"))
+          supplied = request.pop("request_id")
+          observed = hashlib.sha256(
+              json.dumps(
+                  request,
+                  sort_keys=True,
+                  separators=(",", ":"),
+                  allow_nan=False,
+              ).encode("utf-8")
+          ).hexdigest()
+          assert supplied == observed
+          assert request == {
+              "artifact_kind": "PublicPokeFlexRealizedLoadSourceRequest",
+              "dataset_root": "/mnt/lexar4tb/pokeflex",
+              "enabled": True,
+              "information_boundary": {
+                  "automatic_follow_on_allowed": False,
+                  "calibration_take_data_allowed": False,
+                  "development_take_ids": [
+                      "3dPrintedBunny_T1",
+                      "3dPrintedBunny_T3",
+                      "3dPrintedBunny_T4",
+                      "3dPrintedBunny_T6",
+                      "3dPrintedBunny_T7",
+                  ],
+                  "public_data_only": True,
+                  "target_take_data_allowed": False,
+              },
+              "policy_path": "configs/causal4d_public/pokeflex_realized_load_source_v1.json",
+              "runner_labels": [
+                  "self-hosted",
+                  "Linux",
+                  "X64",
+                  "nvidia-smi",
+                  "gpuserver6000",
+              ],
+              "schema_version": 1,
+              "source_qa_artifact_path": "milestones/pokeflex-001-source-warp-gate-v1/artifacts/3dPrintedBunny_source_qa_v1.json",
+              "stage": "development-source-gate",
+          }
+          PY
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from causal4d_public.pokeflex_realized_load import (
+              validate_realized_load_policy,
+              validate_source_qa_binding,
+          )
+
+          policy = json.loads(
+              Path("configs/causal4d_public/pokeflex_realized_load_source_v1.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          validated = validate_realized_load_policy(policy)
+          source_qa = json.loads(
+              Path(
+                  "milestones/pokeflex-001-source-warp-gate-v1/artifacts/3dPrintedBunny_source_qa_v1.json"
+              ).read_text(encoding="utf-8")
+          )
+          validate_source_qa_binding(source_qa, validated["config"])
+          PY
+      - name: Materialize canonical formatting
+        run: |
+          python -m ruff format \
+            src/causal4d_public/pokeflex_realized_load.py \
+            src/causal4d_public/cli/pokeflex_realized_load_source.py \
+            tests/test_pokeflex_realized_load.py
+      - name: Upload canonical formatting candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pokeflex-realized-load-canonical-format-${{ github.run_id }}
+          path: |
+            src/causal4d_public/pokeflex_realized_load.py
+            src/causal4d_public/cli/pokeflex_realized_load_source.py
+            tests/test_pokeflex_realized_load.py
+          if-no-files-found: error
+          retention-days: 7
+      - name: Require committed canonical formatting
+        run: |
+          git diff --exit-code -- \
+            src/causal4d_public/pokeflex_realized_load.py \
+            src/causal4d_public/cli/pokeflex_realized_load_source.py \
+            tests/test_pokeflex_realized_load.py
+      - name: Run focused tests
+        run: |
+          python -m ruff check \
+            src/causal4d_public/pokeflex_realized_load.py \
+            src/causal4d_public/cli/pokeflex_realized_load_source.py \
+            tests/test_pokeflex_realized_load.py
+          python -m pytest -q \
+            tests/test_pokeflex_realized_load.py \
+            tests/test_self_hosted_workflow_policy.py
+
+  evaluate:
+    name: Evaluate development takes read-only
+    needs: validate
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      needs.validate.result == 'success'
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver6000]
+    timeout-minutes: 90
+    steps:
+      - name: Check out exact reviewed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+      - name: Verify exact clean main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+      - name: Select an isolated compatible Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          for candidate in /opt/pyvenv/bin/python python3 python; do
+            if command -v "$candidate" >/dev/null 2>&1 && \
+               "$candidate" - <<'PY' >/dev/null 2>&1
+          import numpy
+          assert tuple(map(int, numpy.__version__.split(".")[:2])) >= (1, 24)
+          PY
+            then
+              resolved="$(command -v "$candidate")"
+              printf 'PYTHON_BIN=%s\n' "$resolved" >> "$GITHUB_ENV"
+              exit 0
+            fi
+          done
+          echo "No Python with NumPy >=1.24 is available" >&2
+          exit 1
+      - name: Validate reviewed execution request
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$PYTHON_BIN" - <<'PY' >> "$GITHUB_ENV"
+          import hashlib
+          import json
+          from pathlib import Path
+
+          path = Path("ops/pokeflex-realized-load-source-gpuserver6000-request.json")
+          request = json.loads(path.read_text(encoding="utf-8"))
+          request_id = request.pop("request_id")
+          observed = hashlib.sha256(
+              json.dumps(
+                  request,
+                  sort_keys=True,
+                  separators=(",", ":"),
+                  allow_nan=False,
+              ).encode("utf-8")
+          ).hexdigest()
+          if request_id != observed:
+              raise SystemExit("request identity mismatch")
+          if request.get("enabled") is not True:
+              raise SystemExit("request is disabled")
+          if request.get("stage") != "development-source-gate":
+              raise SystemExit("unexpected request stage")
+          boundary = request.get("information_boundary", {})
+          if boundary.get("calibration_take_data_allowed") is not False:
+              raise SystemExit("calibration access was enabled")
+          if boundary.get("target_take_data_allowed") is not False:
+              raise SystemExit("target access was enabled")
+          if boundary.get("automatic_follow_on_allowed") is not False:
+              raise SystemExit("automatic follow-on was enabled")
+          print(f"REQUEST_ID={request_id}")
+          print(f"DATASET_ROOT={request['dataset_root']}")
+          print(f"POLICY_PATH={request['policy_path']}")
+          print(f"SOURCE_QA_PATH={request['source_qa_artifact_path']}")
+          PY
+          test "$DATASET_ROOT" = "/mnt/lexar4tb/pokeflex"
+          test -d "$DATASET_ROOT"
+      - name: Run development-only realized-load source gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/pokeflex-realized-load-source-v1"
+          rm -rf "$output"
+          mkdir -p "$output"
+          PYTHONPATH=src "$PYTHON_BIN" -m \
+            causal4d_public.cli.pokeflex_realized_load_source \
+            "$DATASET_ROOT" \
+            "$SOURCE_QA_PATH" \
+            "$output" \
+            --policy "$POLICY_PATH" | tee "$output/console.json"
+          OUTPUT_DIR="$output" "$PYTHON_BIN" - <<'PY'
+          import json
+          import os
+          import platform
+          from pathlib import Path
+
+          import numpy
+
+          output = Path(os.environ["OUTPUT_DIR"])
+          receipt = {
+              "artifact_kind": "PublicPokeFlexRealizedLoadRuntimeReceipt",
+              "schema_version": 1,
+              "github_repository": os.environ["GITHUB_REPOSITORY"],
+              "github_run_id": os.environ["GITHUB_RUN_ID"],
+              "github_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "github_sha": os.environ["GITHUB_SHA"],
+              "request_id": os.environ["REQUEST_ID"],
+              "runner_name": os.environ.get("RUNNER_NAME"),
+              "python": platform.python_version(),
+              "numpy": numpy.__version__,
+              "dataset_root": os.environ["DATASET_ROOT"],
+              "dataset_root_read_only_by_contract": True,
+              "new_physical_data_collected": False,
+              "calibration_take_data_read": False,
+              "target_take_data_read": False,
+          }
+          (output / "runtime_receipt.json").write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - name: Upload compact source-gate evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pokeflex-realized-load-source-v1-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pokeflex-realized-load-source-v1
+          if-no-files-found: error
+          retention-days: 90
