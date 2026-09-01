@@ -175,7 +175,10 @@ def test_source_gate_is_deterministic_and_does_not_open_forbidden_takes(
         assert seal_path.is_file()
         seal = json.loads(seal_path.read_text(encoding="utf-8"))
         metadata = seal["metadata"]
-        assert metadata["dependence_control_component_prediction_marginal_preserved"] is True
+        assert (
+            metadata["dependence_control_component_prediction_marginal_preserved"]
+            is True
+        )
         assert (
             metadata["posterior"]["component_prediction_multiset_sha256"]
             == metadata["dependence_destroyed"][
