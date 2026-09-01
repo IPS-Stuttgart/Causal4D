@@ -105,27 +105,14 @@ def test_stages_only_verified_development_robot_members(tmp_path: Path) -> None:
     assert [row["take_id"] for row in result["records"]] == list(
         config.expected_development_take_ids
     )
-    assert all(
-        row["source_kind"] == "verified-zip-member"
-        for row in result["records"]
-    )
+    assert all(row["source_kind"] == "verified-zip-member" for row in result["records"])
     assert result["information_boundary"]["calibration_take_data_read"] is False
     assert result["information_boundary"]["target_take_data_read"] is False
     assert result["information_boundary"]["dataset_modified"] is False
     for take_id in config.expected_development_take_ids:
-        staged = (
-            destination
-            / config.expected_object_id
-            / take_id
-            / "robot_data.json"
-        )
+        staged = destination / config.expected_object_id / take_id / "robot_data.json"
         assert staged.read_bytes() == content[take_id]
-        archive = (
-            tmp_path
-            / "poking"
-            / config.expected_object_id
-            / f"{take_id}.zip"
-        )
+        archive = tmp_path / "poking" / config.expected_object_id / f"{take_id}.zip"
         assert archive.read_bytes() == archive_bytes[take_id]
 
 
@@ -148,8 +135,7 @@ def test_prefers_a_readable_source_qa_bound_extracted_file(tmp_path: Path) -> No
     )
 
     assert all(
-        row["source_kind"] == "verified-extracted-file"
-        for row in result["records"]
+        row["source_kind"] == "verified-extracted-file" for row in result["records"]
     )
 
 
@@ -161,9 +147,7 @@ def test_rejects_a_robot_member_that_differs_from_source_qa(tmp_path: Path) -> N
     }
     _write_archives(tmp_path, config, content)
     first = config.expected_development_take_ids[0]
-    archive_path = (
-        tmp_path / "poking" / config.expected_object_id / f"{first}.zip"
-    )
+    archive_path = tmp_path / "poking" / config.expected_object_id / f"{first}.zip"
     with zipfile.ZipFile(archive_path, mode="w") as archive:
         archive.writestr(f"{first}/robot_data.json", b"changed")
 
