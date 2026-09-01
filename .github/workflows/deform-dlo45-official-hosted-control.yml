@@ -1,0 +1,193 @@
+name: Official DEFORM DLO4/DLO5 hosted decision control
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/deform-dlo45-official-hosted-control.yml"
+      - ".github/workflows/deform-dlo45-public-gpuserver4090.yml"
+      - "ops/deform-dlo45-public-gpuserver4090-request.json"
+      - "scripts/remote/evaluate_deform_dlo45_decision_identifiability.py"
+      - "src/causal4d_public/deform_dlo45_decision_*.py"
+      - "tests/test_deform_dlo45_decision_identifiability.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deform-dlo45-official-hosted-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OUTPUT_DIR: deform-dlo45-hosted-control
+      BAYESIAN_PHYSTWIN_REVISION: 754a2a97a4a10369ad15236d84f4d2a81c454055
+      DEFORM_REVISION: b73b8b8ecc033caefa693fab7898741d4e6dbeff
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+    steps:
+      - name: Check out exact Causal4D revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out exact BayesianPhysTwin certificate provider
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: IPS-Stuttgart/BayesianPhysTwin
+          ref: ${{ env.BAYESIAN_PHYSTWIN_REVISION }}
+          path: _bpt
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out exact official DEFORM release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: roahmlab/DEFORM
+          ref: ${{ env.DEFORM_REVISION }}
+          path: _deform
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install focused runtime
+        run: |
+          python -m pip install --disable-pip-version-check -e ".[dev]" pandas scipy
+          python -m pip check
+
+      - name: Verify revisions, request, and official split
+        run: |
+          test "$(git -C _bpt rev-parse HEAD)" = "${BAYESIAN_PHYSTWIN_REVISION}"
+          test "$(git -C _deform rev-parse HEAD)" = "${DEFORM_REVISION}"
+          test "$(find _deform/data_set/DLO4 -type f | wc -l)" -eq 70
+          test "$(find _deform/data_set/DLO5 -type f | wc -l)" -eq 70
+          test "$(find _deform/data_set/DLO4/train -type f | wc -l)" -eq 56
+          test "$(find _deform/data_set/DLO4/eval -type f | wc -l)" -eq 14
+          test "$(find _deform/data_set/DLO5/train -type f | wc -l)" -eq 56
+          test "$(find _deform/data_set/DLO5/eval -type f | wc -l)" -eq 14
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          request = json.loads(
+              Path("ops/deform-dlo45-public-gpuserver4090-request.json").read_text()
+          )
+          assert request["schema_version"] == 3
+          assert request["expected_train_files_per_object"] == 56
+          assert request["expected_eval_files_per_object"] == 14
+          assert request["regret_tolerance_m"] == 0.001
+          assert request["exploratory_delay_sign_regret_tolerance_m"] == 0.010
+          assert request["exploratory_analysis_status"] == (
+              "post-primary-retrospective-exploratory"
+          )
+          assert request["bayesian_phystwin_revision"] == (
+              Path("requirements/ci/bayesian-phystwin-guarded-provider.sha")
+              .read_text()
+              .strip()
+          )
+          PY
+
+      - name: Run focused contracts
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/_bpt/src
+        run: |
+          python -m pytest -q tests/test_deform_dlo45_decision_identifiability.py
+
+      - name: Run target-closed official evaluation
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/_bpt/src
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          mkdir -p "${OUTPUT_DIR}"
+          python - <<'PY' > "${RUNNER_TEMP}/request.env"
+          import json
+          from pathlib import Path
+          import shlex
+
+          request = json.loads(
+              Path("ops/deform-dlo45-public-gpuserver4090-request.json").read_text()
+          )
+          for key in (
+              "request_id",
+              "prefix_fraction",
+              "regret_tolerance_m",
+              "exploratory_delay_sign_regret_tolerance_m",
+              "ambiguity_threshold_m",
+              "bootstrap_replicates",
+              "seed",
+              "max_delay_frames",
+              "gain_min",
+              "gain_max",
+              "gain_count",
+              "expected_files_per_object",
+              "expected_train_files_per_object",
+              "expected_eval_files_per_object",
+          ):
+              print(f"{key.upper()}={shlex.quote(str(request[key]))}")
+          PY
+          source "${RUNNER_TEMP}/request.env"
+          python scripts/remote/evaluate_deform_dlo45_decision_identifiability.py \
+            --data-root _deform/data_set \
+            --output-dir "${OUTPUT_DIR}" \
+            --prefix-fraction "${PREFIX_FRACTION}" \
+            --regret-tolerance-m "${REGRET_TOLERANCE_M}" \
+            --exploratory-delay-sign-regret-tolerance-m \
+              "${EXPLORATORY_DELAY_SIGN_REGRET_TOLERANCE_M}" \
+            --ambiguity-threshold-m "${AMBIGUITY_THRESHOLD_M}" \
+            --bootstrap-replicates "${BOOTSTRAP_REPLICATES}" \
+            --seed "${SEED}" \
+            --max-delay-frames "${MAX_DELAY_FRAMES}" \
+            --gain-min "${GAIN_MIN}" \
+            --gain-max "${GAIN_MAX}" \
+            --gain-count "${GAIN_COUNT}" \
+            --expected-files-per-object "${EXPECTED_FILES_PER_OBJECT}" \
+            --expected-train-files-per-object \
+              "${EXPECTED_TRAIN_FILES_PER_OBJECT}" \
+            --expected-eval-files-per-object \
+              "${EXPECTED_EVAL_FILES_PER_OBJECT}" \
+            --request-id "${REQUEST_ID}" \
+            --trusted-official-pickle \
+            2>&1 | tee "${OUTPUT_DIR}/run.log"
+
+      - name: Verify and summarize evidence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          evidence = json.loads(
+              Path("deform-dlo45-hosted-control/evidence.json").read_text()
+          )
+          assert evidence["schema_version"] == 3
+          assert evidence["claim_eligible"] is True
+          assert evidence["aggregate"]["case_count"] == 28
+          assert set(evidence["arms"]) == {
+              "strict_one_class_primary",
+              "exploratory_prefix_timing",
+          }
+          assert evidence["arms"]["exploratory_prefix_timing"][
+              "confirmatory_claim_eligible"
+          ] is False
+          assert evidence["object_reports"]["DLO4"]["official_split"]["verified"]
+          assert evidence["object_reports"]["DLO5"]["official_split"]["verified"]
+          print(json.dumps(evidence["arms"], indent=2, sort_keys=True))
+          PY
+          cat "${OUTPUT_DIR}/report.md" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: deform-dlo45-hosted-control-${{ github.event.pull_request.head.sha || github.sha }}
+          path: deform-dlo45-hosted-control/
+          if-no-files-found: warn
+          retention-days: 30

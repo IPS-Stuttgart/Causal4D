@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   evaluate:
-    name: Target-closed DEFORM DLO4/DLO5 evaluation
+    name: Official-split DEFORM DLO4/DLO5 decision evaluation
     if: github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]
     timeout-minutes: 180
@@ -24,7 +24,7 @@ jobs:
       DATA_ROOT: /mnt/seagate10tb/florianpfaff/datasets/deform/data_set
       OUTPUT_DIR: deform-dlo45-public-evaluation
     steps:
-      - name: Check out exact reviewed revision
+      - name: Check out exact reviewed Causal4D revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -32,39 +32,115 @@ jobs:
           persist-credentials: false
           clean: true
 
-      - name: Validate request and repository state
+      - name: Validate reviewed request and repository state
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
           test -z "$(git status --porcelain=v1)"
-          python3 - <<'PY'
+          python3 - <<'PY' > "${RUNNER_TEMP}/deform-dlo45-request.env"
           import json
           from pathlib import Path
+          import shlex
+
           request = json.loads(
               Path("ops/deform-dlo45-public-gpuserver4090-request.json").read_text()
           )
-          assert request["schema_version"] == 1
+          assert request["schema_version"] == 3
           assert request["enabled"] is True
           assert request["runner"] == "gpuserver4090"
           assert request["public_data_only"] is True
+          assert request["trusted_official_pickle"] is True
+          assert request["expected_objects"] == ["DLO4", "DLO5"]
+          assert int(request["expected_files_per_object"]) == 70
+          assert int(request["expected_train_files_per_object"]) == 56
+          assert int(request["expected_eval_files_per_object"]) == 14
+          assert (
+              int(request["expected_train_files_per_object"])
+              + int(request["expected_eval_files_per_object"])
+              == int(request["expected_files_per_object"])
+          )
           assert 0.15 <= float(request["prefix_fraction"]) <= 0.60
+          assert float(request["regret_tolerance_m"]) == 0.001
+          assert (
+              float(request["exploratory_delay_sign_regret_tolerance_m"])
+              == 0.010
+          )
+          assert request["primary_analysis_status"] == "frozen_strict_primary"
+          assert request["exploratory_analysis_status"] == (
+              "post-primary-retrospective-exploratory"
+          )
+          assert float(request["ambiguity_threshold_m"]) >= 0.0
           assert int(request["bootstrap_replicates"]) >= 1000
-          print(request["request_id"])
+          assert int(request["max_delay_frames"]) >= 0
+          assert float(request["gain_min"]) > 0.0
+          assert float(request["gain_max"]) >= float(request["gain_min"])
+          assert int(request["gain_count"]) >= 2
+          assert len(request["bayesian_phystwin_revision"]) == 40
+          fields = {
+              "REQUEST_ID": request["request_id"],
+              "PREFIX_FRACTION": request["prefix_fraction"],
+              "REGRET_TOLERANCE_M": request["regret_tolerance_m"],
+              "EXPLORATORY_DELAY_SIGN_REGRET_TOLERANCE_M": request[
+                  "exploratory_delay_sign_regret_tolerance_m"
+              ],
+              "AMBIGUITY_THRESHOLD_M": request["ambiguity_threshold_m"],
+              "BOOTSTRAP_REPLICATES": request["bootstrap_replicates"],
+              "SEED": request["seed"],
+              "MAX_DELAY_FRAMES": request["max_delay_frames"],
+              "GAIN_MIN": request["gain_min"],
+              "GAIN_MAX": request["gain_max"],
+              "GAIN_COUNT": request["gain_count"],
+              "EXPECTED_FILES_PER_OBJECT": request["expected_files_per_object"],
+              "EXPECTED_TRAIN_FILES_PER_OBJECT": request[
+                  "expected_train_files_per_object"
+              ],
+              "EXPECTED_EVAL_FILES_PER_OBJECT": request[
+                  "expected_eval_files_per_object"
+              ],
+              "BPT_REVISION": request["bayesian_phystwin_revision"],
+          }
+          for name, value in fields.items():
+              print(f"{name}={shlex.quote(str(value))}")
           PY
+          cat "${RUNNER_TEMP}/deform-dlo45-request.env"
 
-      - name: Select and provision an isolated numerical runtime
+      - name: Bind exact BayesianPhysTwin certificate revision
         shell: bash
         run: |
           set -euo pipefail
+          source "${RUNNER_TEMP}/deform-dlo45-request.env"
+          pinned="$(tr -d '[:space:]' \
+            < requirements/ci/bayesian-phystwin-guarded-provider.sha)"
+          test "${BPT_REVISION}" = "${pinned}"
+          echo "BPT_REVISION=${BPT_REVISION}" >> "${GITHUB_ENV}"
+          echo "BAYESIAN_PHYSTWIN_REVISION=${BPT_REVISION}" >> "${GITHUB_ENV}"
+
+      - name: Check out exact BayesianPhysTwin certificate provider
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: IPS-Stuttgart/BayesianPhysTwin
+          ref: ${{ env.BPT_REVISION }}
+          path: _bpt
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Verify exact provider checkout and select runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C _bpt rev-parse HEAD)" = "${BPT_REVISION}"
           selected=""
-          for candidate in python3.12 python3.11 python3.10 /usr/bin/python3 python3; do
+          for candidate in \
+            python3.12 python3.11 python3.10 /usr/bin/python3 python3; do
             command -v "${candidate}" >/dev/null 2>&1 || continue
             if "${candidate}" - <<'PY'
           import sys
           if sys.version_info < (3, 10):
               raise SystemExit(1)
           import numpy
+          import pandas
           PY
             then
               selected="$(command -v "${candidate}")"
@@ -72,81 +148,71 @@ jobs:
             fi
           done
           test -n "${selected}"
-          runtime_site="${RUNNER_TEMP}/causal4d-deform-dlo45-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          rm -rf -- "${runtime_site}"
-          mkdir -p "${runtime_site}" "${OUTPUT_DIR}"
-          if ! "${selected}" -c 'import scipy, h5py' >/dev/null 2>&1; then
-            "${selected}" -m pip install \
-              --disable-pip-version-check \
-              --no-input \
-              --no-cache-dir \
-              --target "${runtime_site}" \
-              "scipy==1.13.1" "h5py==3.11.0" \
-              2>&1 | tee "${OUTPUT_DIR}/runtime-provision.log"
-          fi
-          export PYTHONPATH="${runtime_site}:${PYTHONPATH:-}"
+          mkdir -p "${OUTPUT_DIR}"
           echo "DLO_PYTHON=${selected}" >> "${GITHUB_ENV}"
-          echo "PYTHONPATH=${PYTHONPATH}" >> "${GITHUB_ENV}"
           {
             echo "python=${selected}"
-            echo "runtime_site=${runtime_site}"
+            echo "causal4d_revision=${GITHUB_SHA}"
+            echo "bayesian_phystwin_revision=${BPT_REVISION}"
             "${selected}" --version
             "${selected}" - <<'PY'
           import numpy
+          import pandas
           print("numpy", numpy.__version__)
-          try:
-              import scipy
-              print("scipy", scipy.__version__)
-          except ImportError as error:
-              print("scipy unavailable", error)
-          try:
-              import h5py
-              print("h5py", h5py.__version__)
-          except ImportError as error:
-              print("h5py unavailable", error)
+          print("pandas", pandas.__version__)
           PY
           } > "${OUTPUT_DIR}/runtime.txt"
 
-      - name: Run target-closed public-data evaluation
+      - name: Verify source imports resolve to reviewed checkouts
         shell: bash
         run: |
           set -euo pipefail
-          request_id="$(${DLO_PYTHON} - <<'PY'
-          import json
+          export PYTHONPATH="${GITHUB_WORKSPACE}/src:${GITHUB_WORKSPACE}/_bpt/src"
+          "${DLO_PYTHON}" - <<'PY'
           from pathlib import Path
-          request = json.loads(
-              Path("ops/deform-dlo45-public-gpuserver4090-request.json").read_text()
+          import bayesian_phystwin.query_decision_certificate_v1 as certificate
+          import causal4d.decision_identifiable_intervention as consumer
+
+          workspace = Path.cwd().resolve()
+          assert Path(certificate.__file__).resolve().is_relative_to(
+              workspace / "_bpt" / "src"
           )
-          print(request["request_id"])
-          PY
-          )"
-          prefix_fraction="$(${DLO_PYTHON} - <<'PY'
-          import json
-          from pathlib import Path
-          request = json.loads(
-              Path("ops/deform-dlo45-public-gpuserver4090-request.json").read_text()
+          assert Path(consumer.__file__).resolve().is_relative_to(
+              workspace / "src"
           )
-          print(request["prefix_fraction"])
           PY
-          )"
-          bootstrap_replicates="$(${DLO_PYTHON} - <<'PY'
-          import json
-          from pathlib import Path
-          request = json.loads(
-              Path("ops/deform-dlo45-public-gpuserver4090-request.json").read_text()
-          )
-          print(request["bootstrap_replicates"])
-          PY
-          )"
-          "${DLO_PYTHON}" scripts/remote/evaluate_deform_dlo45_public.py \
+
+      - name: Run sealed official-split decision-identifiability evaluation
+        shell: bash
+        run: |
+          set -euo pipefail
+          source "${RUNNER_TEMP}/deform-dlo45-request.env"
+          export PYTHONPATH="${GITHUB_WORKSPACE}/src:${GITHUB_WORKSPACE}/_bpt/src"
+          "${DLO_PYTHON}" \
+            scripts/remote/evaluate_deform_dlo45_decision_identifiability.py \
             --data-root "${DATA_ROOT}" \
             --output-dir "${OUTPUT_DIR}" \
-            --prefix-fraction "${prefix_fraction}" \
-            --bootstrap-replicates "${bootstrap_replicates}" \
-            --request-id "${request_id}" \
+            --prefix-fraction "${PREFIX_FRACTION}" \
+            --regret-tolerance-m "${REGRET_TOLERANCE_M}" \
+            --exploratory-delay-sign-regret-tolerance-m \
+              "${EXPLORATORY_DELAY_SIGN_REGRET_TOLERANCE_M}" \
+            --ambiguity-threshold-m "${AMBIGUITY_THRESHOLD_M}" \
+            --bootstrap-replicates "${BOOTSTRAP_REPLICATES}" \
+            --seed "${SEED}" \
+            --max-delay-frames "${MAX_DELAY_FRAMES}" \
+            --gain-min "${GAIN_MIN}" \
+            --gain-max "${GAIN_MAX}" \
+            --gain-count "${GAIN_COUNT}" \
+            --expected-files-per-object "${EXPECTED_FILES_PER_OBJECT}" \
+            --expected-train-files-per-object \
+              "${EXPECTED_TRAIN_FILES_PER_OBJECT}" \
+            --expected-eval-files-per-object \
+              "${EXPECTED_EVAL_FILES_PER_OBJECT}" \
+            --request-id "${REQUEST_ID}" \
+            --trusted-official-pickle \
             2>&1 | tee "${OUTPUT_DIR}/run.log"
 
-      - name: Record runner and source provenance
+      - name: Record runner and byte-level source provenance
         if: always()
         shell: bash
         run: |
@@ -161,11 +227,15 @@ jobs:
             echo "workflow_run_id=${GITHUB_RUN_ID}"
             echo "data_root=${DATA_ROOT}"
             readlink -f "${DATA_ROOT}" || true
-            find "${DATA_ROOT}" -maxdepth 3 -type f -printf '%P\t%s\n' | sort
+            find "${DATA_ROOT}/DLO4" "${DATA_ROOT}/DLO5" \
+              -type f -printf '%P\t%s\n' | sort
             uname -a
             nvidia-smi -L || true
             df -h /mnt/seagate10tb || true
           } > "${OUTPUT_DIR}/provenance.txt"
+          find "${DATA_ROOT}/DLO4" "${DATA_ROOT}/DLO5" \
+            -type f -print0 | sort -z | xargs -0 sha256sum \
+            > "${OUTPUT_DIR}/source-sha256.txt"
 
       - name: Publish scientific summary
         if: always()
