@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from dataclasses import dataclass
@@ -296,6 +297,21 @@ def _linear_prediction(target_prefix: FloatArray, total_length: int) -> FloatArr
     return (beta[0] + beta[1] * x).astype(np.float64)
 
 
+def _component_prediction_multiset_sha256(predictions: FloatArray) -> str:
+    """Hash a component set independently of its template ordering."""
+
+    array = np.asarray(predictions, dtype=np.float64)
+    _require(array.ndim == 2, "component predictions must form a matrix")
+    row_digests = sorted(
+        hashlib.sha256(np.ascontiguousarray(row).tobytes()).hexdigest()
+        for row in array
+    )
+    digest = hashlib.sha256()
+    for row_digest in row_digests:
+        digest.update(row_digest.encode("ascii"))
+    return digest.hexdigest()
+
+
 def _posterior_from_profiles(
     target_prefix: FloatArray,
     evidence_profiles: FloatArray,
@@ -316,11 +332,14 @@ def _posterior_from_profiles(
             evidence = _shift(evidence_profiles[template_index], int(delay))
             outcome = _shift(outcome_profiles[template_index], int(delay))
             for gain in config.gain_grid:
-                offset = float(
+                evidence_offset = float(
                     np.median(target_prefix - float(gain) * evidence[:prefix])
                 )
-                evidence_prediction = float(gain) * evidence + offset
-                outcome_prediction = float(gain) * outcome + offset
+                outcome_offset = float(
+                    np.median(target_prefix - float(gain) * outcome[:prefix])
+                )
+                evidence_prediction = float(gain) * evidence + evidence_offset
+                outcome_prediction = float(gain) * outcome + outcome_offset
                 residual = target_prefix - evidence_prediction[:prefix]
                 log_likelihood = _student_log_likelihood(
                     residual,
@@ -343,7 +362,8 @@ def _posterior_from_profiles(
                         "template_index": template_index,
                         "delay_frames": int(delay),
                         "gain": float(gain),
-                        "offset_n": offset,
+                        "offset_n": evidence_offset,
+                        "outcome_offset_n": outcome_offset,
                     }
                 )
                 log_weights.append(log_likelihood + log_prior)
@@ -364,6 +384,9 @@ def _posterior_from_profiles(
     map_index = int(np.argmax(weights))
     summary = {
         "candidate_count": len(metadata),
+        "component_prediction_multiset_sha256": (
+            _component_prediction_multiset_sha256(prediction_array)
+        ),
         "posterior_entropy": float(-np.sum(weights * np.log(weights + 1e-300))),
         "effective_candidate_count": float(1.0 / np.sum(weights**2)),
         "map_candidate": metadata[map_index],
@@ -428,6 +451,11 @@ def build_forecast_bundle(
             template_variance,
             config,
         )
+    )
+    _require(
+        posterior["component_prediction_multiset_sha256"]
+        == destroyed["component_prediction_multiset_sha256"],
+        "dependence control changed the component prediction marginal",
     )
     mean_profile = np.mean(profiles, axis=0)
     mean_profile += float(np.median(target_prefix - mean_profile[:prefix]))
@@ -495,5 +523,6 @@ def build_forecast_bundle(
             "dependence_control_permutation": permutation.tolist(),
             "dependence_control_prefix_marginal_preserved": True,
             "dependence_control_suffix_marginal_preserved": True,
+            "dependence_control_component_prediction_marginal_preserved": True,
         },
     )
