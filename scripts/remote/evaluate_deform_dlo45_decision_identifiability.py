@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Target-closed decision-identifiability evaluation on DEFORM DLO4/DLO5.
 
-One recording is held out from every released repeated-action group. Its observed
-prefix aligns the remaining recordings into finite source-supported hypotheses.
-Decision records and prediction hashes are sealed before held-out suffix scoring.
+For each DLO, the publisher-defined 56-file training split supplies the finite
+source-supported future hypotheses. Each of the 14 official evaluation files is
+an independent held-out trajectory. Its observed prefix aligns the training
+trajectories; decision records and prediction hashes are sealed before suffix
+scoring.
 """
 
 from __future__ import annotations
 
 import argparse
-from collections import defaultdict
 import json
 import os
 from pathlib import Path
@@ -32,14 +33,13 @@ from causal4d_public.deform_dlo45_decision_core import (
 from causal4d_public.deform_dlo45_decision_data import (
     discover_files,
     harmonize,
-    infer_grouping,
     load_object,
-    natural_key,
 )
 from causal4d_public.deform_dlo45_decision_reporting import (
     aggregate_rows,
     report_markdown,
 )
+from causal4d_public.deform_dlo45_official_split import infer_official_split
 
 ARTIFACT_KIND = "Causal4DDeformDLO45DecisionIdentifiabilityV1"
 OBJECT_IDS = ("DLO4", "DLO5")
@@ -59,6 +59,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gain-max", type=float, default=1.25)
     parser.add_argument("--gain-count", type=int, default=11)
     parser.add_argument("--expected-files-per-object", type=int, default=70)
+    parser.add_argument("--expected-train-files-per-object", type=int, default=56)
+    parser.add_argument("--expected-eval-files-per-object", type=int, default=14)
     parser.add_argument("--request-id", default="unspecified")
     parser.add_argument(
         "--trusted-official-pickle",
@@ -80,6 +82,11 @@ def main() -> None:
     require(args.gain_min > 0.0, "gain minimum must be positive")
     require(args.gain_max >= args.gain_min, "invalid gain interval")
     require(args.trusted_official_pickle, "official pickle trust flag is required")
+    require(
+        args.expected_train_files_per_object + args.expected_eval_files_per_object
+        == args.expected_files_per_object,
+        "official train/eval counts do not sum to expected total",
+    )
 
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -98,73 +105,80 @@ def main() -> None:
             trusted_official_pickle=args.trusted_official_pickle,
         )
         source_failures[object_id] = failures
-        grouping = infer_grouping(records)
-        records, labels, harmonization = harmonize(records, grouping["labels"])
-        regrouping = infer_grouping(records)
-        labels = list(regrouping["labels"])
-        grouped: dict[str, list[int]] = defaultdict(list)
-        for index, label in enumerate(labels):
-            grouped[str(label)].append(index)
-        require(
-            all(len(indices) >= 2 for indices in grouped.values()),
-            f"{object_id} contains singleton groups",
+        initial_split = infer_official_split(
+            records,
+            expected_train=args.expected_train_files_per_object,
+            expected_eval=args.expected_eval_files_per_object,
         )
+        records, labels, harmonization = harmonize(records, initial_split["labels"])
+        split = infer_official_split(
+            records,
+            expected_train=args.expected_train_files_per_object,
+            expected_eval=args.expected_eval_files_per_object,
+        )
+        labels = list(split["labels"])
+        source_indices = [index for index, label in enumerate(labels) if label == "train"]
+        target_indices = [index for index, label in enumerate(labels) if label == "eval"]
+        require(len(source_indices) >= 2, f"{object_id} has fewer than two train sources")
+        require(bool(target_indices), f"{object_id} has no official eval targets")
+
         total_steps = records[0].values.shape[0]
         prefix_steps = int(round(total_steps * args.prefix_fraction))
         prefix_steps = min(max(prefix_steps, 6), total_steps - 6)
         coordinate_dimension = 3 if records[0].values.shape[1] % 3 == 0 else None
+        sources = np.stack([records[index].values for index in source_indices])
+        source_paths = [records[index].relative_path for index in source_indices]
 
-        for group_label in sorted(grouped, key=natural_key):
-            indices = grouped[group_label]
-            for target_index in indices:
-                source_indices = [index for index in indices if index != target_index]
-                target_prefix = records[target_index].values[:prefix_steps].copy()
-                sources = np.stack([records[index].values for index in source_indices])
-                case = build_preoutcome_case(
-                    target_prefix,
-                    sources,
-                    regret_tolerance_m=args.regret_tolerance_m,
-                    delays=delays,
-                    gains=gains,
-                )
-                case_id = f"{object_id}__{group_label}__{target_index:03d}"
-                public = public_preoutcome_record(case)
-                public.update(
-                    {
-                        "case_id": case_id,
-                        "object_id": object_id,
-                        "group_label": group_label,
-                        "cluster_id": f"{object_id}::{group_label}",
-                        "target_index": target_index,
-                        "target_path": records[target_index].relative_path,
-                        "source_paths": [
-                            records[index].relative_path for index in source_indices
-                        ],
-                        "coordinate_dimension": coordinate_dimension,
-                    }
-                )
-                case.update(public)
-                case["_target_values"] = records[target_index].values
-                prepared.append(case)
-                prediction_arrays[case_id + "__update"] = np.asarray(
-                    case["_update_prediction"],
-                    dtype=float,
-                )
-                prediction_arrays[case_id + "__retain"] = np.asarray(
-                    case["_retain_prediction"],
-                    dtype=float,
-                )
-                prediction_arrays[case_id + "__selected"] = np.asarray(
-                    case["_selected_prediction"],
-                    dtype=float,
-                )
+        for target_index in target_indices:
+            target_record = records[target_index]
+            target_prefix = target_record.values[:prefix_steps].copy()
+            case = build_preoutcome_case(
+                target_prefix,
+                sources,
+                regret_tolerance_m=args.regret_tolerance_m,
+                delays=delays,
+                gains=gains,
+            )
+            case_id = f"{object_id}__official_eval__{Path(target_record.relative_path).stem}"
+            public = public_preoutcome_record(case)
+            public.update(
+                {
+                    "case_id": case_id,
+                    "object_id": object_id,
+                    "group_label": "official_eval",
+                    "cluster_id": f"{object_id}::{target_record.relative_path}",
+                    "target_index": target_index,
+                    "target_path": target_record.relative_path,
+                    "source_paths": source_paths,
+                    "source_split": "official_train",
+                    "target_split": "official_eval",
+                    "coordinate_dimension": coordinate_dimension,
+                }
+            )
+            case.update(public)
+            case["_target_values"] = target_record.values
+            prepared.append(case)
+            prediction_arrays[case_id + "__update"] = np.asarray(
+                case["_update_prediction"],
+                dtype=float,
+            )
+            prediction_arrays[case_id + "__retain"] = np.asarray(
+                case["_retain_prediction"],
+                dtype=float,
+            )
+            prediction_arrays[case_id + "__selected"] = np.asarray(
+                case["_selected_prediction"],
+                dtype=float,
+            )
 
         object_reports[object_id] = {
             "discovered_files": len(discover_files(args.data_root, object_id)),
             "usable_trajectories": len(records),
             "load_failures": failures,
-            "initial_grouping": grouping,
-            "grouping": regrouping,
+            "initial_official_split": initial_split,
+            "official_split": split,
+            "official_train_trajectories": len(source_indices),
+            "official_eval_trajectories": len(target_indices),
             "harmonization": harmonization,
             "prefix_steps": prefix_steps,
             "coordinate_dimension": coordinate_dimension,
@@ -208,31 +222,43 @@ def main() -> None:
         bootstrap_replicates=args.bootstrap_replicates,
         seed=args.seed,
     )
+    expected_cases = len(OBJECT_IDS) * args.expected_eval_files_per_object
     claim_eligible = bool(
-        len(rows) == len(OBJECT_IDS) * args.expected_files_per_object
+        len(rows) == expected_cases
         and all(
-            report["usable_trajectories"] == args.expected_files_per_object
-            and report["grouping"]["verified"] is True
+            report["discovered_files"] == args.expected_files_per_object
+            and report["usable_trajectories"] == args.expected_files_per_object
+            and not report["load_failures"]
+            and report["initial_official_split"]["verified"] is True
+            and report["official_split"]["verified"] is True
+            and report["official_train_trajectories"]
+            == args.expected_train_files_per_object
+            and report["official_eval_trajectories"]
+            == args.expected_eval_files_per_object
+            and report["harmonization"]["discarded_dimension_mismatch"] == 0
             for report in object_reports.values()
         )
     )
-    bootstrap = aggregate["group_cluster_bootstrap_improvement_over_retain_m"]
+    bootstrap = aggregate["trajectory_bootstrap_improvement_over_retain_m"]
     harmful_upper = aggregate["harmful_certified_update_rate"]["upper95"]
+    by_object = aggregate["by_object"]
     positive = bool(
         claim_eligible
         and aggregate["ambiguous_certified_count"] > 0
+        and aggregate["certified_update_count"] > 0
         and float(bootstrap["lower95"]) >= -1e-12
+        and all(float(record["mean_improvement_over_retain_mm"]) >= 0.0 for record in by_object.values())
         and float(harmful_upper) <= 0.10
     )
     if not claim_eligible:
-        decision = "not_claim_eligible_schema_or_grouping"
+        decision = "not_claim_eligible_official_split_or_loading"
     elif positive:
         decision = "positive_retrospective_decision_identifiability_evidence"
     else:
         decision = "claim_eligible_negative_or_inconclusive_result"
 
     evidence = {
-        "schema_version": 1,
+        "schema_version": 2,
         "artifact_kind": ARTIFACT_KIND,
         "request_id": args.request_id,
         "repository_revision": os.environ.get("GITHUB_SHA"),
@@ -247,13 +273,15 @@ def main() -> None:
             "delays": list(delays),
             "gains": gains,
             "expected_files_per_object": args.expected_files_per_object,
+            "expected_train_files_per_object": args.expected_train_files_per_object,
+            "expected_eval_files_per_object": args.expected_eval_files_per_object,
         },
         "action_contract": {
             "candidate_actions": list(ACTION_NAMES),
             "fallback_action": FALLBACK_ACTION_NAME,
             "fallback_prediction_is_exact_retain_prediction": True,
-            "loss": "held-out-source-hypothesis suffix RMSE in metres",
-            "quotient": "one registered source-supported prefix-compatible class",
+            "loss": "official-train-hypothesis suffix RMSE in metres",
+            "quotient": "one source-supported prefix-compatible class",
         },
         "object_reports": object_reports,
         "source_failures": source_failures,
@@ -265,7 +293,8 @@ def main() -> None:
             "public_data_only": True,
             "new_physical_data_collected": False,
             "trusted_official_checksum_verified_pickle": True,
-            "leave_one_recording_out": True,
+            "publisher_train_split_used_for_hypotheses": True,
+            "publisher_eval_split_used_for_targets": True,
             "target_file_decoded_before_preoutcome_seal": True,
             "target_sequence_length_used_as_registered_horizon_metadata": True,
             "target_suffix_values_passed_to_alignment": False,
@@ -280,9 +309,11 @@ def main() -> None:
         },
         "claim_boundary": (
             "This evaluation verifies finite source-supported forecast decisions "
-            "on released trajectories. It does not identify a unique physical "
-            "state, establish counterfactual outcomes for unexecuted robot "
-            "commands, or constitute prospective deployment validation."
+            "on the publisher-defined DEFORM train/eval split. Trajectories are "
+            "nested within two physical DLOs, so it does not establish population-"
+            "level object generalization, identify a unique physical state, infer "
+            "counterfactual outcomes for unexecuted robot commands, or constitute "
+            "prospective deployment validation."
         ),
     }
     write_json(output_dir / "case_rows.json", rows)
