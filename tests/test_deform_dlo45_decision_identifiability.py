@@ -54,9 +54,7 @@ def synthetic_sources() -> tuple[np.ndarray, np.ndarray]:
             0.2 * time + 0.1,
         ]
     )
-    sources = np.stack(
-        [base + offset for offset in (-0.006, -0.002, 0.002, 0.006)]
-    )
+    sources = np.stack([base + offset for offset in (-0.006, -0.002, 0.002, 0.006)])
     return base[:12].copy(), sources
 
 
