@@ -19,7 +19,7 @@ jobs:
     name: Probe complete public real-world holdings
     if: github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]
-    timeout-minutes: 90
+    timeout-minutes: 180
     steps:
       - name: Check out exact reviewed revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -38,6 +38,7 @@ jobs:
           python3 - <<'PY'
           import json
           from pathlib import Path
+
           request = json.loads(
               Path("ops/public-realworld-probe-gpuserver4090-request.json").read_text()
           )
@@ -45,6 +46,26 @@ jobs:
           assert request["enabled"] is True
           assert request["runner"] == "gpuserver4090"
           assert request["public_data_only"] is True
+          discovery = request["pokeflex_replica_discovery"]
+          assert discovery == {
+              "cache_root": (
+                  "/home/github-runner/.cache/datasets/"
+                  "pokeflex-causal4d-realized-load-v1"
+              ),
+              "calibration_take_data_allowed": False,
+              "development_take_ids": [
+                  "3dPrintedBunny_T1",
+                  "3dPrintedBunny_T3",
+                  "3dPrintedBunny_T4",
+                  "3dPrintedBunny_T6",
+                  "3dPrintedBunny_T7",
+              ],
+              "enabled": True,
+              "source_qa_result_sha256": (
+                  "e09d36db4e1ba8a38c70e112c3af9ab95516ee245302f71a853f36cd2dd0e0e7"
+              ),
+              "target_take_data_allowed": False,
+          }
           print(request["request_id"])
           PY
 
@@ -86,6 +107,29 @@ jobs:
             --request-id "${request_id}" \
             2>&1 | tee public-realworld-probe/run.log
 
+      - name: Discover source-QA-bound PokeFlex development replica
+        shell: bash
+        run: |
+          set -euo pipefail
+          cache_root="$(${PROBE_PYTHON} - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(
+              Path("ops/public-realworld-probe-gpuserver4090-request.json").read_text()
+          )
+          print(request["pokeflex_replica_discovery"]["cache_root"])
+          PY
+          )"
+          "${PROBE_PYTHON}" \
+            scripts/remote/discover_pokeflex_development_replica_gpuserver4090.py \
+            --source-qa \
+              milestones/pokeflex-001-source-warp-gate-v1/artifacts/3dPrintedBunny_source_qa_v1.json \
+            --output \
+              public-realworld-probe/pokeflex-development-replica.json \
+            --cache-root "${cache_root}" \
+            2>&1 | tee \
+              public-realworld-probe/pokeflex-development-replica.log
+
       - name: Record runner provenance
         if: always()
         shell: bash
@@ -112,6 +156,25 @@ jobs:
             cat public-realworld-probe/probe.md >> "${GITHUB_STEP_SUMMARY}"
           else
             echo "Probe report was not produced." >> "${GITHUB_STEP_SUMMARY}"
+          fi
+          if [[ -f public-realworld-probe/pokeflex-development-replica.json ]]; then
+            "${PROBE_PYTHON:-python3}" - <<'PY' >> "${GITHUB_STEP_SUMMARY}"
+          import json
+          from pathlib import Path
+
+          result = json.loads(
+              Path(
+                  "public-realworld-probe/pokeflex-development-replica.json"
+              ).read_text()
+          )
+          print("\n### PokeFlex development replica discovery")
+          print()
+          print(f"- Complete verified roster: `{result.get('complete')}`")
+          print(f"- Found: `{', '.join(result.get('found_take_ids', [])) or 'none'}`")
+          print(f"- Missing: `{', '.join(result.get('missing_take_ids', [])) or 'none'}`")
+          print(f"- Cache verified: `{result.get('cache_verified')}`")
+          print("- Calibration T5 and target T2 payloads were not read.")
+          PY
           fi
 
       - name: Upload probe evidence
