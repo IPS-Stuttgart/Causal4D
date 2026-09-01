@@ -1,0 +1,149 @@
+name: Dispatch reviewed PokeFlex realized-load source gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/dispatch-pokeflex-realized-load-source.yml"
+      - ".github/workflows/pokeflex-realized-load-source-gpuserver6000.yml"
+      - "ops/pokeflex-realized-load-source-gpuserver6000-request.json"
+  push:
+    branches: [main]
+    paths:
+      - "ops/pokeflex-realized-load-source-gpuserver6000-request.json"
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: dispatch-pokeflex-realized-load-source
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate reviewed request and exact-SHA target
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact reviewed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+      - name: Verify clean immutable checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+      - name: Verify source-only request and target-workflow contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          request_path = Path(
+              "ops/pokeflex-realized-load-source-gpuserver6000-request.json"
+          )
+          request = json.loads(request_path.read_text(encoding="utf-8"))
+          supplied = request.pop("request_id")
+          observed = hashlib.sha256(
+              json.dumps(
+                  request,
+                  sort_keys=True,
+                  separators=(",", ":"),
+                  allow_nan=False,
+              ).encode("utf-8")
+          ).hexdigest()
+          if supplied != observed:
+              raise SystemExit("reviewed request identity mismatch")
+          if request.get("enabled") is not True:
+              raise SystemExit("reviewed request is disabled")
+          if request.get("stage") != "development-source-gate":
+              raise SystemExit("unexpected reviewed request stage")
+          if request.get("dataset_root") != "/mnt/lexar4tb/pokeflex":
+              raise SystemExit("unexpected PokeFlex dataset root")
+          boundary = request.get("information_boundary", {})
+          expected_development = [
+              "3dPrintedBunny_T1",
+              "3dPrintedBunny_T3",
+              "3dPrintedBunny_T4",
+              "3dPrintedBunny_T6",
+              "3dPrintedBunny_T7",
+          ]
+          if boundary.get("development_take_ids") != expected_development:
+              raise SystemExit("development-take roster changed")
+          if boundary.get("public_data_only") is not True:
+              raise SystemExit("public-data-only boundary changed")
+          if boundary.get("calibration_take_data_allowed") is not False:
+              raise SystemExit("calibration take was authorized")
+          if boundary.get("target_take_data_allowed") is not False:
+              raise SystemExit("target take was authorized")
+          if boundary.get("automatic_follow_on_allowed") is not False:
+              raise SystemExit("automatic follow-on was authorized")
+
+          workflow = Path(
+              ".github/workflows/pokeflex-realized-load-source-gpuserver6000.yml"
+          ).read_text(encoding="utf-8")
+          required = (
+              "workflow_dispatch:",
+              "expected_sha:",
+              "github.event_name == 'workflow_dispatch'",
+              "github.ref == 'refs/heads/main'",
+              "inputs.expected_sha == github.sha",
+              'test "${EXPECTED_SHA}" = "${GITHUB_SHA}"',
+          )
+          missing = [fragment for fragment in required if fragment not in workflow]
+          if missing:
+              raise SystemExit(f"target workflow lost exact-SHA guards: {missing}")
+          PY
+
+  dispatch:
+    name: Dispatch exact reviewed main revision
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      EXPECTED_SHA: ${{ github.sha }}
+      GH_TOKEN: ${{ github.token }}
+      TARGET_WORKFLOW: pokeflex-realized-load-source-gpuserver6000.yml
+    steps:
+      - name: Dispatch fixed workflow with exact expected SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          payload=$(printf '{"ref":"main","inputs":{"expected_sha":"%s"}}' "$EXPECTED_SHA")
+          response="$RUNNER_TEMP/dispatch-response.txt"
+          status=$(curl \
+            --fail-with-body \
+            --location \
+            --silent \
+            --show-error \
+            --output "$response" \
+            --write-out '%{http_code}' \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/$TARGET_WORKFLOW/dispatches" \
+            --data "$payload")
+          if [[ "$status" != "204" ]]; then
+            cat "$response" >&2
+            echo "workflow dispatch returned HTTP $status" >&2
+            exit 1
+          fi
+          {
+            echo "### PokeFlex source gate dispatched"
+            echo
+            echo "- Workflow: \`$TARGET_WORKFLOW\`"
+            echo "- Exact reviewed SHA: \`$EXPECTED_SHA\`"
+            echo "- Calibration and target access remain disabled by the reviewed request."
+          } >> "$GITHUB_STEP_SUMMARY"
