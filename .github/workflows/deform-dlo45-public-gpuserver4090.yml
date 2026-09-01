@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   evaluate:
-    name: Target-closed DEFORM DLO4/DLO5 decision evaluation
+    name: Official-split DEFORM DLO4/DLO5 decision evaluation
     if: github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]
     timeout-minutes: 180
@@ -53,6 +53,13 @@ jobs:
           assert request["trusted_official_pickle"] is True
           assert request["expected_objects"] == ["DLO4", "DLO5"]
           assert int(request["expected_files_per_object"]) == 70
+          assert int(request["expected_train_files_per_object"]) == 56
+          assert int(request["expected_eval_files_per_object"]) == 14
+          assert (
+              int(request["expected_train_files_per_object"])
+              + int(request["expected_eval_files_per_object"])
+              == int(request["expected_files_per_object"])
+          )
           assert 0.15 <= float(request["prefix_fraction"]) <= 0.60
           assert float(request["regret_tolerance_m"]) >= 0.0
           assert float(request["ambiguity_threshold_m"]) >= 0.0
@@ -74,6 +81,12 @@ jobs:
               "GAIN_MAX": request["gain_max"],
               "GAIN_COUNT": request["gain_count"],
               "EXPECTED_FILES_PER_OBJECT": request["expected_files_per_object"],
+              "EXPECTED_TRAIN_FILES_PER_OBJECT": request[
+                  "expected_train_files_per_object"
+              ],
+              "EXPECTED_EVAL_FILES_PER_OBJECT": request[
+                  "expected_eval_files_per_object"
+              ],
               "BPT_REVISION": request["bayesian_phystwin_revision"],
           }
           for name, value in fields.items():
@@ -158,7 +171,7 @@ jobs:
           )
           PY
 
-      - name: Run sealed decision-identifiability evaluation
+      - name: Run sealed official-split decision-identifiability evaluation
         shell: bash
         run: |
           set -euo pipefail
@@ -178,6 +191,10 @@ jobs:
             --gain-max "${GAIN_MAX}" \
             --gain-count "${GAIN_COUNT}" \
             --expected-files-per-object "${EXPECTED_FILES_PER_OBJECT}" \
+            --expected-train-files-per-object \
+              "${EXPECTED_TRAIN_FILES_PER_OBJECT}" \
+            --expected-eval-files-per-object \
+              "${EXPECTED_EVAL_FILES_PER_OBJECT}" \
             --request-id "${REQUEST_ID}" \
             --trusted-official-pickle \
             2>&1 | tee "${OUTPUT_DIR}/run.log"
