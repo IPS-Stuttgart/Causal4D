@@ -1,0 +1,69 @@
+{
+  "artifact_kind": "PublicPokeFlexRealizedLoadSourcePolicy",
+  "config": {
+    "bootstrap_replicates": 20000,
+    "bootstrap_seed": 20260901,
+    "contact_threshold_n": 3.0,
+    "delay_grid_frames": [
+      -3,
+      -2,
+      -1,
+      0,
+      1,
+      2,
+      3
+    ],
+    "delay_prior_std_frames": 1.5,
+    "expected_development_take_ids": [
+      "3dPrintedBunny_T1",
+      "3dPrintedBunny_T3",
+      "3dPrintedBunny_T4",
+      "3dPrintedBunny_T6",
+      "3dPrintedBunny_T7"
+    ],
+    "expected_object_id": "3dPrintedBunny",
+    "expected_source_qa_result_sha256": "e09d36db4e1ba8a38c70e112c3af9ab95516ee245302f71a853f36cd2dd0e0e7",
+    "forbidden_take_ids": [
+      "3dPrintedBunny_T2",
+      "3dPrintedBunny_T5"
+    ],
+    "force_axis_index": 1,
+    "forecast_horizon_frames": 48,
+    "gain_grid": [
+      0.6,
+      0.7,
+      0.8,
+      0.9,
+      1.0,
+      1.1,
+      1.2,
+      1.3,
+      1.4
+    ],
+    "gain_prior_std": 0.25,
+    "likelihood_scale_floor_n": 0.25,
+    "maximum_mean_rmse_ratio_vs_kinematic_ridge": 1.05,
+    "maximum_worst_take_rmse_ratio_vs_persistence": 1.1,
+    "minimum_mean_rmse_improvement_fraction_vs_dependence_control": 0.02,
+    "minimum_mean_rmse_improvement_fraction_vs_persistence": 0.05,
+    "minimum_take_win_fraction_vs_persistence": 0.6,
+    "onset_consecutive_frames": 3,
+    "path_phase_weight": 0.5,
+    "policy_id": "causal4d-pokeflex-realized-load-source-v1",
+    "predictive_variance_floor_n2": 0.25,
+    "prefix_frame_count": 6,
+    "ridge_penalty": 0.01,
+    "student_t_degrees_of_freedom": 4.0
+  },
+  "config_sha256": "b785dfa1c7e02b265033781bf5b6d5f88e5e234979c56f9ccc8b370f8b630089",
+  "information_boundary": {
+    "automatic_calibration_or_target_dispatch_allowed": false,
+    "calibration_take_data_allowed": false,
+    "development_force_outcomes_allowed_for_source_gate": true,
+    "development_meshes_allowed": false,
+    "development_robot_records_only": true,
+    "new_physical_data_collected": false,
+    "target_take_data_allowed": false
+  },
+  "schema_version": 1
+}
