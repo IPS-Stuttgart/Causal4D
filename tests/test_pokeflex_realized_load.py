@@ -163,12 +163,8 @@ def test_source_gate_is_deterministic_and_does_not_open_forbidden_takes(
         path = tmp_path / "3dPrintedBunny" / take_id / "robot_data.json"
         assert path.read_bytes() == expected
 
-    proposed = first["aggregate_equal_take_results"]["posterior_mean"]["force_rmse_n"][
-        "mean"
-    ]
-    persistence = first["aggregate_equal_take_results"]["persistence"]["force_rmse_n"][
-        "mean"
-    ]
+    proposed = first["aggregate_equal_take_results"]["posterior_mean"]["force_rmse_n"]["mean"]
+    persistence = first["aggregate_equal_take_results"]["persistence"]["force_rmse_n"]["mean"]
     assert proposed < persistence
     for take_id in config.expected_development_take_ids:
         seal_path = tmp_path / "first" / f"prediction_seal_{take_id}.json"
