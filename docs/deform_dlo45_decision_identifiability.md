@@ -54,8 +54,11 @@ For each object, action group, and held-out recording:
    tolerance-admissible action, otherwise the exact retain-state fallback.
 6. Decision records, action losses, prediction hashes, and an NPZ of all candidate
    and selected predictions are written and hashed.
-7. Only after the pre-outcome seal exists is the held-out suffix opened for
-   evaluation.
+7. The public file has necessarily been decoded in this retrospective analysis,
+   and its registered sequence length is available as horizon metadata. However,
+   no held-out suffix value is supplied to alignment, prediction, source-loss
+   construction, certification, or action selection. Suffix scoring starts only
+   after the pre-outcome seal exists.
 
 The one-class quotient is intentionally conservative: posterior weights may form
 the Bayesian update prediction, but the certificate maximizes regret over every

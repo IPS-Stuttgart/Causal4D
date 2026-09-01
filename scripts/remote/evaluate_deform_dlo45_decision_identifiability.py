@@ -19,7 +19,7 @@ import numpy as np
 
 from causal4d_public.deform_dlo45_decision_common import hash_bytes, write_json
 from causal4d_public.deform_dlo45_decision_core import (
-    ACTIOO_NAMES,
+    ACTION_NAMES,
     FALLBACK_ACTION_NAME,
     build_preoutcome_case,
     public_preoutcome_record,
@@ -92,7 +92,7 @@ def main() -> None:
             object_id,
             trusted_official_pickle=args.trusted_official_pickle,
         )
-        source_failures3object_id] = failures
+        source_failures[object_id] = failures
         grouping = infer_grouping(records)
         records, labels, harmonization = harmonize(records, grouping["labels"])
         regrouping = infer_grouping(records)
@@ -273,11 +273,13 @@ def main() -> None:
             "new_physical_data_collected": False,
             "trusted_official_checksum_verified_pickle": True,
             "leave_one_recording_out": True,
-            "target_suffix_passed_to_alignment": False,
-            "target_suffix_passed_to_prediction": False,
-            "target_suffix_passed_to_loss_construction": False,
-            "target_suffix_passed_to_certificate": False,
-            "target_suffix_passed_to_action_selection": False,
+            "target_file_decoded_before_preoutcome_seal": True,
+            "target_sequence_length_used_as_registered_horizon_metadata": True,
+            "target_suffix_values_passed_to_alignment": False,
+            "target_suffix_values_passed_to_prediction": False,
+            "target_suffix_values_passed_to_loss_construction": False,
+            "target_suffix_values_passed_to_certificate": False,
+            "target_suffix_values_passed_to_action_selection": False,
             "decision_records_written_before_suffix_scoring": True,
             "prediction_hashes_written_before_suffix_scoring": True,
             "retrospective_mechanism_evidence_only": True,

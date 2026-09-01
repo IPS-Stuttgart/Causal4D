@@ -190,7 +190,7 @@ def build_preoutcome_case(
     delays: Sequence[int],
     gains: Sequence[float],
 ) -> dict[str, Any]:
-    """Build one decision without accepting or reading a target suffix."""
+    """Build one decision without accepting target-suffix values."""
     require(target_prefix.ndim == 2, "target_prefix must be a matrix")
     require(source_trajectories.ndim == 3, "sources must be a three-dimensional array")
     require(
