@@ -1,6 +1,6 @@
 # Public real-world dataset probe
 
-Request: `2026-08-31-public-realworld-probe-v1`
+Request: `2026-09-01-public-realworld-probe-v2-deform-dlo45-present`
 
 This report is metadata/schema qualification only. It does not authorize a paper claim.
 
@@ -46,8 +46,8 @@ This report is metadata/schema qualification only. It does not authorize a paper
 - Root: `/mnt/seagate10tb/florianpfaff/datasets/deform360`
 - Exists: `True`
 - Files: `250000`
-- Directories: `8830`
-- Size: `2932767726843` bytes
+- Directories: `11595`
+- Size: `4420431727469` bytes
 - Inventory truncated: `True`
 
 ## Scientific boundary

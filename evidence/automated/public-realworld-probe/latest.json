@@ -8365,29 +8365,29 @@
       "truncated": false
     },
     "deform360_partial": {
-      "directory_count": 8830,
+      "directory_count": 11595,
       "errors": [],
       "exists": true,
       "extensions": {
-        ".incomplete": 22,
-        ".json": 1616,
-        ".lock": 119746,
+        ".incomplete": 14,
+        ".json": 3299,
+        ".lock": 114291,
         ".md": 1,
-        ".metadata": 119736,
-        ".mp4": 2417,
-        ".npy": 807,
-        ".ply": 1614,
-        ".png": 807,
+        ".metadata": 114289,
+        ".mp4": 4905,
+        ".npy": 1649,
+        ".ply": 3298,
+        ".png": 1649,
         ".status": 1,
         ".tag": 2,
-        ".tar": 2418,
-        ".txt": 808,
-        "<none>": 5
+        ".tar": 4947,
+        ".txt": 1649,
+        "<none>": 6
       },
       "file_count": 250000,
       "is_dir": true,
       "is_symlink": false,
-      "metadata_sha256": "1512f9a8b40f161f72fbaf1a0285ed538d32e5b774690d4b91ad6f23e66b0738",
+      "metadata_sha256": "cca6fcbcade55e6a5799011770523badf0de91f950a498744e01ed3fe400fe1d",
       "name_token_hits": {
         "action": [
           "processed-repository/.cache/huggingface/download/processed/001-rope/episode_0/robot/opening_dists.png.lock",
@@ -8596,7 +8596,7 @@
       },
       "path": "/mnt/seagate10tb/florianpfaff/datasets/deform360",
       "resolved_path": "/mnt/seagate10tb/florianpfaff/datasets/deform360",
-      "size_bytes": 2932767726843,
+      "size_bytes": 4420431727469,
       "top_level": [
         ".download.lock",
         "download.status",
@@ -8809,6 +8809,6 @@
       "score": 4
     }
   ],
-  "request_id": "2026-08-31-public-realworld-probe-v1",
+  "request_id": "2026-09-01-public-realworld-probe-v2-deform-dlo45-present",
   "schema_version": 1
 }
