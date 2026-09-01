@@ -45,13 +45,11 @@ def main() -> int:
             prefix="causal4d-pokeflex-robot-stage-"
         ) as temporary:
             stage_root = Path(temporary) / "dataset"
-            stage = (
-                stage_pokeflex_development_robot_records_with_owner_fallback(
-                    archive_root,
-                    source_qa,
-                    stage_root,
-                    config,
-                )
+            stage = stage_pokeflex_development_robot_records_with_owner_fallback(
+                archive_root,
+                source_qa,
+                stage_root,
+                config,
             )
             stage_validation = validate_pokeflex_robot_stage(stage)
             (output / "input_stage_manifest.json").write_text(
