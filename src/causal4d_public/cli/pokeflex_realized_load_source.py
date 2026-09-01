@@ -20,6 +20,12 @@ from causal4d_public.pokeflex_robot_stage import (
 )
 
 
+def _official_public_archive_root(dataset_root: str | Path) -> Path:
+    """Return the frozen public poking-archive root below the mounted dataset."""
+
+    return Path(dataset_root).resolve() / "poking"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("dataset_root")
@@ -32,12 +38,13 @@ def main() -> int:
         config = load_realized_load_policy(args.policy)
         output = Path(args.output_dir).resolve()
         output.mkdir(parents=True, exist_ok=True)
+        archive_root = _official_public_archive_root(args.dataset_root)
         with tempfile.TemporaryDirectory(
             prefix="causal4d-pokeflex-robot-stage-"
         ) as temporary:
             stage_root = Path(temporary) / "dataset"
             stage = stage_pokeflex_development_robot_records(
-                args.dataset_root,
+                archive_root,
                 source_qa,
                 stage_root,
                 config,
