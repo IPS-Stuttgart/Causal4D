@@ -9,6 +9,7 @@ import pytest
 from causal4d_public import deform_dlo45_decision_common as common
 from causal4d_public import deform_dlo45_decision_core as core
 from causal4d_public import deform_dlo45_decision_data as data
+from causal4d_public import deform_dlo45_official_split as official_split
 
 
 def fake_certificate(
@@ -117,21 +118,42 @@ def test_fallback_and_retain_predictions_are_identical() -> None:
     assert score["used_exact_fallback"] is True
 
 
-def test_released_identity_grouping_recovers_fourteen_groups() -> None:
-    records = []
-    for action in range(14):
-        for repeat in range(5):
-            relative = f"DLO4/action_{action:02d}_repeat_{repeat}.pkl"
-            records.append(
-                data.LoadedTrajectory(
-                    object_id="DLO4",
-                    path=Path(relative),
-                    relative_path=relative,
-                    values=np.zeros((30, 36)),
-                    source_kind="pickle",
-                )
-            )
-    grouping = data.infer_grouping(records)
-    assert grouping["verified"] is True
-    assert grouping["group_count"] == 14
-    assert grouping["group_sizes"] == [5] * 14
+def test_official_split_recovers_fifty_six_train_and_fourteen_eval() -> None:
+    records = [
+        data.LoadedTrajectory(
+            object_id="DLO4",
+            path=Path(f"DLO4/train/{index}.pkl"),
+            relative_path=f"DLO4/train/{index}.pkl",
+            values=np.zeros((30, 36)),
+            source_kind="pickle",
+        )
+        for index in range(56)
+    ]
+    records.extend(
+        data.LoadedTrajectory(
+            object_id="DLO4",
+            path=Path(f"DLO4/eval/{index}.pkl"),
+            relative_path=f"DLO4/eval/{index}.pkl",
+            values=np.zeros((30, 36)),
+            source_kind="pickle",
+        )
+        for index in range(14)
+    )
+
+    split = official_split.infer_official_split(
+        records,
+        expected_train=56,
+        expected_eval=14,
+    )
+
+    assert split["verified"] is True
+    assert split["counts"] == {"train": 56, "eval": 14}
+    assert split["labels"].count("train") == 56
+    assert split["labels"].count("eval") == 14
+
+
+def test_official_split_rejects_paths_without_unique_split() -> None:
+    with pytest.raises(ValueError, match="exactly one official split"):
+        official_split.official_split_label("DLO4/unknown/1.pkl")
+    with pytest.raises(ValueError, match="exactly one official split"):
+        official_split.official_split_label("DLO4/train/eval/1.pkl")
