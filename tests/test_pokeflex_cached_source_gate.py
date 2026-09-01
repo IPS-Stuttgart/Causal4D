@@ -126,9 +126,7 @@ def test_validates_exact_five_log_cache(tmp_path: Path) -> None:
         config.expected_source_qa_result_sha256
     )
     assert binding["robot_sha256"] == hashes
-    assert binding["development_take_ids"] == list(
-        config.expected_development_take_ids
-    )
+    assert binding["development_take_ids"] == list(config.expected_development_take_ids)
     assert binding["calibration_take_data_read"] is False
     assert binding["target_take_data_read"] is False
     assert len(binding["cache_binding_sha256"]) == 64

@@ -21,9 +21,7 @@ from causal4d_public.pokeflex_realized_load import (  # noqa: E402
 )
 
 
-DEFAULT_DISCOVERY = ROOT / (
-    "public-realworld-probe/pokeflex-development-replica.json"
-)
+DEFAULT_DISCOVERY = ROOT / ("public-realworld-probe/pokeflex-development-replica.json")
 DEFAULT_SOURCE_QA = ROOT / (
     "milestones/pokeflex-001-source-warp-gate-v1/artifacts/"
     "3dPrintedBunny_source_qa_v1.json"

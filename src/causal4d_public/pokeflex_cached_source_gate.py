@@ -150,14 +150,18 @@ def validate_pokeflex_development_cache(
     for take_id in config.expected_development_take_ids:
         take_root = object_root / take_id
         _require(take_root.is_dir(), f"PokeFlex cache take is missing: {take_id}")
-        _require(not take_root.is_symlink(), f"PokeFlex cache take is a symlink: {take_id}")
+        _require(
+            not take_root.is_symlink(), f"PokeFlex cache take is a symlink: {take_id}"
+        )
         take_entries = {path.name for path in take_root.iterdir()}
         _require(
             take_entries == {"robot_data.json"},
             f"PokeFlex cache take has unexpected entries: {take_id}",
         )
         robot_path = take_root / "robot_data.json"
-        _require(not robot_path.is_symlink(), f"PokeFlex robot log is a symlink: {take_id}")
+        _require(
+            not robot_path.is_symlink(), f"PokeFlex robot log is a symlink: {take_id}"
+        )
         observed = _sha256_file(robot_path)
         _require(
             observed == expected_hashes[take_id],
@@ -201,7 +205,9 @@ def run_cached_pokeflex_source_gate(
     discovery_validation = validate_pokeflex_replica_discovery(discovery)
     output = Path(output_dir).resolve()
     output.mkdir(parents=True, exist_ok=True)
-    ready = bool(discovery_validation["complete"] and discovery_validation["cache_verified"])
+    ready = bool(
+        discovery_validation["complete"] and discovery_validation["cache_verified"]
+    )
     decision: dict[str, Any] = {
         "artifact_kind": POKEFLEX_CACHED_SOURCE_DECISION_KIND,
         "schema_version": POKEFLEX_CACHED_SOURCE_DECISION_SCHEMA_VERSION,
@@ -231,7 +237,9 @@ def run_cached_pokeflex_source_gate(
             config,
         )
         validation = validate_realized_load_artifact(result)
-        _require(validation["passed"] is True, "PokeFlex source result did not validate")
+        _require(
+            validation["passed"] is True, "PokeFlex source result did not validate"
+        )
         decision.update(
             {
                 "source_gate_executed": True,
@@ -252,8 +260,7 @@ def validate_cached_source_gate_decision(payload: Mapping[str, Any]) -> dict[str
         "unexpected cached-source decision kind",
     )
     _require(
-        payload.get("schema_version")
-        == POKEFLEX_CACHED_SOURCE_DECISION_SCHEMA_VERSION,
+        payload.get("schema_version") == POKEFLEX_CACHED_SOURCE_DECISION_SCHEMA_VERSION,
         "unsupported cached-source decision schema",
     )
     _require(
