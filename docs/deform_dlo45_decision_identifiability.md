@@ -49,59 +49,81 @@ For each DLO and each of its 14 official evaluation trajectories:
 2. Each of the 56 official training trajectories is aligned to that prefix over a
    frozen grid of temporal delays and scalar gains. Offset, delay, gain, likelihood,
    and posterior weight use the prefix only.
-3. The 56 aligned training trajectories form the finite prior-supported hypothesis
-   set. They are registered as one prefix-compatible quotient class.
-4. The Bayesian continuation and retain-state continuation are scored against the
+3. The Bayesian continuation and retain-state continuation are scored against the
    suffix of every source-supported hypothesis. These losses, not the held-out
    evaluation suffix, define the exact BayesianPhysTwin certificate.
-5. Causal4D authorizes a unique robust action, otherwise a unique 1 mm
-   tolerance-admissible action, otherwise the exact retain-state fallback.
-6. Decision records, action losses, prediction hashes, and an NPZ of all candidate
+4. Causal4D authorizes a unique robust action, otherwise a unique tolerance-
+   admissible action, otherwise the exact retain-state fallback.
+5. Decision records, action losses, prediction hashes, and an NPZ of all candidate
    and selected predictions are written and hashed.
-7. The public target file has necessarily been decoded in this retrospective
+6. The public target file has necessarily been decoded in this retrospective
    analysis, and its registered sequence length is available as horizon metadata.
    No held-out suffix value is supplied to alignment, prediction, source-loss
    construction, certification, or action selection. Suffix scoring starts only
    after the pre-outcome seal exists.
 
-The one-class quotient is intentionally conservative: posterior weights may form
-the Bayesian update prediction, but the certificate maximizes regret over every
-positive-prior training trajectory rather than trusting a within-class posterior
-allocation.
+## Frozen primary arm
 
-## Frozen primary endpoints
+The strict primary was fixed before the first official-evaluation scoring. It places
+all 56 positive-support source hypotheses in one quotient class and uses a 1 mm
+worst-case-regret tolerance. This deliberately permits arbitrary within-class mass
+allocation and therefore provides a severe test of decision identifiability.
 
-The artifact reports:
+The first complete primary execution was claim-eligible but inconclusive: one of 28
+ambiguous targets admitted an update, 27 returned exact fallback, no admitted update
+was harmful, and selected RMSE was slightly below exact retention. Those values are
+retained rather than redefined after outcome access.
+
+## Explicitly exploratory timing quotient
+
+After reviewing the conservative primary result, a secondary arm was added. It is
+marked `post-primary-retrospective-exploratory` in the request, every case record,
+and the evidence summary. It cannot support a confirmatory claim on DLO4/DLO5.
+
+The fixed rule partitions source hypotheses using only the sign of their prefix-
+fitted delay:
+
+- negative delay: early timing regime;
+- zero delay: nominal timing regime;
+- positive delay: late timing regime.
+
+The registered quotient mass of each timing regime is the sum of the prefix-only
+posterior weights of its member hypotheses. Exact worst-case regret is still taken
+over every positive-support hypothesis within each timing regime. The exploratory
+regret tolerance is the round physical value 10 mm. No target suffix value enters
+the partition, quotient masses, losses, certificate, or action selection. Because
+the class rule and tolerance were selected after primary-outcome review, only an
+untouched cohort can confirm them.
+
+## Frozen endpoints
+
+Both arms report:
 
 - finite-action certification rate;
 - update, retain, and exact-fallback counts;
 - certification despite at least 1 mm source-supported future ambiguity;
-- held-out RMSE of the selected rule, always-update, always-retain, expected-source-
-  loss selection, single-hypothesis completion, and the two-action oracle;
+- held-out RMSE of selected, always-update, always-retain, expected-source-loss,
+  single-hypothesis completion, and the two-action oracle;
 - realized decision regret;
-- harmful certified-update rate, where a certified update is worse than exact
-  retention on the held-out suffix;
-- a Wilson interval for harmful certified updates;
+- harmful certified-update rate and Wilson interval;
 - a 20,000-replicate DLO-stratified trajectory bootstrap interval for selected
   improvement over retention;
 - separate DLO4 and DLO5 means and win/tie/loss counts.
 
-A result is claim-eligible only when both DLOs contribute all 70 usable files, the
-publisher-defined 56/14 path split is recovered exactly, and harmonization discards
-no file. A positive retrospective result additionally requires at least one
-certified update in an ambiguous case, a nonnegative lower endpoint for the
-trajectory bootstrap, nonnegative mean improvement in both DLO strata, and a
-harmful-update Wilson upper endpoint no greater than 10%.
+Claim eligibility applies to the strict primary only and requires all 70 files per
+DLO, exact recovery of the publisher's 56/14 split, no load failure or harmonization
+discard, and all 28 official evaluation targets. The exploratory arm is always
+recorded as non-confirmatory, regardless of its numerical outcome.
 
 ## Interpretation boundary
 
-A positive result would support the narrow empirical statement that a finite
+A positive strict result would support the narrow empirical statement that a finite
 source-supported forecast decision can be certified despite nonzero real-trajectory
-future ambiguity. It would not establish unique physical-state identification,
-causal effects of unexecuted controls, closed-loop safety, prospective robot
-performance, or population-level transfer to unseen physical objects. DOT remains
-the appropriate untouched cohort for a later frozen confirmation after the action
-roster and analysis are accepted.
+future ambiguity. An exploratory timing signal can only motivate a frozen test on an
+untouched cohort. Neither establishes unique physical-state identification, causal
+effects of unexecuted controls, closed-loop safety, prospective robot performance,
+or population-level transfer to unseen physical objects. DOT remains the intended
+untouched confirmation cohort.
 
 ## Reproduction
 
@@ -112,3 +134,7 @@ checks out the exact Causal4D revision and exact BayesianPhysTwin revision pinne
 `requirements/ci/bayesian-phystwin-guarded-provider.sha`, verifies the official
 56-train/14-eval split for both DLOs, uses no GitHub secrets, hashes every DLO4/DLO5
 source file, and uploads the complete evidence directory.
+
+A hosted parity control checks out the exact official DEFORM Git revision and runs
+the same evaluator. The `gpuserver4090` run remains the authoritative local-byte
+verification because it uses the separately checksum-verified mounted copy.
