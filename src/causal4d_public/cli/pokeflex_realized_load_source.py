@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +13,10 @@ from causal4d_public.pokeflex_realized_load import (
     load_realized_load_policy,
     run_pokeflex_realized_load_source_gate,
     validate_realized_load_artifact,
+)
+from causal4d_public.pokeflex_robot_stage import (
+    stage_pokeflex_development_robot_records,
+    validate_pokeflex_robot_stage,
 )
 
 
@@ -25,13 +30,33 @@ def main() -> int:
     try:
         source_qa = json.loads(Path(args.source_qa_json).read_text(encoding="utf-8"))
         config = load_realized_load_policy(args.policy)
-        result = run_pokeflex_realized_load_source_gate(
-            args.dataset_root,
-            source_qa,
-            args.output_dir,
-            config,
-        )
+        output = Path(args.output_dir).resolve()
+        output.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(
+            prefix="causal4d-pokeflex-robot-stage-"
+        ) as temporary:
+            stage_root = Path(temporary) / "dataset"
+            stage = stage_pokeflex_development_robot_records(
+                args.dataset_root,
+                source_qa,
+                stage_root,
+                config,
+            )
+            stage_validation = validate_pokeflex_robot_stage(stage)
+            (output / "input_stage_manifest.json").write_text(
+                json.dumps(stage, indent=2, sort_keys=True, allow_nan=False) + "\n",
+                encoding="utf-8",
+            )
+            result = run_pokeflex_realized_load_source_gate(
+                stage_root,
+                source_qa,
+                output,
+                config,
+            )
         validation = validate_realized_load_artifact(result)
+        validation["input_stage_manifest_sha256"] = stage_validation[
+            "stage_manifest_sha256"
+        ]
     except (OSError, KeyError, TypeError, ValueError, np.linalg.LinAlgError) as error:
         print(json.dumps({"passed": False, "error": str(error)}, indent=2))
         return 2
