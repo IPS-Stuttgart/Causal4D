@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,10 @@ from causal4d_public import deform_dlo45_decision_common as common
 from causal4d_public import deform_dlo45_decision_core as core
 from causal4d_public import deform_dlo45_decision_data as data
 from causal4d_public import deform_dlo45_official_split as official_split
+
+ROOT = Path(__file__).resolve().parents[1]
+REQUEST = ROOT / "ops" / "deform-dlo45-public-gpuserver4090-request.json"
+WORKFLOW = ROOT / ".github" / "workflows" / "deform-dlo45-public-gpuserver4090.yml"
 
 
 def fake_certificate(
@@ -157,3 +162,31 @@ def test_official_split_rejects_paths_without_unique_split() -> None:
         official_split.official_split_label("DLO4/unknown/1.pkl")
     with pytest.raises(ValueError, match="exactly one official split"):
         official_split.official_split_label("DLO4/train/eval/1.pkl")
+
+
+def test_frozen_request_uses_publisher_defined_split() -> None:
+    request = json.loads(REQUEST.read_text(encoding="utf-8"))
+
+    assert request["schema_version"] == 2
+    assert request["expected_objects"] == ["DLO4", "DLO5"]
+    assert request["expected_files_per_object"] == 70
+    assert request["expected_train_files_per_object"] == 56
+    assert request["expected_eval_files_per_object"] == 14
+    assert (
+        request["expected_train_files_per_object"]
+        + request["expected_eval_files_per_object"]
+        == request["expected_files_per_object"]
+    )
+    assert request["bayesian_phystwin_revision"] == (
+        ROOT / "requirements" / "ci" / "bayesian-phystwin-guarded-provider.sha"
+    ).read_text(encoding="utf-8").strip()
+
+
+def test_workflow_passes_official_split_counts_to_evaluator() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+
+    assert 'int(request["expected_train_files_per_object"]) == 56' in workflow
+    assert 'int(request["expected_eval_files_per_object"]) == 14' in workflow
+    assert "--expected-train-files-per-object" in workflow
+    assert "--expected-eval-files-per-object" in workflow
+    assert "runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]" in workflow
