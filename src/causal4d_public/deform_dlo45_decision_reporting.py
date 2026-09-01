@@ -187,23 +187,21 @@ def aggregate_rows(
     }
 
 
-def report_markdown(evidence: Mapping[str, Any]) -> str:
-    aggregate = evidence["aggregate"]
+def _arm_lines(
+    title: str,
+    arm: Mapping[str, Any],
+) -> list[str]:
+    aggregate = arm["aggregate"]
     bootstrap = aggregate["trajectory_bootstrap_improvement_over_retain_m"]
     harm = aggregate["harmful_certified_update_rate"]
     lines = [
-        "# DEFORM DLO4/DLO5 decision-identifiability evaluation",
+        f"## {title}",
         "",
-        f"Request: `{evidence['request_id']}`",
-        "",
-        f"Decision: **{evidence['decision']}**",
-        "",
-        "## Primary real-data results",
-        "",
-        f"- Official eval trajectories: {aggregate['case_count']}",
+        f"- Analysis status: `{arm['analysis_status']}`",
+        f"- Decision: **{arm['decision']}**",
         (
             "- Certified finite actions: "
-            f"{aggregate['certified_count']} "
+            f"{aggregate['certified_count']}/{aggregate['case_count']} "
             f"({100.0 * aggregate['certification_rate']:.1f}%)"
         ),
         (
@@ -238,7 +236,7 @@ def report_markdown(evidence: Mapping[str, Any]) -> str:
             f"(Wilson upper 95% {100.0 * harm['upper95']:.1f}%)"
         ),
         "",
-        "## Per-DLO results",
+        "### Per-DLO results",
         "",
     ]
     for object_id, summary in aggregate["by_object"].items():
@@ -251,9 +249,28 @@ def report_markdown(evidence: Mapping[str, Any]) -> str:
             f"{summary['certified_retain_count']}/"
             f"{summary['fallback_count']}."
         )
+    lines.append("")
+    return lines
+
+
+def report_markdown(evidence: Mapping[str, Any]) -> str:
+    primary = evidence["arms"]["strict_one_class_primary"]
+    exploratory = evidence["arms"]["exploratory_prefix_timing"]
+    lines = [
+        "# DEFORM DLO4/DLO5 decision-identifiability evaluation",
+        "",
+        f"Request: `{evidence['request_id']}`",
+        "",
+        (
+            "The strict arm is the frozen primary. The timing-quotient arm was "
+            "added after reviewing the strict result and is exploratory only."
+        ),
+        "",
+    ]
+    lines.extend(_arm_lines("Frozen strict primary", primary))
+    lines.extend(_arm_lines("Post-primary timing-quotient exploration", exploratory))
     lines.extend(
         [
-            "",
             "## Information boundary",
             "",
             "- Public checksum-verified DEFORM DLO4/DLO5 recordings only.",
@@ -268,8 +285,12 @@ def report_markdown(evidence: Mapping[str, Any]) -> str:
                 "suffix scoring."
             ),
             (
-                "- Trajectories are nested within two physical DLOs; the bootstrap "
-                "is descriptive, not population-level object inference."
+                "- The exploratory quotient uses only prefix-fitted delay signs; "
+                "it was nevertheless selected after primary-outcome review."
+            ),
+            (
+                "- Trajectories are nested within two physical DLOs; bootstraps "
+                "are descriptive, not population-level object inference."
             ),
             (
                 "- This is retrospective mechanism evidence, not prospective "
