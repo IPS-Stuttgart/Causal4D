@@ -14,6 +14,7 @@ import numpy as np
 
 from .deform_dlo45_decision_common import require
 
+
 @dataclass(frozen=True)
 class LoadedTrajectory:
     """One released DEFORM trajectory after numeric canonicalization."""
@@ -59,9 +60,7 @@ def numeric_candidates(
             candidates.extend(numeric_candidates(converted, prefix + ".to_numpy"))
         if hasattr(value, "values"):
             try:
-                candidates.extend(
-                    numeric_candidates(value.values, prefix + ".values")
-                )
+                candidates.extend(numeric_candidates(value.values, prefix + ".values"))
             except (AttributeError, TypeError, ValueError):
                 pass
         return candidates
@@ -137,9 +136,7 @@ def load_raw_payload(
     suffix = path.suffix.lower()
     header = path.read_bytes()[:8]
     if suffix == ".npy" or header.startswith(b"\x93NUMPY"):
-        return choose_trajectory_array(
-            [("npy", np.load(path, allow_pickle=False))]
-        )
+        return choose_trajectory_array([("npy", np.load(path, allow_pickle=False))])
     if suffix == ".npz" or header.startswith(b"PK\x03\x04"):
         with np.load(path, allow_pickle=False) as archive:
             return choose_trajectory_array(
@@ -380,12 +377,14 @@ def harmonize(
         )
         for record in retained
     ]
-    return output, retained_labels, {
-        "feature_dimension": feature_dimension,
-        "target_length": target_length,
-        "retained_count": len(retained),
-        "discarded_dimension_mismatch": len(records) - len(retained),
-        "original_lengths": original_lengths,
-    }
-
-
+    return (
+        output,
+        retained_labels,
+        {
+            "feature_dimension": feature_dimension,
+            "target_length": target_length,
+            "retained_count": len(retained),
+            "discarded_dimension_mismatch": len(records) - len(retained),
+            "original_lengths": original_lengths,
+        },
+    )
