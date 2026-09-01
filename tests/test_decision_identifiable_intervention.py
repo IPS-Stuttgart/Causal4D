@@ -147,9 +147,7 @@ def test_serialized_mapping_certificate_is_supported() -> None:
         "tolerance_admissible_action_mask": (
             fixture.tolerance_admissible_action_mask.tolist()
         ),
-        "robustly_optimal_action_mask": (
-            fixture.robustly_optimal_action_mask.tolist()
-        ),
+        "robustly_optimal_action_mask": (fixture.robustly_optimal_action_mask.tolist()),
     }
     result = consume_query_decision_certificate(
         payload,
@@ -190,9 +188,7 @@ def test_summary_semantics_and_masks_are_verified() -> None:
         "minimax_action_index": fixture.minimax_action_index,
         "minimax_worst_case_regret": fixture.minimax_worst_case_regret,
         "regret_tolerance": fixture.regret_tolerance,
-        "tolerance_admissible_action_mask": (
-            fixture.tolerance_admissible_action_mask
-        ),
+        "tolerance_admissible_action_mask": (fixture.tolerance_admissible_action_mask),
         "robustly_optimal_action_mask": fixture.robustly_optimal_action_mask,
     }
     with pytest.raises(ValueError, match="semantics"):
@@ -245,9 +241,7 @@ def test_optional_bayesian_phystwin_constructor_is_consumed(
 
     parent = types.ModuleType("bayesian_phystwin")
     parent.__path__ = []  # type: ignore[attr-defined]
-    child = types.ModuleType(
-        "bayesian_phystwin.query_decision_certificate_v1"
-    )
+    child = types.ModuleType("bayesian_phystwin.query_decision_certificate_v1")
     child.query_decision_certificate = fake_certificate  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "bayesian_phystwin", parent)
     monkeypatch.setitem(

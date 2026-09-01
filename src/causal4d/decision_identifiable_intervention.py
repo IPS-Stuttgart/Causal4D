@@ -225,9 +225,7 @@ class DecisionIdentifiableInterventionV1:
             "tolerance_admissible_action_names": list(
                 self.tolerance_admissible_action_names
             ),
-            "robustly_optimal_action_names": list(
-                self.robustly_optimal_action_names
-            ),
+            "robustly_optimal_action_names": list(self.robustly_optimal_action_names),
             "reason_code": self.reason_code,
             "source_certificate_version": self.source_certificate_version,
             "source_certificate_semantics": self.source_certificate_semantics,
