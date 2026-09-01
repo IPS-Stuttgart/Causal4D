@@ -1,0 +1,30 @@
+{
+  "artifact_kind": "PublicPokeFlexRealizedLoadSourceRequest",
+  "dataset_root": "/mnt/lexar4tb/pokeflex",
+  "enabled": true,
+  "information_boundary": {
+    "automatic_follow_on_allowed": false,
+    "calibration_take_data_allowed": false,
+    "development_take_ids": [
+      "3dPrintedBunny_T1",
+      "3dPrintedBunny_T3",
+      "3dPrintedBunny_T4",
+      "3dPrintedBunny_T6",
+      "3dPrintedBunny_T7"
+    ],
+    "public_data_only": true,
+    "target_take_data_allowed": false
+  },
+  "policy_path": "configs/causal4d_public/pokeflex_realized_load_source_v1.json",
+  "request_id": "df02f0e81c3111177b43b9e346d4aafa107a658a66db1bc16b6acf573ec47b74",
+  "runner_labels": [
+    "self-hosted",
+    "Linux",
+    "X64",
+    "nvidia-smi",
+    "gpuserver6000"
+  ],
+  "schema_version": 1,
+  "source_qa_artifact_path": "milestones/pokeflex-001-source-warp-gate-v1/artifacts/3dPrintedBunny_source_qa_v1.json",
+  "stage": "development-source-gate"
+}
