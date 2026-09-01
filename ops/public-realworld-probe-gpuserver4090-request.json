@@ -3,7 +3,7 @@
   "enabled": true,
   "runner": "gpuserver4090",
   "public_data_only": true,
-  "request_id": "2026-09-01-public-realworld-probe-v3-pokeflex-development-replica",
+  "request_id": "2026-09-01-public-realworld-probe-v4-pokeflex-cache-source-gate",
   "pokeflex_replica_discovery": {
     "cache_root": "/home/github-runner/.cache/datasets/pokeflex-causal4d-realized-load-v1",
     "calibration_take_data_allowed": false,
@@ -16,6 +16,15 @@
     ],
     "enabled": true,
     "source_qa_result_sha256": "e09d36db4e1ba8a38c70e112c3af9ab95516ee245302f71a853f36cd2dd0e0e7",
+    "target_take_data_allowed": false
+  },
+  "pokeflex_cached_source_gate": {
+    "automatic_follow_on_allowed": false,
+    "calibration_take_data_allowed": false,
+    "enabled": true,
+    "policy_path": "configs/causal4d_public/pokeflex_realized_load_source_v1.json",
+    "run_only_when_cache_verified": true,
+    "source_qa_artifact_path": "milestones/pokeflex-001-source-warp-gate-v1/artifacts/3dPrintedBunny_source_qa_v1.json",
     "target_take_data_allowed": false
   }
 }
