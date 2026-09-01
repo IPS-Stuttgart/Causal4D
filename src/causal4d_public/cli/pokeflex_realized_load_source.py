@@ -10,6 +10,10 @@ from pathlib import Path
 
 import numpy as np
 
+from causal4d_public.pokeflex_access_diagnostic import (
+    build_pokeflex_access_diagnostic,
+    write_pokeflex_access_diagnostic,
+)
 from causal4d_public.pokeflex_owner_stage import (
     stage_pokeflex_development_robot_records_with_owner_fallback,
 )
@@ -41,27 +45,51 @@ def main() -> int:
         output = Path(args.output_dir).resolve()
         output.mkdir(parents=True, exist_ok=True)
         archive_root = _official_public_archive_root(args.dataset_root)
-        with tempfile.TemporaryDirectory(
-            prefix="causal4d-pokeflex-robot-stage-"
-        ) as temporary:
-            stage_root = Path(temporary) / "dataset"
-            stage = stage_pokeflex_development_robot_records_with_owner_fallback(
+        try:
+            with tempfile.TemporaryDirectory(
+                prefix="causal4d-pokeflex-robot-stage-"
+            ) as temporary:
+                stage_root = Path(temporary) / "dataset"
+                stage = stage_pokeflex_development_robot_records_with_owner_fallback(
+                    archive_root,
+                    source_qa,
+                    stage_root,
+                    config,
+                )
+                stage_validation = validate_pokeflex_robot_stage(stage)
+                (output / "input_stage_manifest.json").write_text(
+                    json.dumps(stage, indent=2, sort_keys=True, allow_nan=False) + "\n",
+                    encoding="utf-8",
+                )
+                result = run_pokeflex_realized_load_source_gate(
+                    stage_root,
+                    source_qa,
+                    output,
+                    config,
+                )
+        except PermissionError as error:
+            diagnostic = build_pokeflex_access_diagnostic(
                 archive_root,
-                source_qa,
-                stage_root,
                 config,
+                error,
             )
-            stage_validation = validate_pokeflex_robot_stage(stage)
-            (output / "input_stage_manifest.json").write_text(
-                json.dumps(stage, indent=2, sort_keys=True, allow_nan=False) + "\n",
-                encoding="utf-8",
+            diagnostic_path = write_pokeflex_access_diagnostic(
+                output / "technical_access_boundary.json",
+                diagnostic,
             )
-            result = run_pokeflex_realized_load_source_gate(
-                stage_root,
-                source_qa,
-                output,
-                config,
-            )
+            technical_result = {
+                "passed": False,
+                "technical_status": ("source-evaluation-blocked-before-payload-access"),
+                "source_gate_executed": False,
+                "source_backend_admitted": False,
+                "diagnostic_file": diagnostic_path.name,
+                "diagnostic_sha256": diagnostic["diagnostic_sha256"],
+                "development_member_payloads_read": False,
+                "calibration_take_data_read": False,
+                "target_take_data_read": False,
+            }
+            print(json.dumps(technical_result, indent=2, sort_keys=True))
+            return 0
         validation = validate_realized_load_artifact(result)
         validation["input_stage_manifest_sha256"] = stage_validation[
             "stage_manifest_sha256"
