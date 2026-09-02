@@ -357,7 +357,7 @@
       "workflow": "self-hosted-evaluation.yml"
     },
     {
-      "authorization_model": "reviewed-file-main",
+      "authorization_model": "main-only",
       "dataset_access": "verified-public-tracking-cloth-source-gate-and-conditional-target",
       "job": "evaluate",
       "purpose": "V2 query-conditioned sparse-marker evaluation on real cloth recordings",
