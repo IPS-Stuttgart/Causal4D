@@ -1,0 +1,35 @@
+{
+  "expected": {
+    "archive_count": 170,
+    "dropping_count": 54,
+    "poking_count": 116
+  },
+  "information_boundary": {
+    "archive_member_decompression_allowed": false,
+    "archive_member_extraction_allowed": false,
+    "archive_member_open_allowed": false,
+    "challenge_outcome_allowed": false,
+    "probe_response_payload_allowed": false,
+    "zip_central_directory_metadata_only": true
+  },
+  "next_stage_if_passed": "freeze-source-only-action-and-response-carrier-contract",
+  "request_id": "pokeflex-probe-challenge-fold-audit-gpuserver4090-v1",
+  "roots": [
+    "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+    "/home/github-runner/.cache/datasets/pokeflex",
+    "/home/github-runner/.cache/workflows/pokeflex"
+  ],
+  "runner_label": "gpuserver4090",
+  "schema": "causal4d/pokeflex-probe-challenge-fold-audit-request",
+  "schema_version": 1,
+  "selection": {
+    "minimum_candidate_pokes": 3,
+    "minimum_drops": 2,
+    "minimum_eligible_objects": 12,
+    "query_ids": [
+      "held-poke-response",
+      "held-drop-response"
+    ],
+    "salt": "PokeFlex-active-probe-folds-v1-2026-09-02"
+  }
+}

@@ -1,0 +1,207 @@
+name: PokeFlex probe/challenge fold audit
+
+on:
+  push:
+    branches:
+      - main
+      - science/pokeflex-probe-challenge-fold-audit-v1
+    paths:
+      - ".github/requests/pokeflex-probe-challenge-fold-audit-gpuserver4090-v1.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pokeflex-probe-challenge-fold-audit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Metadata-only audit contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Validate frozen request
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path(
+              ".github/requests/"
+              "pokeflex-probe-challenge-fold-audit-gpuserver4090-v1.json"
+          )
+          request = json.loads(path.read_text(encoding="utf-8"))
+          assert request["schema"] == (
+              "causal4d/pokeflex-probe-challenge-fold-audit-request"
+          )
+          assert request["schema_version"] == 1
+          assert request["request_id"] == (
+              "pokeflex-probe-challenge-fold-audit-gpuserver4090-v1"
+          )
+          assert request["runner_label"] == "gpuserver4090"
+          assert request["expected"] == {
+              "archive_count": 170,
+              "dropping_count": 54,
+              "poking_count": 116,
+          }
+          assert request["selection"] == {
+              "minimum_candidate_pokes": 3,
+              "minimum_drops": 2,
+              "minimum_eligible_objects": 12,
+              "query_ids": ["held-poke-response", "held-drop-response"],
+              "salt": "PokeFlex-active-probe-folds-v1-2026-09-02",
+          }
+          assert request["information_boundary"] == {
+              "archive_member_decompression_allowed": False,
+              "archive_member_extraction_allowed": False,
+              "archive_member_open_allowed": False,
+              "challenge_outcome_allowed": False,
+              "probe_response_payload_allowed": False,
+              "zip_central_directory_metadata_only": True,
+          }
+          assert request["next_stage_if_passed"] == (
+              "freeze-source-only-action-and-response-carrier-contract"
+          )
+          PY
+
+      - name: Install focused test dependencies
+        run: python3 -m pip install --disable-pip-version-check pytest ruff
+
+      - name: Validate scripts and synthetic information boundary
+        run: |
+          python3 -m py_compile \
+            scripts/remote/audit_pokeflex_probe_challenge_folds_gpuserver4090.py \
+            scripts/ci/verify_pokeflex_probe_challenge_fold_audit.py
+          ruff check \
+            scripts/remote/audit_pokeflex_probe_challenge_folds_gpuserver4090.py \
+            scripts/ci/verify_pokeflex_probe_challenge_fold_audit.py \
+            tests/test_pokeflex_probe_challenge_fold_audit.py
+          pytest -q tests/test_pokeflex_probe_challenge_fold_audit.py
+
+  audit:
+    name: Audit 170 ZIP central directories on gpuserver4090
+    needs: contract
+    runs-on: [self-hosted, Linux, X64, gpuserver4090]
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Bind request and runner
+        run: |
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          from pathlib import Path
+
+          request = json.loads(
+              Path(
+                  ".github/requests/"
+                  "pokeflex-probe-challenge-fold-audit-gpuserver4090-v1.json"
+              ).read_text(encoding="utf-8")
+          )
+          print(f"REQUEST_ID={request['request_id']}")
+          print(f"SELECTION_SALT={request['selection']['salt']}")
+          print(
+              "EXPECTED_ARCHIVES="
+              f"{request['expected']['archive_count']}"
+          )
+          print(f"EXPECTED_POKING={request['expected']['poking_count']}")
+          print(f"EXPECTED_DROPPING={request['expected']['dropping_count']}")
+          print(
+              "MINIMUM_ELIGIBLE_OBJECTS="
+              f"{request['selection']['minimum_eligible_objects']}"
+          )
+          print(
+              "MINIMUM_CANDIDATE_POKES="
+              f"{request['selection']['minimum_candidate_pokes']}"
+          )
+          print(
+              "MINIMUM_DROPS="
+              f"{request['selection']['minimum_drops']}"
+          )
+          PY
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "workflow_run=${GITHUB_RUN_ID}"
+            echo "workflow_attempt=${GITHUB_RUN_ATTEMPT}"
+            echo "head_sha=${GITHUB_SHA}"
+          } > runner.txt
+
+      - name: Run metadata-only PokeFlex fold audit
+        id: audit
+        shell: bash
+        run: |
+          mkdir -p build/pokeflex-probe-challenge-fold-audit
+          set +e
+          python3 \
+            scripts/remote/audit_pokeflex_probe_challenge_folds_gpuserver4090.py \
+            --output-dir build/pokeflex-probe-challenge-fold-audit \
+            --request-id "$REQUEST_ID" \
+            --selection-salt "$SELECTION_SALT" \
+            --root /mnt/seagate10tb/florianpfaff/datasets/pokeflex \
+            --root /home/github-runner/.cache/datasets/pokeflex \
+            --root /home/github-runner/.cache/workflows/pokeflex \
+            --expected-archives "$EXPECTED_ARCHIVES" \
+            --expected-poking "$EXPECTED_POKING" \
+            --expected-dropping "$EXPECTED_DROPPING" \
+            --minimum-eligible-objects "$MINIMUM_ELIGIBLE_OBJECTS" \
+            --minimum-candidate-pokes "$MINIMUM_CANDIDATE_POKES" \
+            --minimum-drops "$MINIMUM_DROPS"
+          rc=$?
+          set -e
+          echo "return_code=$rc" >> "$GITHUB_OUTPUT"
+          echo "$rc" > build/pokeflex-probe-challenge-fold-audit/return_code.txt
+
+      - name: Verify successful fold freeze
+        if: steps.audit.outputs.return_code == '0'
+        run: |
+          python3 scripts/ci/verify_pokeflex_probe_challenge_fold_audit.py \
+            build/pokeflex-probe-challenge-fold-audit/audit.json \
+            --output-json \
+              build/pokeflex-probe-challenge-fold-audit/verification.json \
+            --request-id "$REQUEST_ID" \
+            --selection-salt "$SELECTION_SALT" \
+            --expected-archives "$EXPECTED_ARCHIVES" \
+            --expected-poking "$EXPECTED_POKING" \
+            --expected-dropping "$EXPECTED_DROPPING" \
+            --minimum-eligible-objects "$MINIMUM_ELIGIBLE_OBJECTS"
+
+      - name: Publish audit summary
+        if: always()
+        run: |
+          if test -f build/pokeflex-probe-challenge-fold-audit/audit.md; then
+            cat build/pokeflex-probe-challenge-fold-audit/audit.md \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload metadata-only audit evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pokeflex-probe-challenge-fold-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/pokeflex-probe-challenge-fold-audit/
+            runner.txt
+            .github/requests/pokeflex-probe-challenge-fold-audit-gpuserver4090-v1.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce metadata-readiness gate
+        if: always()
+        run: |
+          rc="$(cat build/pokeflex-probe-challenge-fold-audit/return_code.txt)"
+          if test "$rc" -ne 0; then
+            echo "PokeFlex metadata readiness gate failed with code $rc" >&2
+            exit "$rc"
+          fi
