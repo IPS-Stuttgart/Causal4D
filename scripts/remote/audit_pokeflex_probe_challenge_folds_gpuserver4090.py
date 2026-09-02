@@ -77,6 +77,7 @@ class ArchiveRecord:
     file_name: str
     stem: str
     object_id: str
+    raw_take_id: str
     take_id: str
     action_class: str
     take_index: int | None
@@ -99,6 +100,7 @@ class ArchiveRecord:
             "file_name": self.file_name,
             "stem": self.stem,
             "object_id": self.object_id,
+            "raw_take_id": self.raw_take_id,
             "take_id": self.take_id,
             "action_class": self.action_class,
             "take_index": self.take_index,
@@ -251,7 +253,9 @@ def safe_member_name(name: str) -> bool:
 
 def inspect_archive(path: Path, root: Path) -> ArchiveRecord:
     stat = path.stat()
-    object_id, take_id, action_class, take_index = parse_archive_identity(path, root)
+    object_id, raw_take_id, action_class, take_index = parse_archive_identity(
+        path, root
+    )
     with zipfile.ZipFile(path, mode="r", allowZip64=True) as archive:
         infos = archive.infolist()
         # Deliberately do not call ZipFile.open/read/extract/testzip.
@@ -289,7 +293,8 @@ def inspect_archive(path: Path, root: Path) -> ArchiveRecord:
         file_name=path.name,
         stem=path.stem,
         object_id=object_id,
-        take_id=take_id,
+        raw_take_id=raw_take_id,
+        take_id=f"{action_class}:{raw_take_id}",
         action_class=action_class,
         take_index=take_index,
         size_bytes=int(stat.st_size),

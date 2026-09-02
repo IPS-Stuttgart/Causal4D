@@ -72,6 +72,15 @@ def test_metadata_audit_freezes_two_queries_without_payload_access(tmp_path: Pat
     assert audit["decision"]["proceed"] is True
     assert audit["summary"]["dual_query_eligible_objects"] == 2
     assert audit["summary"]["frozen_fold_count"] == 4
+    assert all(
+        record["take_id"].startswith(f"{record['action_class']}:")
+        for record in audit["archives"]
+    )
+    assert all(
+        interaction.startswith("poking:")
+        for fold in audit["frozen_folds"]
+        for interaction in fold["candidate_probe_take_ids"]
+    )
     assert audit["information_boundary"] == {
         "archive_member_payload_opened": False,
         "archive_member_payload_bytes_read": 0,

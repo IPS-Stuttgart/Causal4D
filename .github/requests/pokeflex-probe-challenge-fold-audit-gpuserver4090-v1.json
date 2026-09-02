@@ -13,8 +13,15 @@
     "zip_central_directory_metadata_only": true
   },
   "next_stage_if_passed": "freeze-source-only-action-and-response-carrier-contract",
+  "prior_run": {
+    "archive_member_payload_opened": false,
+    "audit_id": "73d63e1d1980c723346b55288ef75a3535bde814d5d2603bcc6d4c0a21cb68fc",
+    "dataset_gate_passed": true,
+    "failure_stage": "post-audit verifier only",
+    "workflow_run_id": 33589834614
+  },
   "request_id": "pokeflex-probe-challenge-fold-audit-gpuserver4090-v1",
-  "retry_reason": "remove unused import before any self-hosted or dataset step",
+  "retry_reason": "qualify duplicate raw T1/T2/T3 stems by action class after a successful metadata-only scan; no archive member payload was opened",
   "roots": [
     "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
     "/home/github-runner/.cache/datasets/pokeflex",
@@ -33,5 +40,5 @@
     ],
     "salt": "PokeFlex-active-probe-folds-v1-2026-09-02"
   },
-  "technical_revision": 2
+  "technical_revision": 3
 }

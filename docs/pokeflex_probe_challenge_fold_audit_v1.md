@@ -17,7 +17,10 @@ pointcloud, probe response, or challenge outcome.
 
 ## Frozen roster rule
 
-For each parsed object identity, complete poking takes are ordered by a
+Poking and dropping folders reuse raw stems such as `Object_T1`. The audit
+therefore assigns the canonical action-qualified identities `poking:Object_T1`
+and `dropping:Object_T1`; raw stems remain metadata only. For each parsed
+object identity, complete poking interactions are ordered by a
 content-independent SHA-256 ordering using the registered salt. One poke is
 reserved as the held poke challenge, one as calibration, and the remaining
 complete pokes form the candidate diagnostic-probe library. Dropping takes are

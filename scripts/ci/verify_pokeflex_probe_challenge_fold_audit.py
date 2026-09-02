@@ -110,6 +110,7 @@ def main() -> int:
             set(record).issuperset(
                 {
                     "relative_path",
+                    "raw_take_id",
                     "take_id",
                     "object_id",
                     "action_class",
@@ -120,9 +121,17 @@ def main() -> int:
             ),
             "archive record missing metadata field",
         )
-        take_key = f"{record['object_id']}::{record['take_id']}"
-        require(take_key not in archive_take_ids, f"duplicate object/take identity: {take_key}")
-        archive_take_ids.add(take_key)
+        take_id = record["take_id"]
+        expected_prefix = f"{record['action_class']}:"
+        require(
+            isinstance(take_id, str) and take_id.startswith(expected_prefix),
+            f"take identity is not action-qualified: {take_id}",
+        )
+        require(
+            take_id not in archive_take_ids,
+            f"duplicate action-qualified take identity: {take_id}",
+        )
+        archive_take_ids.add(take_id)
 
     panels = result.get("object_panels")
     folds = result.get("frozen_folds")
