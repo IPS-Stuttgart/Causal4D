@@ -168,6 +168,7 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check \
             numpy==2.2.6 \
+            scipy==1.17.1 \
             mypy==1.18.2 \
             pytest==8.4.2 \
             ruff==0.16.5
@@ -199,7 +200,7 @@ jobs:
             tests/test_github_action_pins.py \
             tests/test_self_hosted_workflow_policy.py
 
-      - name: Commit validated audit capsule
+      - name: Commit validated non-workflow audit files
         if: github.event_name == 'pull_request'
         shell: bash
         run: |
@@ -209,7 +210,6 @@ jobs:
           git add -A \
             .github/materialize \
             .github/requests/deform360-sensor-reveal-source-audit-gpuserver4090-v1.json \
-            .github/workflows/deform360-sensor-reveal-source-audit-gpuserver4090.yml \
             .github/self-hosted-jobs.json \
             configs/causal4d_public/deform360_sensor_reveal_source_audit_v1.json \
             docs/deform360_sensor_reveal_source_audit.md \
@@ -217,7 +217,7 @@ jobs:
             tests/test_deform360_sensor_reveal_source.py \
             tests/test_self_hosted_workflow_policy.py
           if git diff --cached --quiet; then
-            echo "Validated audit capsule is already materialized."
+            echo "Validated non-workflow audit files are already materialized."
             exit 0
           fi
           git commit -m "Add source-only Deform360 sensor-reveal audit"
