@@ -1,0 +1,214 @@
+name: Materialize Deform360 sensor-reveal source audit
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/materialize-deform360-sensor-reveal-source-audit.yml"
+      - ".github/materialize/deform360-sensor-reveal-source-audit.part*"
+      - ".github/requests/deform360-sensor-reveal-source-audit-gpuserver4090-v1.json"
+      - ".github/workflows/deform360-sensor-reveal-source-audit-gpuserver4090.yml"
+      - ".github/self-hosted-jobs.json"
+      - "configs/causal4d_public/deform360_sensor_reveal_source_audit_v1.json"
+      - "docs/deform360_sensor_reveal_source_audit.md"
+      - "src/causal4d_public/deform360_sensor_reveal_source.py"
+      - "tests/test_deform360_sensor_reveal_source.py"
+      - "tests/test_self_hosted_workflow_policy.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: true
+          clean: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Materialize exact audited sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import io
+          import json
+          import tarfile
+          from pathlib import Path, PurePosixPath
+
+          root = Path(".github/materialize")
+          names = (
+              "deform360-sensor-reveal-source-audit.part00",
+              "deform360-sensor-reveal-source-audit.part01",
+              "deform360-sensor-reveal-source-audit.part02a",
+              "deform360-sensor-reveal-source-audit.part02b",
+              "deform360-sensor-reveal-source-audit.part02c",
+              "deform360-sensor-reveal-source-audit.part02d",
+              "deform360-sensor-reveal-source-audit.part03a",
+              "deform360-sensor-reveal-source-audit.part03b",
+          )
+          expected_sizes = (6000, 6000, 1500, 1500, 1500, 1500, 1500, 1032)
+          parts = tuple(root / name for name in names)
+          actual_sizes = tuple(path.stat().st_size for path in parts)
+          if actual_sizes != expected_sizes:
+              raise SystemExit(
+                  f"staged archive sizes changed: {actual_sizes!r} != {expected_sizes!r}"
+              )
+          encoded = "".join(
+              path.read_text(encoding="utf-8").strip() for path in parts
+          )
+          raw = base64.b64decode(encoded, validate=True)
+          if len(raw) != 15398:
+              raise SystemExit(f"unexpected archive byte count: {len(raw)}")
+
+          expected_members = {
+              ".github/requests/deform360-sensor-reveal-source-audit-gpuserver4090-v1.json",
+              ".github/workflows/deform360-sensor-reveal-source-audit-gpuserver4090.yml",
+              "configs/causal4d_public/deform360_sensor_reveal_source_audit_v1.json",
+              "docs/deform360_sensor_reveal_source_audit.md",
+              "src/causal4d_public/deform360_sensor_reveal_source.py",
+              "tests/test_deform360_sensor_reveal_source.py",
+          }
+          with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as archive:
+              members = archive.getmembers()
+              actual_members = {member.name for member in members}
+              if actual_members != expected_members:
+                  raise SystemExit(
+                      "archive member set changed: "
+                      f"{sorted(actual_members)!r} != {sorted(expected_members)!r}"
+                  )
+              for member in members:
+                  pure = PurePosixPath(member.name)
+                  if (
+                      not member.isfile()
+                      or pure.is_absolute()
+                      or ".." in pure.parts
+                      or member.linkname
+                  ):
+                      raise SystemExit(f"unsafe archive member: {member.name!r}")
+                  source = archive.extractfile(member)
+                  if source is None:
+                      raise SystemExit(f"missing archive payload: {member.name!r}")
+                  destination = Path(*pure.parts)
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  destination.write_bytes(source.read())
+
+          policy_path = Path("tests/test_self_hosted_workflow_policy.py")
+          policy = policy_path.read_text(encoding="utf-8")
+          marker = "REVIEWED_FILE_MAIN_TRIGGERS = {\n"
+          entry = (
+              '    "deform360-sensor-reveal-source-audit-gpuserver4090.yml": (\n'
+              '        ".github/requests/"\n'
+              '        "deform360-sensor-reveal-source-audit-gpuserver4090-v1.json"\n'
+              "    ),\n"
+          )
+          if entry not in policy:
+              if marker not in policy:
+                  raise SystemExit("reviewed-file policy marker is missing")
+              policy = policy.replace(marker, marker + entry, 1)
+          policy_path.write_text(policy, encoding="utf-8")
+
+          registry_path = Path(".github/self-hosted-jobs.json")
+          registry = json.loads(registry_path.read_text(encoding="utf-8"))
+          registry_entry = {
+              "authorization_model": "reviewed-file-main",
+              "dataset_access": (
+                  "approved-source-only-deform360-multimodal-carrier-audit"
+              ),
+              "job": "audit",
+              "purpose": (
+                  "Source-only Deform360 sensor-reveal carrier and grouped routing audit"
+              ),
+              "runner_labels": [
+                  "self-hosted",
+                  "Linux",
+                  "X64",
+                  "nvidia-smi",
+                  "gpuserver4090",
+              ],
+              "secrets_allowed": False,
+              "workflow": (
+                  "deform360-sensor-reveal-source-audit-gpuserver4090.yml"
+              ),
+          }
+          jobs = registry.get("jobs")
+          if not isinstance(jobs, list):
+              raise SystemExit("self-hosted registry jobs are missing")
+          key = (registry_entry["workflow"], registry_entry["job"])
+          keys = {(item["workflow"], item["job"]) for item in jobs}
+          if key not in keys:
+              jobs.append(registry_entry)
+          jobs.sort(key=lambda item: (item["workflow"], item["job"]))
+          registry_path.write_text(
+              json.dumps(registry, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+
+          for path in parts:
+              path.unlink()
+          PY
+
+      - name: Install exact validation toolchain
+        run: |
+          python -m pip install --disable-pip-version-check \
+            numpy==2.2.6 \
+            mypy==1.18.2 \
+            pytest==8.4.2 \
+            ruff==0.16.5
+
+      - name: Canonicalize and validate final files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m ruff format \
+            src/causal4d_public/deform360_sensor_reveal_source.py \
+            tests/test_deform360_sensor_reveal_source.py \
+            tests/test_self_hosted_workflow_policy.py
+          python -m ruff check \
+            src/causal4d_public/deform360_sensor_reveal_source.py \
+            tests/test_deform360_sensor_reveal_source.py \
+            tests/test_self_hosted_workflow_policy.py
+          python -m ruff format --check \
+            src/causal4d_public/deform360_sensor_reveal_source.py \
+            tests/test_deform360_sensor_reveal_source.py \
+            tests/test_self_hosted_workflow_policy.py
+          python -m mypy --strict \
+            src/causal4d_public/deform360_sensor_reveal_source.py
+          PYTHONPATH=src python -m pytest -q \
+            tests/test_deform360_sensor_reveal_source.py \
+            tests/test_github_action_pins.py \
+            tests/test_self_hosted_workflow_policy.py
+
+      - name: Commit validated audit capsule
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A \
+            .github/materialize \
+            .github/requests/deform360-sensor-reveal-source-audit-gpuserver4090-v1.json \
+            .github/workflows/deform360-sensor-reveal-source-audit-gpuserver4090.yml \
+            .github/self-hosted-jobs.json \
+            configs/causal4d_public/deform360_sensor_reveal_source_audit_v1.json \
+            docs/deform360_sensor_reveal_source_audit.md \
+            src/causal4d_public/deform360_sensor_reveal_source.py \
+            tests/test_deform360_sensor_reveal_source.py \
+            tests/test_self_hosted_workflow_policy.py
+          if git diff --cached --quiet; then
+            echo "Validated audit capsule is already materialized."
+            exit 0
+          fi
+          git commit -m "Add source-only Deform360 sensor-reveal audit"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
