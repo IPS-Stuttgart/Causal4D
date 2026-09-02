@@ -48,9 +48,7 @@ def protocol() -> dict:
 
 
 def expected_objects(payload: dict) -> list[str]:
-    split = payload["object_split"][
-        "expected_if_all_18_objects_are_eligible"
-    ]
+    split = payload["object_split"]["expected_if_all_18_objects_are_eligible"]
     values = list(split["source"])
     for group in split["calibration"].values():
         values.extend(group)
@@ -121,9 +119,9 @@ def test_protocol_digest_tamper_fails() -> None:
 
 def test_protocol_forbids_preselection_response_access() -> None:
     payload = protocol()
-    payload["take_roles"][
-        "target_probe_response_available_before_first_selection"
-    ] = True
+    payload["take_roles"]["target_probe_response_available_before_first_selection"] = (
+        True
+    )
     canonical = dict(payload)
     canonical.pop("protocol_sha256")
     payload["protocol_sha256"] = protocol_verifier.hashlib.sha256(
@@ -140,8 +138,7 @@ def test_synthetic_roster_has_twelve_paths_per_object() -> None:
     assert roster["summary"]["target_object_count"] == 6
     assert roster["summary"]["ordered_two_probe_paths_per_object"] == 12
     assert all(
-        item["ordered_distinct_probe_pair_count"] == 12
-        for item in roster["objects"]
+        item["ordered_distinct_probe_pair_count"] == 12 for item in roster["objects"]
     )
     verification = roster_verifier.verify_roster(roster, payload)
     assert verification["target_object_count"] == 6
@@ -158,9 +155,7 @@ def test_missing_target_probe_fails_closed() -> None:
         ]["target"].values()
         for object_id in values
     )
-    panel = next(
-        item for item in audit["object_panels"] if item["object_id"] == target
-    )
+    panel = next(item for item in audit["object_panels"] if item["object_id"] == target)
     panel["candidate_probe_take_ids"] = panel["candidate_probe_take_ids"][:1]
     panel["calibration_poke_take_id"] = None
     panel["poke_challenge_take_id"] = None
