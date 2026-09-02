@@ -51,8 +51,7 @@ def verify_roster(
         "protocol digest binding changed",
     )
     require(
-        roster.get("metadata_audit_id")
-        == protocol["dataset"]["metadata_audit_id"],
+        roster.get("metadata_audit_id") == protocol["dataset"]["metadata_audit_id"],
         "metadata audit binding changed",
     )
     require(
