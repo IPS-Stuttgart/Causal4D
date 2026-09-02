@@ -1,0 +1,67 @@
+{
+  "claim_boundary": [
+    "This is task-conditioned sparse marker observation, not physical intervention selection.",
+    "Cotton alone determines policy choices and fitted prediction models.",
+    "Denim is an independent frozen source gate for those cotton-fitted models.",
+    "Wool and polyester contents remained unopened because the denim gate failed.",
+    "No paper, population-generalization, deployment-safety, or active probe-to-act claim is authorized."
+  ],
+  "dataset": {
+    "csv_count": 120,
+    "name": "Tracking Cloth Deformation v1",
+    "source_fit_materials": ["cotton"],
+    "source_gate_materials": ["denim"],
+    "source_gate_recording_horizon_rows": 87,
+    "source_gate_recordings": 29,
+    "target_contents_opened": false,
+    "target_materials": ["wool", "polyester"]
+  },
+  "execution": {
+    "artifact_id": 9831004928,
+    "artifact_sha256": "8f75c19531e5c1df44e747a828143d957912d2c2fcf6a86074e8e15b7d1dec75",
+    "job": 100118290916,
+    "merge_revision": "1802cd544a04fb1eaaf4342cb68d516e4e4ef100",
+    "repository": "IPS-Stuttgart/Causal4D",
+    "runner_label": "gpuserver4090",
+    "runner_name": "workstation1",
+    "workflow_run": 33588742638
+  },
+  "interpretation": {
+    "active_probe_to_act_claim_supported": false,
+    "cross_material_residual_transport_supported": false,
+    "failure_localization": "transported observation-query coupling",
+    "paper_claim_authorized": false,
+    "passive_query_conditioned_observation_supported": false,
+    "target_opened": false,
+    "technical_execution_succeeded": true
+  },
+  "request_id": "328737f73b038c81f0a9b7d4d1ed9a40e40d5cbad214e85812b69c6405f0277e",
+  "result_id": "c7220ab39d869d95fe691e0ac58a6f595203f5999c78730f068e8cb79c02420f",
+  "schema": "causal4d.tracking-cloth-query-observation-negative-evidence",
+  "schema_version": 1,
+  "source_gate": {
+    "aggregate": {
+      "constant_velocity": {"equal_recording_gaussian_nll": -8.413839374339902, "equal_recording_marginal_90_coverage": 0.8886067746824213, "equal_recording_mse_m2": 0.0025821330991785425, "equal_recording_normalized_joint_nees": 2.9796626846959895, "equal_recording_rmse_mm": 50.81469373299954},
+      "dependence_destroyed": {"equal_recording_gaussian_nll": -8.341315396178345, "equal_recording_marginal_90_coverage": 0.8913383937824748, "equal_recording_mse_m2": 0.0025817796070694895, "equal_recording_normalized_joint_nees": 3.0606056818003946, "equal_recording_rmse_mm": 50.81121536697867},
+      "global_state_conditioned": {"equal_recording_gaussian_nll": 0.023317227747100613, "equal_recording_marginal_90_coverage": 0.876187668635391, "equal_recording_mse_m2": 0.007088133499262146, "equal_recording_normalized_joint_nees": 7.751783579701362, "equal_recording_rmse_mm": 84.1910535583333},
+      "source_mean_residual": {"equal_recording_gaussian_nll": -8.279804271956754, "equal_recording_marginal_90_coverage": 0.8913809108479328, "equal_recording_mse_m2": 0.002557525407830176, "equal_recording_normalized_joint_nees": 3.089744733108524, "equal_recording_rmse_mm": 50.571982439194294},
+      "task_conditioned": {"equal_recording_gaussian_nll": 14.145233089827885, "equal_recording_marginal_90_coverage": 0.885782392809322, "equal_recording_mse_m2": 0.01292334260598581, "equal_recording_normalized_joint_nees": 14.954333445851633, "equal_recording_rmse_mm": 113.68088056478895}
+    },
+    "checks": {
+      "maximum_worst_scenario_ratio": false,
+      "minimum_distinct_selection_cells": true,
+      "minimum_improvement_vs_constant_velocity": false,
+      "minimum_improvement_vs_dependence_destroyed": false,
+      "minimum_improvement_vs_global_state": false,
+      "minimum_recording_win_fraction": false
+    },
+    "distinct_task_vs_global_state_selection_cells": 8,
+    "passed": false,
+    "relative_mse_improvements": {"vs_constant_velocity": -4.0049095494330365, "vs_dependence_destroyed": -4.005594811655809, "vs_global_state": -0.8232363438599303},
+    "task_to_global_state_scenario_mse_ratios": {"self_collision": 1.0, "shake": 1.9057549114452288, "table": 0.6753414992708682, "twist": 1.8963794555646991},
+    "task_vs_global_state_recording_win_fraction": 0.4482758620689655
+  },
+  "source_result_sha256": "76b71e4ce28f302327c251ca919dd5ef9013f9394c742656de9c80b3ca9a49bf",
+  "source_summary_sha256": "36b0edfce1c1b230ea5baa841b179505ad42c92d6195db3978783c7e5269e481",
+  "status": "source-gate-failed-target-closed-v2"
+}
