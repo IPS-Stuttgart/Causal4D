@@ -1,0 +1,64 @@
+name: Patch Deform360 materializer SciPy dependency
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/patch-deform360-materializer-scipy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: true
+          clean: true
+
+      - name: Add the repository-pinned SciPy runtime dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path(
+              ".github/workflows/"
+              "materialize-deform360-sensor-reveal-source-audit.yml"
+          )
+          text = path.read_text(encoding="utf-8")
+          old = """            numpy==2.2.6 \\
+            mypy==1.18.2 \\
+          """
+          new = """            numpy==2.2.6 \\
+            scipy==1.17.1 \\
+            mypy==1.18.2 \\
+          """
+          if old not in text and new not in text:
+              raise SystemExit("materializer dependency block changed")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          Path(
+              ".github/workflows/patch-deform360-materializer-scipy.yml"
+          ).unlink()
+          PY
+          grep -F 'scipy==1.17.1' \
+            .github/workflows/materialize-deform360-sensor-reveal-source-audit.yml
+
+      - name: Commit dependency repair and remove this helper
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A \
+            .github/workflows/materialize-deform360-sensor-reveal-source-audit.yml \
+            .github/workflows/patch-deform360-materializer-scipy.yml
+          git commit -m "Install SciPy for Deform360 audit tests"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
