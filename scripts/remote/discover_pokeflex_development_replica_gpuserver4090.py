@@ -4,19 +4,37 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import sys
 from pathlib import Path
+from types import ModuleType
 
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "src"))
+DISCOVERY_MODULE_PATH = ROOT / "src/causal4d_public/pokeflex_replica_discovery.py"
 
-from causal4d_public.pokeflex_replica_discovery import (  # noqa: E402
-    discover_pokeflex_development_replica,
-    validate_pokeflex_replica_discovery,
-)
+
+def _load_discovery_module() -> ModuleType:
+    """Load the pure-standard-library module without importing package __init__."""
+
+    module_name = "_causal4d_pokeflex_replica_discovery_standalone"
+    specification = importlib.util.spec_from_file_location(
+        module_name,
+        DISCOVERY_MODULE_PATH,
+    )
+    if specification is None or specification.loader is None:
+        raise RuntimeError("failed to create standalone PokeFlex discovery module")
+    module = importlib.util.module_from_spec(specification)
+    sys.modules[module_name] = module
+    specification.loader.exec_module(module)
+    return module
+
+
+_DISCOVERY = _load_discovery_module()
+discover_pokeflex_development_replica = _DISCOVERY.discover_pokeflex_development_replica
+validate_pokeflex_replica_discovery = _DISCOVERY.validate_pokeflex_replica_discovery
 
 
 DEFAULT_SEARCH_ROOTS = (
@@ -73,7 +91,7 @@ def main() -> int:
         )
         validation = validate_pokeflex_replica_discovery(result)
         _write_json(args.output, result)
-    except (OSError, KeyError, TypeError, ValueError) as error:
+    except (OSError, KeyError, RuntimeError, TypeError, ValueError) as error:
         failure = {
             "passed": False,
             "technical_status": "replica-discovery-failed-closed",
