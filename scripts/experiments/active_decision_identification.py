@@ -72,18 +72,12 @@ def _certificate(
 def _information_problem() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     prior = np.full(8, 1.0 / 8.0, dtype=np.float64)
     task_likelihood = np.asarray(
-        [
-            (1.0, 0.0) if hypothesis < 4 else (0.0, 1.0)
-            for hypothesis in range(8)
-        ],
+        [(1.0, 0.0) if hypothesis < 4 else (0.0, 1.0) for hypothesis in range(8)],
         dtype=np.float64,
     )
     nuisance_likelihood = np.asarray(
         [
-            tuple(
-                1.0 if outcome == hypothesis % 4 else 0.0
-                for outcome in range(4)
-            )
+            tuple(1.0 if outcome == hypothesis % 4 else 0.0 for outcome in range(4))
             for hypothesis in range(8)
         ],
         dtype=np.float64,
@@ -109,9 +103,7 @@ def run() -> dict[str, Any]:
     )
     nuisance_probe = CertificateProbeV1(
         name="nuisance-four-way",
-        outcomes=tuple(
-            CertificateOutcomeV1(0.25, current) for _ in range(4)
-        ),
+        outcomes=tuple(CertificateOutcomeV1(0.25, current) for _ in range(4)),
         physical_risk=0.01,
         cost=0.05,
     )
@@ -154,9 +146,7 @@ def run() -> dict[str, Any]:
     task_information = mutual_information_nats(prior, task_likelihood)
     nuisance_information = mutual_information_nats(prior, nuisance_likelihood)
     information_selected = (
-        "nuisance-four-way"
-        if nuisance_information > task_information
-        else "task-sign"
+        "nuisance-four-way" if nuisance_information > task_information else "task-sign"
     )
 
     reports = {report.name: report for report in active.probe_reports}
