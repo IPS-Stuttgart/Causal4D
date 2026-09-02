@@ -61,9 +61,10 @@ def test_claim_boundary_exposes_unvalidated_lipschitz_assumption() -> None:
     )
     assert result.status == "certified"
     assert result.selected_action_index == 0
-    assert "valid global action-loss Lipschitz constants" in result.as_dict()[
-        "claim_boundary"
-    ]
+    assert (
+        "valid global action-loss Lipschitz constants"
+        in result.as_dict()["claim_boundary"]
+    )
 
 
 def test_budget_exhaustion_fails_closed() -> None:
