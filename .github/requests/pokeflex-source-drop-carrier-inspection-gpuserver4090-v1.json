@@ -1,0 +1,35 @@
+{
+  "dataset_root": "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+  "dropping_take_indices": [1, 2, 3],
+  "information_boundary": {
+    "maximum_representative_members_per_suffix_per_archive": 2,
+    "target_archive_open_allowed": false,
+    "target_outcome_allowed": false
+  },
+  "request_id": "pokeflex-source-drop-carrier-inspection-gpuserver4090-v1",
+  "runner_label": "gpuserver4090",
+  "schema": "causal4d/pokeflex-source-drop-state-carrier-inspection-request",
+  "schema_version": 1,
+  "source_and_calibration_objects": [
+    "3dPrintedHeart",
+    "3dPrintedPyramid",
+    "FoamDice",
+    "FoamHalfSphere",
+    "PlushDice",
+    "PlushMoon",
+    "PlushTurtle",
+    "PlushVolleyball",
+    "ToiletPaperRoll",
+    "3dPrintedPizza",
+    "FoamCylinder",
+    "PlushOctopus"
+  ],
+  "target_objects_excluded": [
+    "3dPrintedBunny",
+    "3dPrintedCylinder",
+    "Sponge",
+    "MemoryFoam",
+    "Beanbag",
+    "Pillow"
+  ]
+}
