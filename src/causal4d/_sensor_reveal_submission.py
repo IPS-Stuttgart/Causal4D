@@ -132,8 +132,7 @@ def validate_sensor_reveal_submission(
     if len(submission.probes) != len(manifest.sensor_names):
         raise ValueError("submission sensor count mismatch")
     if any(
-        len(row) != len(manifest.action_names)
-        for row in submission.hypothesis_losses
+        len(row) != len(manifest.action_names) for row in submission.hypothesis_losses
     ):
         raise ValueError("submission action count mismatch")
     for index, probe in enumerate(submission.probes):

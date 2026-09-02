@@ -228,9 +228,7 @@ def test_no_guaranteed_sensor_path_returns_exact_fallback_without_reveal() -> No
 
 
 def test_verifier_does_not_import_producer_or_planner() -> None:
-    source = Path("src/causal4d/sensor_reveal_verifier.py").read_text(
-        encoding="utf-8"
-    )
+    source = Path("src/causal4d/sensor_reveal_verifier.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     imported = set()
     for node in ast.walk(tree):

@@ -56,34 +56,23 @@ def _routing_problem() -> tuple[
         for route in range(2):
             for nuisance in range(4):
                 for _duplicate in range(2):
-                    losses.append(
-                        (0.0, 1.0, 0.6) if task == 0 else (1.0, 0.0, 0.6)
-                    )
+                    losses.append((0.0, 1.0, 0.6) if task == 0 else (1.0, 0.0, 0.6))
                     weights.append(1.0 / 32.0)
-                    route_rows.append(
-                        (1.0, 0.0) if route == 0 else (0.0, 1.0)
-                    )
+                    route_rows.append((1.0, 0.0) if route == 0 else (0.0, 1.0))
                     if route == 0:
                         local_zero_rows.append(
-                            (1.0, 0.0, 0.0)
-                            if task == 0
-                            else (0.0, 1.0, 0.0)
+                            (1.0, 0.0, 0.0) if task == 0 else (0.0, 1.0, 0.0)
                         )
                         local_one_rows.append((0.0, 0.0, 1.0))
                     else:
                         local_zero_rows.append((0.0, 0.0, 1.0))
                         local_one_rows.append(
-                            (1.0, 0.0, 0.0)
-                            if task == 0
-                            else (0.0, 1.0, 0.0)
+                            (1.0, 0.0, 0.0) if task == 0 else (0.0, 1.0, 0.0)
                         )
-                    global_rows.append(
-                        (1.0, 0.0) if task == 0 else (0.0, 1.0)
-                    )
+                    global_rows.append((1.0, 0.0) if task == 0 else (0.0, 1.0))
                     nuisance_rows.append(
                         tuple(
-                            1.0 if outcome == nuisance else 0.0
-                            for outcome in range(4)
+                            1.0 if outcome == nuisance else 0.0 for outcome in range(4)
                         )
                     )
     probes = (
@@ -166,9 +155,7 @@ def _routing_study() -> dict[str, Any]:
     verification_ids = []
     unrequested_disclosures = 0
     for hypothesis, realized_losses in enumerate(losses):
-        outcomes = tuple(
-            _deterministic_outcome(probe, hypothesis) for probe in probes
-        )
+        outcomes = tuple(_deterministic_outcome(probe, hypothesis) for probe in probes)
         payload_ids = tuple(
             _digest(f"controlled-payload/{hypothesis}/{sensor}")
             for sensor in sensor_names
@@ -216,9 +203,7 @@ def _routing_study() -> dict[str, Any]:
         verification = verify_sensor_reveal_trace(
             manifest.as_dict(), plan.as_dict(), trace.as_dict()
         )
-        serialized_trace = json.dumps(
-            trace.as_dict(), sort_keys=True, allow_nan=False
-        )
+        serialized_trace = json.dumps(trace.as_dict(), sort_keys=True, allow_nan=False)
         revealed = set(trace.revealed_sensor_indices)
         for sensor_index, payload_id in enumerate(payload_ids):
             if sensor_index not in revealed and payload_id in serialized_trace:

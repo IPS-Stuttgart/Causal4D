@@ -120,8 +120,7 @@ class SensorRevealTruth:
             for value in self.sensor_payload_sha256
         )
         adapters = tuple(
-            _digest(value, "sensor adapter id")
-            for value in self.sensor_adapter_ids
+            _digest(value, "sensor adapter id") for value in self.sensor_adapter_ids
         )
         losses = tuple(
             _number(value, "realized action loss")
@@ -204,12 +203,10 @@ def seal_sensor_reveal_case(
         _number(value, "sensor risk", nonnegative=True) for value in sensor_risks
     )
     outcomes = tuple(
-        _integer(value, "sensor outcome index")
-        for value in sensor_outcome_indices
+        _integer(value, "sensor outcome index") for value in sensor_outcome_indices
     )
     payloads = tuple(
-        _digest(value, "sensor payload digest")
-        for value in sensor_payload_sha256
+        _digest(value, "sensor payload digest") for value in sensor_payload_sha256
     )
     adapters = tuple(
         _digest(value, "sensor adapter id") for value in sensor_adapter_ids

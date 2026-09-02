@@ -163,9 +163,7 @@ def _sequence(value: object, *, name: str) -> Sequence[object]:
     return value
 
 
-def _exact_keys(
-    value: Mapping[str, object], expected: set[str], *, name: str
-) -> None:
+def _exact_keys(value: Mapping[str, object], expected: set[str], *, name: str) -> None:
     actual = set(value)
     if actual != expected:
         missing = sorted(expected - actual)
@@ -237,17 +235,11 @@ def verify_sensor_reveal_manifest(
     if record["claim_boundary"] != SENSOR_REVEAL_TRACE_CLAIM_BOUNDARY:
         raise ValueError("sensor-reveal manifest claim boundary changed")
     case_id = _name(record["case_id"], name="case_id")
-    public_context_id = _digest(
-        record["public_context_id"], name="public_context_id"
-    )
-    truth_commitment = _digest(
-        record["truth_commitment"], name="truth_commitment"
-    )
+    public_context_id = _digest(record["public_context_id"], name="public_context_id")
+    truth_commitment = _digest(record["truth_commitment"], name="truth_commitment")
     action_names = _names(record["action_names"], name="action_names")
     sensor_names = _names(record["sensor_names"], name="sensor_names")
-    fallback = _integer(
-        record["fallback_action_index"], name="fallback_action_index"
-    )
+    fallback = _integer(record["fallback_action_index"], name="fallback_action_index")
     if fallback >= len(action_names):
         raise ValueError("fallback_action_index is outside action_names")
     outcome_rows = _sequence(
@@ -300,8 +292,7 @@ def _validate_certificate(
     if not raw_weights:
         raise ValueError("certificate weights must be nonempty")
     weights = tuple(
-        _finite_nonnegative(item, name="certificate weight")
-        for item in raw_weights
+        _finite_nonnegative(item, name="certificate weight") for item in raw_weights
     )
     if not math.isclose(sum(weights), 1.0, rel_tol=0.0, abs_tol=_ATOL):
         raise ValueError("certificate weights must sum to one")
@@ -324,8 +315,7 @@ def _validate_certificate(
     if len(raw_regret) != action_count:
         raise ValueError("certificate regret vector has wrong action count")
     regrets = tuple(
-        _finite_nonnegative(item, name="certificate regret")
-        for item in raw_regret
+        _finite_nonnegative(item, name="certificate regret") for item in raw_regret
     )
     tolerance = _finite_nonnegative(
         certificate["regret_tolerance"], name="regret_tolerance"
@@ -336,17 +326,14 @@ def _validate_certificate(
         name="certificate admissible actions",
     )
     admissible_indices = tuple(
-        _integer(item, name="admissible action index")
-        for item in raw_admissible
+        _integer(item, name="admissible action index") for item in raw_admissible
     )
     if len(set(admissible_indices)) != len(admissible_indices):
         raise ValueError("certificate admissible actions must be unique")
     if any(index >= action_count for index in admissible_indices):
         raise ValueError("certificate admissible action outside action roster")
     expected_admissible = tuple(
-        index
-        for index, regret in enumerate(regrets)
-        if regret <= tolerance + _ATOL
+        index for index, regret in enumerate(regrets) if regret <= tolerance + _ATOL
     )
     if admissible_indices != expected_admissible:
         raise ValueError("certificate admissible actions do not match regrets")
@@ -357,9 +344,7 @@ def _validate_certificate(
         for index, regret in enumerate(regrets)
         if math.isclose(regret, minimum, rel_tol=1e-5, abs_tol=_ATOL)
     )
-    minimax = _integer(
-        certificate["minimax_action_index"], name="minimax_action_index"
-    )
+    minimax = _integer(certificate["minimax_action_index"], name="minimax_action_index")
     if minimax >= action_count or minimax != expected_minimax:
         raise ValueError("certificate minimax action is inconsistent")
     minimax_regret = _finite_nonnegative(
@@ -453,9 +438,7 @@ def _validate_policy_tree(
     worst_cost = _finite_nonnegative(
         node["worst_case_probe_cost"], name="worst_case_probe_cost"
     )
-    worst_risk = _finite_nonnegative(
-        node["worst_case_risk"], name="worst_case_risk"
-    )
+    worst_risk = _finite_nonnegative(node["worst_case_risk"], name="worst_case_risk")
     if expected_cost > worst_cost + _ATOL:
         raise ValueError("expected probe cost exceeds worst-case probe cost")
     if type(node["guaranteed_certification"]) is not bool:
@@ -472,11 +455,7 @@ def _validate_policy_tree(
         action_index=action_index,
     )
     if mode == "act":
-        if (
-            action_index is None
-            or probe_index is not None
-            or probe_name is not None
-        ):
+        if action_index is None or probe_index is not None or probe_name is not None:
             raise ValueError("act node has inconsistent action/probe fields")
         if outcomes or node["guaranteed_certification"] is not True:
             raise ValueError("act node must be a certified terminal node")
@@ -522,9 +501,7 @@ def _validate_policy_tree(
             if outcome_index in seen_outcomes:
                 raise ValueError("policy contains duplicate outcome branches")
             seen_outcomes.add(outcome_index)
-            outcome_name = _name(
-                branch["outcome_name"], name="branch outcome_name"
-            )
+            outcome_name = _name(branch["outcome_name"], name="branch outcome_name")
             if outcome_name != sensor_outcomes[probe_index][outcome_index]:
                 raise ValueError("branch outcome name does not match manifest")
             probability = _finite_nonnegative(
@@ -563,17 +540,11 @@ def _validate_policy_tree(
         expected_total = sensor_costs[probe_index] + expected_child_cost
         worst_total = sensor_costs[probe_index] + worst_child_cost
         risk_total = sensor_risks[probe_index] + worst_child_risk
-        if not math.isclose(
-            expected_cost, expected_total, rel_tol=0.0, abs_tol=_ATOL
-        ):
+        if not math.isclose(expected_cost, expected_total, rel_tol=0.0, abs_tol=_ATOL):
             raise ValueError("policy expected sensor cost is inconsistent")
-        if not math.isclose(
-            worst_cost, worst_total, rel_tol=0.0, abs_tol=_ATOL
-        ):
+        if not math.isclose(worst_cost, worst_total, rel_tol=0.0, abs_tol=_ATOL):
             raise ValueError("policy worst-case sensor cost is inconsistent")
-        if not math.isclose(
-            worst_risk, risk_total, rel_tol=0.0, abs_tol=_ATOL
-        ):
+        if not math.isclose(worst_risk, risk_total, rel_tol=0.0, abs_tol=_ATOL):
             raise ValueError("policy worst-case sensor risk is inconsistent")
     return node
 
@@ -707,9 +678,7 @@ def verify_sensor_reveal_trace(
         if matching[0]["outcome_name"] != outcome_name:
             raise ValueError("trace outcome branch name mismatch")
         child = _mapping(matching[0]["policy"], name="child policy")
-        after_id = _digest(
-            event["policy_node_id_after"], name="policy_node_id_after"
-        )
+        after_id = _digest(event["policy_node_id_after"], name="policy_node_id_after")
         if after_id != policy_node_id(child):
             raise ValueError("trace policy_node_id_after mismatch")
         revealed_indices.append(sensor_index)
@@ -767,9 +736,7 @@ def verify_sensor_reveal_trace(
     if not math.isclose(stored_risk, total_risk, rel_tol=0.0, abs_tol=_ATOL):
         raise ValueError("trace total sensor risk mismatch")
     certificate = _mapping(node["certificate"], name="terminal certificate")
-    support = _sequence(
-        certificate["support_indices"], name="terminal support_indices"
-    )
+    support = _sequence(certificate["support_indices"], name="terminal support_indices")
     stored_support_count = _integer(
         record["terminal_certificate_support_count"],
         name="terminal_certificate_support_count",

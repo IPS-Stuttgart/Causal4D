@@ -177,9 +177,7 @@ class SensorRevealTrace:
             "terminal_certificate_support_count": (
                 self.terminal_certificate_support_count
             ),
-            "terminal_certificate_reason_code": (
-                self.terminal_certificate_reason_code
-            ),
+            "terminal_certificate_reason_code": (self.terminal_certificate_reason_code),
             "sealed_before_scoring": self.sealed_before_scoring,
             "claim_boundary": SENSOR_REVEAL_TRACE_CLAIM_BOUNDARY,
         }
@@ -390,7 +388,5 @@ def score_sensor_reveal_trace(
         improvement_vs_fallback=fallback - selected,
         total_sensor_cost=trace.total_sensor_cost,
         cost_multiplier=multiplier,
-        objective_with_sensor_cost=(
-            selected + multiplier * trace.total_sensor_cost
-        ),
+        objective_with_sensor_cost=(selected + multiplier * trace.total_sensor_cost),
     )
