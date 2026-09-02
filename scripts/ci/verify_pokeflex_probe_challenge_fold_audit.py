@@ -59,11 +59,15 @@ def main() -> int:
     require(result.get("schema") == SCHEMA, "unexpected audit schema")
     require(result.get("schema_version") == SCHEMA_VERSION, "unexpected audit version")
     require(result.get("request_id") == args.request_id, "request id mismatch")
-    require(result.get("selection_salt") == args.selection_salt, "selection salt mismatch")
+    require(
+        result.get("selection_salt") == args.selection_salt, "selection salt mismatch"
+    )
 
     stored_id = result.get("audit_id")
     require(isinstance(stored_id, str) and len(stored_id) == 64, "invalid audit id")
-    identity_payload = {key: value for key, value in result.items() if key != "audit_id"}
+    identity_payload = {
+        key: value for key, value in result.items() if key != "audit_id"
+    }
     recomputed_id = hashlib.sha256(canonical_json(identity_payload)).hexdigest()
     require(stored_id == recomputed_id, "audit id mismatch")
 
@@ -79,16 +83,28 @@ def main() -> int:
     require(boundary == expected_boundary, "information boundary changed")
 
     summary = result.get("summary", {})
-    require(summary.get("archive_count") == args.expected_archives, "archive count mismatch")
-    require(summary.get("audited_archive_count") == args.expected_archives, "not all archives audited")
-    require(summary.get("poking_count") == args.expected_poking, "poking count mismatch")
-    require(summary.get("dropping_count") == args.expected_dropping, "dropping count mismatch")
+    require(
+        summary.get("archive_count") == args.expected_archives, "archive count mismatch"
+    )
+    require(
+        summary.get("audited_archive_count") == args.expected_archives,
+        "not all archives audited",
+    )
+    require(
+        summary.get("poking_count") == args.expected_poking, "poking count mismatch"
+    )
+    require(
+        summary.get("dropping_count") == args.expected_dropping,
+        "dropping count mismatch",
+    )
     require(summary.get("unknown_count") == 0, "unknown action archives remain")
     require(
         summary.get("dual_query_eligible_objects", 0) >= args.minimum_eligible_objects,
         "insufficient dual-query eligible objects",
     )
-    require(summary.get("suspicious_member_path_count") == 0, "unsafe ZIP member path found")
+    require(
+        summary.get("suspicious_member_path_count") == 0, "unsafe ZIP member path found"
+    )
     require(not result.get("archive_errors"), "archive metadata errors remain")
     require(result.get("status") == "ready-for-source-only-protocol", "audit not ready")
     decision = result.get("decision", {})
@@ -100,12 +116,18 @@ def main() -> int:
     )
 
     archives = result.get("archives")
-    require(isinstance(archives, list) and len(archives) == args.expected_archives, "archive records invalid")
+    require(
+        isinstance(archives, list) and len(archives) == args.expected_archives,
+        "archive records invalid",
+    )
     archive_take_ids: set[str] = set()
     for record in archives:
         require(isinstance(record, dict), "archive record must be an object")
         forbidden = FORBIDDEN_ARCHIVE_KEYS.intersection(record)
-        require(not forbidden, f"archive record exposes forbidden payload key(s): {sorted(forbidden)}")
+        require(
+            not forbidden,
+            f"archive record exposes forbidden payload key(s): {sorted(forbidden)}",
+        )
         require(
             set(record).issuperset(
                 {
@@ -138,8 +160,14 @@ def main() -> int:
     require(isinstance(panels, list), "object panels missing")
     require(isinstance(folds, list), "frozen folds missing")
     eligible_objects = {p["object_id"] for p in panels if p.get("eligible_dual_query")}
-    require(len(eligible_objects) == summary["dual_query_eligible_objects"], "eligible-object count mismatch")
-    require(len(folds) == 2 * len(eligible_objects), "expected two folds per eligible object")
+    require(
+        len(eligible_objects) == summary["dual_query_eligible_objects"],
+        "eligible-object count mismatch",
+    )
+    require(
+        len(folds) == 2 * len(eligible_objects),
+        "expected two folds per eligible object",
+    )
 
     by_object: dict[str, list[dict[str, Any]]] = {}
     for fold in folds:
@@ -147,11 +175,16 @@ def main() -> int:
         object_id = fold.get("object_id")
         require(object_id in eligible_objects, "fold belongs to ineligible object")
         candidates = fold.get("candidate_probe_take_ids")
-        require(isinstance(candidates, list) and candidates, "candidate probe roster empty")
+        require(
+            isinstance(candidates, list) and bool(candidates),
+            "candidate probe roster empty",
+        )
         require(len(candidates) == len(set(candidates)), "duplicate candidate probe")
         calibration = fold.get("calibration_take_id")
         challenge = fold.get("challenge_take_id")
-        require(calibration not in candidates, "calibration take leaked into candidates")
+        require(
+            calibration not in candidates, "calibration take leaked into candidates"
+        )
         require(challenge not in candidates, "challenge take leaked into candidates")
         require(calibration != challenge, "calibration and challenge are identical")
         require(
@@ -168,10 +201,18 @@ def main() -> int:
             == {"held-poke-response", "held-drop-response"},
             f"{object_id}: missing registered query fold",
         )
-        probe_rosters = {tuple(fold["candidate_probe_take_ids"]) for fold in object_folds}
-        require(len(probe_rosters) == 1, f"{object_id}: query folds use different probe rosters")
+        probe_rosters = {
+            tuple(fold["candidate_probe_take_ids"]) for fold in object_folds
+        }
+        require(
+            len(probe_rosters) == 1,
+            f"{object_id}: query folds use different probe rosters",
+        )
         calibrations = {fold["calibration_take_id"] for fold in object_folds}
-        require(len(calibrations) == 1, f"{object_id}: query folds use different calibration take")
+        require(
+            len(calibrations) == 1,
+            f"{object_id}: query folds use different calibration take",
+        )
 
     verification = {
         "schema": VERIFY_SCHEMA,
