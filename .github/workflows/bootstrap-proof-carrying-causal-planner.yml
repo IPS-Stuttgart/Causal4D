@@ -63,6 +63,7 @@ jobs:
             tests/test_proof_carrying_causal_planner.py
             scripts/experiments/proof_carrying_causal_planner_study.py
           )
+          python -m ruff format "${files[@]}"
           python -m ruff check "${files[@]}"
           python -m ruff format --check "${files[@]}"
           python -m mypy --no-site-packages src/causal4d/proof_carrying_causal_planner.py
