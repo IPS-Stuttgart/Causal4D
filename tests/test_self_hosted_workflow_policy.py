@@ -29,6 +29,9 @@ REVIEWED_FILE_MAIN_TRIGGERS = {
     "public-realworld-probe-gpuserver4090.yml": (
         "ops/public-realworld-probe-gpuserver4090-request.json"
     ),
+    "pokeflex-probe-challenge-fold-audit-gpuserver4090.yml": (
+        ".github/requests/pokeflex-probe-challenge-fold-audit-gpuserver4090-v1.json"
+    ),
 }
 
 
