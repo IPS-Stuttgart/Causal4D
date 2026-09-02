@@ -285,6 +285,21 @@
       "workflow": "deform360-reset-mechanics.yml"
     },
     {
+      "authorization_model": "reviewed-file-main",
+      "dataset_access": "approved-source-only-deform360-multimodal-carrier-audit",
+      "job": "audit",
+      "purpose": "Source-only Deform360 sensor-reveal carrier and grouped routing audit",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi",
+        "gpuserver4090"
+      ],
+      "secrets_allowed": false,
+      "workflow": "deform360-sensor-reveal-source-audit-gpuserver4090.yml"
+    },
+    {
       "authorization_model": "main-only",
       "dataset_access": "none",
       "job": "gpu",

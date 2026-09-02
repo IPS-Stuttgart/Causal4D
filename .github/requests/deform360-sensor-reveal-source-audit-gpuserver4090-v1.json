@@ -1,0 +1,54 @@
+{
+  "config_path": "configs/causal4d_public/deform360_sensor_reveal_source_audit_v1.json",
+  "config_sha256": "1a21a62fbc69ab726e2a06537547844586b1ccd629dad03931c001073f0a072f",
+  "dataset": {
+    "aligned_root_discovery": "scripts/remote/find_deform360_replication_root.py",
+    "forbidden_episode_ids": [
+      1,
+      3,
+      4,
+      8
+    ],
+    "object_id": "002-rope-silk",
+    "point_cloud_root": "/mnt/seagate10tb/florianpfaff/datasets/deform360/processed-repository/processed",
+    "repository": "brownu/deform360",
+    "revision": "7fea8e20231a47641d1d2bc8791920ec4e62ec5e",
+    "source_episode_ids": [
+      0,
+      2,
+      5,
+      6,
+      7,
+      9
+    ]
+  },
+  "evaluation": {
+    "finite_sensor_outcomes": "source-tercile prefix codebooks",
+    "future_horizon_frames": 6,
+    "grouping_unit": "complete episode",
+    "prefix_window_frames": 6,
+    "repeat_count": 2,
+    "reset_count": 5,
+    "target_carrier": "future mean end-effector translation path"
+  },
+  "information_boundary": {
+    "dataset_modified": false,
+    "forbidden_episode_payloads_read": false,
+    "held_target_payloads_read": false,
+    "new_physical_data_collected": false,
+    "paper_claim_authorized": false,
+    "point_cloud_member_payloads_read": false,
+    "raw_camera_video_decoded": false,
+    "source_episode_payloads_allowed": true,
+    "source_only": true
+  },
+  "module_path": "src/causal4d_public/deform360_sensor_reveal_source.py",
+  "next_stage_if_ready": "fit-and-seal-leave-one-episode-out-sequential-sensor-policies",
+  "protocol_id": "causal4d-deform360-002-rope-silk-sensor-reveal-source-audit-v1",
+  "request_id": "deform360-sensor-reveal-source-audit-gpuserver4090-v1",
+  "request_sha256": "a0658eff495aa397b02cc95205132e47167142d93289d7dd61f1061d7a400fcb",
+  "runner_label": "gpuserver4090",
+  "schema": "causal4d/deform360-sensor-reveal-source-audit-request",
+  "schema_version": 1,
+  "technical_revision": 1
+}
