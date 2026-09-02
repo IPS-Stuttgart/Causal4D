@@ -82,3 +82,11 @@ persistent physical information abducted from one real interaction transfers
 across an intervention change.  Even then, repeated logged executions are not
 literal individual-level counterfactual ground truth unless identical exogenous
 conditions are independently established.
+
+## Execution status
+
+The first contract run found only formatter drift; Ruff lint itself passed.  A
+one-shot formatter then applied the repository's exact Ruff version to the three
+new Python files and removed itself.  This documentation-only commit retriggers
+the unchanged frozen contract and the metadata-only prerequisite inventory; it
+does not change a scientific threshold, pairing rule, or information boundary.
