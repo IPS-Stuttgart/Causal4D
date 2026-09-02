@@ -1,0 +1,18 @@
+{
+  "dataset_modified": false,
+  "dataset_root": "/home/github-runner/.cache/datasets/tracking-cloth-deformation-v1-zenodo-14644526",
+  "head_sha": "1802cd544a04fb1eaaf4342cb68d516e4e4ef100",
+  "module_sha256": "c39a65845674e9be84790ff54219cce270123c565f3c7019b8db6ef035919683",
+  "numpy": "2.2.6",
+  "paper_claim_authorized": false,
+  "platform": "Linux-6.8.0-136-generic-x86_64-with-glibc2.35",
+  "python": "3.10.12 (main, Jun 22 2026, 18:55:27) [GCC 11.4.0]",
+  "request_sha256": "0e5ce7951cacdd140ecbbe0c93a837efc6123950de9617ae9ba9c138e3b68a99",
+  "result_sha256": "76b71e4ce28f302327c251ca919dd5ef9013f9394c742656de9c80b3ca9a49bf",
+  "run_id": "33588742638",
+  "runner_arch": "X64",
+  "runner_name": "workstation1",
+  "runner_os": "Linux",
+  "schema_version": 2,
+  "target_contents_opened": false
+}
