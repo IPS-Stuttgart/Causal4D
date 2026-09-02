@@ -170,6 +170,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python -m ruff check --fix \
+            src/causal4d_public/deform360_sensor_reveal_source.py \
+            tests/test_deform360_sensor_reveal_source.py \
+            tests/test_self_hosted_workflow_policy.py
           python -m ruff format \
             src/causal4d_public/deform360_sensor_reveal_source.py \
             tests/test_deform360_sensor_reveal_source.py \
