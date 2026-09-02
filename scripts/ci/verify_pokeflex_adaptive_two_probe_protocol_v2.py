@@ -115,12 +115,17 @@ def verify_protocol(payload: dict[str, Any]) -> dict[str, Any]:
     require(dataset["expected_object_count"] == 18, "object count changed")
     require(
         dataset["metadata_audit_id"]
-        == "73d63e1d1980c723346b55288ef75a3535bde814d5d2603bcc6d4c0a21cb68fc",
+        == "a3e0f70e7d0d222cc6f78b8db8be381c60133f28c87bbf722b6ce5f795dff8e3",
         "metadata audit identity changed",
     )
     require(
         dataset["metadata_audit_workflow_run"] == 33591607990,
         "metadata audit run changed",
+    )
+    require(
+        dataset["metadata_identity_sha256"]
+        == "940bfeb33a12403c9e2e3f5c604c03e7ff967023b8e2a808d19324f358582e2f",
+        "metadata roster identity changed",
     )
 
     split = payload["object_split"]
@@ -355,6 +360,7 @@ def verify_protocol(payload: dict[str, Any]) -> dict[str, Any]:
         "status": "verified-before-source-modeling-and-target-drop-access",
         "protocol_id": PROTOCOL_ID,
         "protocol_sha256": stored_digest,
+        "metadata_identity_sha256": dataset["metadata_identity_sha256"],
         "expected_primary_target_objects": registered["target"],
         "expected_calibration_objects": registered["calibration"],
         "expected_source_objects": registered["source"],

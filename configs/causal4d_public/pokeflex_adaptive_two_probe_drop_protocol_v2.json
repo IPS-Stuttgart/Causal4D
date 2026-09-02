@@ -32,10 +32,11 @@
     "expected_dropping_count": 54,
     "expected_object_count": 18,
     "expected_poking_count": 116,
-    "metadata_audit_id": "73d63e1d1980c723346b55288ef75a3535bde814d5d2603bcc6d4c0a21cb68fc",
+    "metadata_audit_id": "a3e0f70e7d0d222cc6f78b8db8be381c60133f28c87bbf722b6ce5f795dff8e3",
     "metadata_audit_request_id": "pokeflex-probe-challenge-fold-audit-gpuserver4090-v1",
     "metadata_audit_workflow_run": 33591607990,
-    "name": "PokeFlex"
+    "name": "PokeFlex",
+    "metadata_identity_sha256": "940bfeb33a12403c9e2e3f5c604c03e7ff967023b8e2a808d19324f358582e2f"
   },
   "evidence_class": {
     "adaptive_acquisition": "offline-selected reveal of at most two separately logged pokes",
@@ -154,7 +155,6 @@
     "task_dependence_endpoint": "fraction of target objects whose impact and settled queries induce different first probes or response-conditioned second-probe branches"
   },
   "protocol_id": "pokeflex-adaptive-two-probe-drop-protocol-v2",
-  "protocol_sha256": "698c2b5d8f41527f14868ca6f35268637990b8c23942fb224f998ba70f76f1ea",
   "registered_queries": [
     {
       "components": [
@@ -286,5 +286,6 @@
       "at least two target objects receive different acquisition trees for impact and settled queries",
       "dependence destruction removes at least half of the adaptive advantage over best-single-probe"
     ]
-  }
+  },
+  "protocol_sha256": "f33b190d0391f8782b990f50a521f69085ee3df947a92e6b4d7e3be80de8d9e3"
 }
