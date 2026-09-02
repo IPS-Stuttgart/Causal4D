@@ -1,0 +1,73 @@
+{
+  "candidate_groups": [
+    "upper",
+    "lower",
+    "central",
+    "lateral",
+    "fast"
+  ],
+  "constant_velocity_residual_prediction": "exact_zero",
+  "dataset_root": "/home/github-runner/.cache/datasets/tracking-cloth-deformation-v1-zenodo-14644526",
+  "expected_census": {
+    "by_material": {
+      "cotton": 30,
+      "denim": 30,
+      "polyester": 30,
+      "wool": 30
+    },
+    "classified_csv_count": 120
+  },
+  "generic_policy_target": "current_global_affine_residual_field",
+  "horizon_seconds": [
+    0.1,
+    0.25,
+    0.5
+  ],
+  "information_boundary": {
+    "dataset_modified": false,
+    "paper_claim_authorized": false,
+    "physical_command_sent": false,
+    "population_generalization_claim_authorized": false,
+    "rgb_or_depth_data_used": false,
+    "target_file_contents_opened_before_source_gate": false,
+    "target_models_refit_after_gate": false
+  },
+  "lag_seconds": 0.05,
+  "primary_scenarios": [
+    "shake",
+    "twist",
+    "table",
+    "self_collision"
+  ],
+  "primary_statistical_unit": "material_size_physical_specimen",
+  "request_id": "328737f73b038c81f0a9b7d4d1ed9a40e40d5cbad214e85812b69c6405f0277e",
+  "ridge": 0.001,
+  "schema": "causal4d.tracking-cloth-query-observation-request",
+  "schema_version": 2,
+  "source_fit_materials": [
+    "cotton"
+  ],
+  "source_gate": {
+    "maximum_worst_scenario_ratio": 1.15,
+    "minimum_distinct_selection_cells": 1,
+    "minimum_improvement_vs_constant_velocity": 0.02,
+    "minimum_improvement_vs_dependence_destroyed": 0.02,
+    "minimum_improvement_vs_global_state": 0.02,
+    "minimum_recording_win_fraction": 0.55
+  },
+  "source_gate_materials": [
+    "denim"
+  ],
+  "source_gate_statistical_unit": "complete_recording_after_averaging_horizons",
+  "stage": "source-gated-evaluation-v2",
+  "stride_seconds": 0.1,
+  "target_materials": [
+    "wool",
+    "polyester"
+  ],
+  "target_model_training_materials": [
+    "cotton"
+  ],
+  "target_nesting": "horizons_within_recordings_within_material_size_specimens",
+  "target_specimen_count_if_opened": 4
+}

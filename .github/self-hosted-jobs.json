@@ -375,6 +375,21 @@
       "authorization_model": "main-only",
       "dataset_access": "verified-public-tracking-cloth-source-gate-and-conditional-target",
       "job": "evaluate",
+      "purpose": "V2 query-conditioned sparse-marker evaluation on real cloth recordings",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi",
+        "gpuserver4090"
+      ],
+      "secrets_allowed": false,
+      "workflow": "tracking-cloth-query-observation-v2.yml"
+    },
+    {
+      "authorization_model": "main-only",
+      "dataset_access": "verified-public-tracking-cloth-source-gate-and-conditional-target",
+      "job": "evaluate",
       "purpose": "Source-gated task-conditioned sparse-marker evaluation on real cloth recordings",
       "runner_labels": [
         "self-hosted",

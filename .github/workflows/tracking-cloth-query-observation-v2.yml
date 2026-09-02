@@ -1,0 +1,357 @@
+name: Tracking Cloth task-conditioned observation V2
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/tracking-cloth-query-observation-v2.yml"
+      - ".github/workflows/tracking-cloth-query-observation-v2-file-dispatch.yml"
+      - "configs/causal4d_public/tracking_cloth_query_observation_v2.json"
+      - "ops/tracking-cloth-query-observation-v2-gpuserver4090-request.json"
+      - "src/causal4d_public/tracking_cloth_query_observation_v2.py"
+      - "tests/test_tracking_cloth_query_observation_v2.py"
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: Exact reviewed Tracking Cloth V2 request identity
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tracking-cloth-query-observation-v2-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DATASET_ROOT: /home/github-runner/.cache/datasets/tracking-cloth-deformation-v1-zenodo-14644526
+  REQUEST: configs/causal4d_public/tracking_cloth_query_observation_v2.json
+  MODULE_PATH: src/causal4d_public/tracking_cloth_query_observation_v2.py
+  EVIDENCE_DIR: tracking-cloth-query-observation-v2
+  NUMPY_VERSION: 2.2.6
+
+jobs:
+  contract:
+    name: Validate the Tracking Cloth V2 protocol and implementation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Validate focused source, tests, and frozen request
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -e ".[dev]"
+          python -m pip check
+          files=(
+            src/causal4d_public/tracking_cloth_query_observation_v2.py
+            tests/test_tracking_cloth_query_observation_v2.py
+          )
+          python -m ruff check "${files[@]}"
+          python -m ruff format --check "${files[@]}"
+          python -m mypy --no-site-packages \
+            src/causal4d_public/tracking_cloth_query_observation_v2.py
+          python -m pytest -q tests/test_tracking_cloth_query_observation_v2.py
+          python - <<'PY'
+          import hashlib
+          import importlib.util
+          from pathlib import Path
+          import sys
+
+          module_path = Path(
+              "src/causal4d_public/tracking_cloth_query_observation_v2.py"
+          ).resolve()
+          module_name = "tracking_cloth_query_observation_v2_contract"
+          spec = importlib.util.spec_from_file_location(module_name, module_path)
+          if spec is None or spec.loader is None:
+              raise SystemExit("failed to create standalone module specification")
+          module = importlib.util.module_from_spec(spec)
+          sys.modules[module_name] = module
+          spec.loader.exec_module(module)
+          if module.PILOT_KIND != "TrackingClothTaskConditionedObservationV2":
+              raise SystemExit("pilot module identity changed")
+
+          request_path = Path(
+              "configs/causal4d_public/tracking_cloth_query_observation_v2.json"
+          )
+          request = module.load_request(request_path)
+          assert request["source_fit_materials"] == ["cotton"]
+          assert request["source_gate_materials"] == ["denim"]
+          assert request["target_materials"] == ["wool", "polyester"]
+          assert request["target_model_training_materials"] == ["cotton"]
+          assert request["primary_statistical_unit"] == "material_size_physical_specimen"
+          assert request["source_gate_statistical_unit"] == (
+              "complete_recording_after_averaging_horizons"
+          )
+          assert request["target_nesting"] == (
+              "horizons_within_recordings_within_material_size_specimens"
+          )
+          assert request["target_specimen_count_if_opened"] == 4
+          assert request["constant_velocity_residual_prediction"] == "exact_zero"
+          assert request["expected_census"]["classified_csv_count"] == 120
+          assert request["information_boundary"]["paper_claim_authorized"] is False
+          assert (
+              request["information_boundary"][
+                  "population_generalization_claim_authorized"
+              ]
+              is False
+          )
+          assert request["information_boundary"]["target_models_refit_after_gate"] is False
+          assert hashlib.sha256(module_path.read_bytes()).hexdigest()
+          PY
+
+  evaluate:
+    name: Run source-gated real-cloth V2 evaluation on gpuserver4090
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main'
+    needs: contract
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]
+    timeout-minutes: 180
+    env:
+      DISPATCH_REQUEST_ID: ${{ inputs.request_id }}
+    steps:
+      - name: Check out exact reviewed main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Verify exact revision, immutable request bytes, and mounted dataset
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+          test -d "${DATASET_ROOT}"
+          test -f "${REQUEST}"
+          test -f "${MODULE_PATH}"
+          /usr/bin/python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          request_path = Path(os.environ["REQUEST"])
+          request = json.loads(request_path.read_text(encoding="utf-8"))
+          supplied = request.get("request_id")
+          unhashed = dict(request)
+          unhashed.pop("request_id", None)
+          canonical = json.dumps(
+              unhashed,
+              sort_keys=True,
+              separators=(",", ":"),
+              ensure_ascii=False,
+              allow_nan=False,
+          ).encode("utf-8")
+          calculated = hashlib.sha256(canonical).hexdigest()
+          if supplied != calculated:
+              raise SystemExit("frozen V2 protocol request_id is invalid")
+          if os.environ["DISPATCH_REQUEST_ID"] != supplied:
+              raise SystemExit("dispatch request identity differs from frozen V2 protocol")
+          if request.get("schema_version") != 2:
+              raise SystemExit("unexpected V2 request schema")
+          if request.get("primary_statistical_unit") != (
+              "material_size_physical_specimen"
+          ):
+              raise SystemExit("unexpected primary target unit")
+          if request.get("source_gate_statistical_unit") != (
+              "complete_recording_after_averaging_horizons"
+          ):
+              raise SystemExit("unexpected source-gate unit")
+          if request.get("target_specimen_count_if_opened") != 4:
+              raise SystemExit("unexpected target specimen count")
+          if request.get("dataset_root") != os.environ["DATASET_ROOT"]:
+              raise SystemExit("mounted root differs from frozen V2 protocol")
+          root = Path(os.environ["DATASET_ROOT"]).resolve()
+          csv_count = sum(1 for _ in root.rglob("*.csv"))
+          print(json.dumps({
+              "request_id": supplied,
+              "dataset_root": str(root),
+              "csv_name_count_before_payload_access": csv_count,
+              "target_file_contents_opened": False,
+              "dataset_modified": False,
+          }, indent=2, sort_keys=True))
+          PY
+
+      - name: Bootstrap isolated NumPy runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          selected=""
+          for candidate in python3.13 python3.12 python3.11 python3.10 /usr/bin/python3 python3; do
+            command -v "${candidate}" >/dev/null 2>&1 || continue
+            if "${candidate}" - <<'PY'
+          import sys
+          raise SystemExit(0 if sys.version_info >= (3, 10) else 1)
+          PY
+            then
+              if "${candidate}" -m pip --version >/dev/null 2>&1; then
+                selected="$(command -v "${candidate}")"
+                break
+              fi
+            fi
+          done
+          test -n "${selected}"
+          runtime="$PWD/.tracking-cloth-query-v2-runtime"
+          rm -rf "${runtime}"
+          mkdir -p "${runtime}"
+          "${selected}" -m pip install \
+            --disable-pip-version-check \
+            --no-input \
+            --only-binary=:all: \
+            --target "${runtime}" \
+            "numpy==${NUMPY_VERSION}"
+          PYTHONPATH="${runtime}" "${selected}" - <<'PY'
+          import numpy
+          import os
+          import sys
+
+          if numpy.__version__ != os.environ["NUMPY_VERSION"]:
+              raise SystemExit("unexpected isolated NumPy version")
+          print(sys.version)
+          print("numpy", numpy.__version__)
+          PY
+          echo "EVAL_PYTHON=${selected}" >> "${GITHUB_ENV}"
+          echo "EVAL_PYTHONPATH=${runtime}" >> "${GITHUB_ENV}"
+
+      - name: Validate V2 module contract inside isolated runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="${EVAL_PYTHONPATH}" "${EVAL_PYTHON}" - <<'PY'
+          import importlib.util
+          import os
+          from pathlib import Path
+          import sys
+
+          module_path = Path(os.environ["MODULE_PATH"]).resolve()
+          module_name = "tracking_cloth_query_observation_v2_preflight"
+          spec = importlib.util.spec_from_file_location(module_name, module_path)
+          if spec is None or spec.loader is None:
+              raise SystemExit("failed to create V2 module specification")
+          module = importlib.util.module_from_spec(spec)
+          sys.modules[module_name] = module
+          spec.loader.exec_module(module)
+          request = module.load_request(Path(os.environ["REQUEST"]))
+          if request["request_id"] != os.environ["DISPATCH_REQUEST_ID"]:
+              raise SystemExit("isolated-runtime request identity mismatch")
+          if Path(os.environ["DATASET_ROOT"]).resolve() != module.EXPECTED_ROOT.resolve():
+              raise SystemExit("isolated-runtime dataset root mismatch")
+          PY
+
+      - name: Execute source gate and conditionally score untouched materials
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${EVIDENCE_DIR}"
+          mkdir -p "${EVIDENCE_DIR}"
+          PYTHONPATH="${EVAL_PYTHONPATH}" "${EVAL_PYTHON}" \
+            "${MODULE_PATH}" \
+            --request "${REQUEST}" \
+            --output-dir "${EVIDENCE_DIR}" \
+            2>&1 | tee "${EVIDENCE_DIR}/run.log"
+
+      - name: Validate evidence and bind runtime provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="${EVAL_PYTHONPATH}" "${EVAL_PYTHON}" - <<'PY'
+          import hashlib
+          import importlib.util
+          import json
+          import os
+          import platform
+          from pathlib import Path
+          import sys
+
+          import numpy
+
+          evidence = Path(os.environ["EVIDENCE_DIR"])
+          module_path = Path(os.environ["MODULE_PATH"]).resolve()
+          module_name = "tracking_cloth_query_observation_v2_result_check"
+          spec = importlib.util.spec_from_file_location(module_name, module_path)
+          if spec is None or spec.loader is None:
+              raise SystemExit("failed to create standalone V2 module specification")
+          module = importlib.util.module_from_spec(spec)
+          sys.modules[module_name] = module
+          spec.loader.exec_module(module)
+          result_path = evidence / "result.json"
+          result = json.loads(result_path.read_text(encoding="utf-8"))
+          module.validate_result(result)
+          if result["target_contents_opened"] != result["source_gate"]["passed"]:
+              raise SystemExit("target access/source-gate invariant failed")
+          runtime = {
+              "schema_version": 2,
+              "head_sha": os.environ["GITHUB_SHA"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "runner_name": os.environ.get("RUNNER_NAME"),
+              "runner_os": os.environ.get("RUNNER_OS"),
+              "runner_arch": os.environ.get("RUNNER_ARCH"),
+              "python": sys.version,
+              "platform": platform.platform(),
+              "numpy": numpy.__version__,
+              "dataset_root": os.environ["DATASET_ROOT"],
+              "module_sha256": hashlib.sha256(module_path.read_bytes()).hexdigest(),
+              "request_sha256": hashlib.sha256(
+                  Path(os.environ["REQUEST"]).read_bytes()
+              ).hexdigest(),
+              "result_sha256": hashlib.sha256(result_path.read_bytes()).hexdigest(),
+              "target_contents_opened": result["target_contents_opened"],
+              "dataset_modified": False,
+              "paper_claim_authorized": False,
+          }
+          (evidence / "runtime.json").write_text(
+              json.dumps(runtime, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps({
+              "decision": result["decision"],
+              "result_id": result["result_id"],
+              "target_contents_opened": result["target_contents_opened"],
+          }, indent=2, sort_keys=True))
+          PY
+          (
+            cd "${EVIDENCE_DIR}"
+            sha256sum result.json summary.md runtime.json run.log > SHA256SUMS
+          )
+
+      - name: Record runner and storage context
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "runner=${RUNNER_NAME:-unknown}"
+            echo "sha=${GITHUB_SHA}"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "dataset_root=${DATASET_ROOT}"
+            uname -a
+            df -h "${DATASET_ROOT}"
+            command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi || true
+          } > "${EVIDENCE_DIR}/runner.txt"
+          (
+            cd "${EVIDENCE_DIR}"
+            sha256sum runner.txt >> SHA256SUMS
+          )
+
+      - name: Upload content-bound V2 result bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tracking-cloth-query-observation-v2-${{ github.sha }}
+          path: tracking-cloth-query-observation-v2
+          if-no-files-found: error
+          retention-days: 30
