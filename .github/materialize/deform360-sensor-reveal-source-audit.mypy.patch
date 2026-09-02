@@ -5,13 +5,13 @@
  from collections.abc import Mapping, Sequence
  from pathlib import Path
 -from typing import Any
-+from typing import Any, cast
++from typing import Any, TypeAlias, cast
  
  import numpy as np
 +import numpy.typing as npt
 +
-+Array = npt.NDArray[Any]
-+FloatArray = npt.NDArray[np.float64]
++Array: TypeAlias = npt.NDArray[Any]
++FloatArray: TypeAlias = npt.NDArray[np.float64]
  
  AUDIT_SCHEMA_VERSION = 1
  AUDIT_KIND = "Deform360SensorRevealSourceAudit"
@@ -26,7 +26,62 @@
      _require(payload.get("schema_version") == AUDIT_SCHEMA_VERSION, "config schema changed")
      _require(payload.get("artifact_kind") == CONFIG_KIND, "config kind changed")
      _require(
-@@ -268,11 +274,11 @@
+@@ -82,26 +88,32 @@
+         == _payload_sha256(payload, digest_field="config_sha256"),
+         "config checksum mismatch",
+     )
+-    source_ids = payload.get("source_episode_ids")
+-    forbidden_ids = payload.get("forbidden_episode_ids")
++    source_value = payload.get("source_episode_ids")
++    if not isinstance(source_value, list):
++        raise ValueError("source_episode_ids must be a list")
++    source_ids = cast(list[object], source_value)
+     _require(
+-        isinstance(source_ids, list)
+-        and len(source_ids) >= 3
++        len(source_ids) >= 3
+         and all(type(value) is int and value >= 0 for value in source_ids)
+         and len(set(source_ids)) == len(source_ids),
+         "source_episode_ids must contain at least three unique nonnegative integers",
+     )
++    forbidden_value = payload.get("forbidden_episode_ids")
++    if not isinstance(forbidden_value, list):
++        raise ValueError("forbidden_episode_ids must be a list")
++    forbidden_ids = cast(list[object], forbidden_value)
+     _require(
+-        isinstance(forbidden_ids, list)
+-        and all(type(value) is int and value >= 0 for value in forbidden_ids)
++        all(type(value) is int and value >= 0 for value in forbidden_ids)
+         and len(set(forbidden_ids)) == len(forbidden_ids),
+         "forbidden_episode_ids must be unique nonnegative integers",
+     )
+     _require(not set(source_ids) & set(forbidden_ids), "source and forbidden episodes overlap")
+-    boundary = payload.get("information_boundary")
++    boundary_value = payload.get("information_boundary")
++    if not isinstance(boundary_value, Mapping):
++        raise ValueError("information_boundary must be a mapping")
++    boundary = cast(Mapping[str, Any], boundary_value)
+     _require(
+-        isinstance(boundary, Mapping)
+-        and boundary.get("source_only") is True
++        boundary.get("source_only") is True
+         and boundary.get("forbidden_episode_payloads_read") is False
+         and boundary.get("held_target_payloads_read") is False
+         and boundary.get("dataset_modified") is False
+@@ -116,8 +128,10 @@
+         "minimum_common_tactile_groups",
+     ):
+         _require(type(payload.get(key)) is int and payload[key] >= 1, f"{key} is invalid")
+-    costs = payload.get("sensor_costs")
+-    _require(isinstance(costs, Mapping), "sensor_costs are missing")
++    costs_value = payload.get("sensor_costs")
++    if not isinstance(costs_value, Mapping):
++        raise ValueError("sensor_costs are missing")
++    costs = cast(Mapping[str, Any], costs_value)
+     for key in ("robot_opening", "robot_translation", "tactile"):
+         value = costs.get(key)
+         _require(
+@@ -268,11 +282,11 @@
      }
  
  
@@ -40,7 +95,7 @@
      candidates = (episode / "robot" / "robot.npz", episode / "robot.npz")
      paths = [path for path in candidates if path.is_file()]
      if not paths:
-@@ -283,7 +289,7 @@
+@@ -283,7 +297,7 @@
              "reason": f"expected one robot.npz, found {len(paths)}",
          }, {}
      path = paths[0]
@@ -49,7 +104,7 @@
      with np.load(path, allow_pickle=False) as payload:
          keys = sorted(payload.files)
          for key in keys:
-@@ -323,20 +329,20 @@
+@@ -323,20 +337,20 @@
      return summary, arrays
  
  
@@ -74,7 +129,7 @@
      paths: list[tuple[Path, Path]] = []
      seen_paths: set[Path] = set()
      for episode, root in episode_roots:
-@@ -345,8 +351,8 @@
+@@ -345,8 +359,8 @@
              if resolved not in seen_paths:
                  paths.append((path, root))
                  seen_paths.add(resolved)
@@ -85,7 +140,7 @@
      for path, root in paths:
          episode = next(
              candidate_episode
-@@ -388,18 +394,18 @@
+@@ -388,18 +402,18 @@
      }, energies
  
  
@@ -108,7 +163,7 @@
          step = np.zeros(translations.shape[0], dtype=np.float64)
          if translations.shape[0] > 1:
              step[1:] = np.mean(np.linalg.norm(np.diff(translations, axis=0), axis=-1), axis=1)
-@@ -425,12 +431,12 @@
+@@ -425,12 +439,12 @@
      return rounded
  
  
@@ -123,14 +178,13 @@
      start = max(end - width + 1, 0)
      window = series[start : end + 1]
      return float(np.max(window) - np.min(window))
-@@ -439,12 +445,14 @@
+@@ -439,12 +453,13 @@
  def _quantile_codebook(values: Sequence[float]) -> tuple[float, float]:
      array = np.asarray(values, dtype=np.float64)
      _require(array.ndim == 1 and array.size >= 3, "codebook needs at least three values")
 -    lower, upper = np.quantile(array, (1.0 / 3.0, 2.0 / 3.0))
-+    quantiles = np.quantile(array, (1.0 / 3.0, 2.0 / 3.0))
-+    lower = float(quantiles[0])
-+    upper = float(quantiles[1])
++    lower = float(np.quantile(array, 1.0 / 3.0))
++    upper = float(np.quantile(array, 2.0 / 3.0))
      if upper <= lower:
          spread = max(float(np.ptp(array)), 1.0) * 1e-12
          lower -= spread
@@ -140,7 +194,7 @@
  
  
  def _bin(value: float, thresholds: tuple[float, float]) -> int:
-@@ -516,7 +524,7 @@
+@@ -516,7 +531,7 @@
      predictions: list[int] = []
      targets: list[int] = []
      baseline_predictions: list[int] = []
@@ -149,7 +203,7 @@
      for held_episode in episode_ids:
          training = [row for row in rows if int(row["episode_id"]) != held_episode]
          held = [row for row in rows if int(row["episode_id"]) == held_episode]
-@@ -601,7 +609,7 @@
+@@ -601,7 +616,7 @@
          ]
          for sensor in sensor_names
      }
@@ -158,7 +212,7 @@
      for sensor in sensor_names:
          accuracy = _lookup_accuracy([(value,) for value in outcomes[sensor]], labels)
          grouped = _leave_one_episode_out_accuracy(rows, (sensor,))
-@@ -617,7 +625,7 @@
+@@ -617,7 +632,7 @@
                  ).tolist(),
              }
          )
@@ -167,7 +221,7 @@
      for left_index, left in enumerate(sensor_names):
          for right in sensor_names[left_index + 1 :]:
              keys = list(zip(outcomes[left], outcomes[right], strict=True))
-@@ -688,8 +696,8 @@
+@@ -688,8 +703,8 @@
      source_ids = tuple(config["source_episode_ids"])
      forbidden_ids = tuple(config["forbidden_episode_ids"])
      object_id = str(config["object_id"])
@@ -178,7 +232,7 @@
      common_tactile: set[str] | None = None
  
      roots_for_tactile = tuple(
-@@ -753,7 +761,7 @@
+@@ -753,7 +768,7 @@
          for name in sensor_names
      }
      rows: list[dict[str, Any]] = []
@@ -187,7 +241,7 @@
      for record in episode_records:
          episode_id = int(record["episode_id"])
          series = feature_state[episode_id]
-@@ -895,8 +903,10 @@
+@@ -895,8 +910,10 @@
          == _payload_sha256(payload, digest_field="result_sha256"),
          "result checksum mismatch",
      )
@@ -200,7 +254,7 @@
      _require(
          boundary.get("source_only") is True
          and boundary.get("forbidden_episode_payloads_read") is False
-@@ -906,20 +916,26 @@
+@@ -906,20 +923,26 @@
          and boundary.get("paper_claim_authorized") is False,
          "result crossed a source or claim boundary",
      )
@@ -235,7 +289,7 @@
          "result episode roster changed",
      )
  
-@@ -936,18 +952,24 @@
+@@ -936,18 +959,24 @@
      if args.verify is not None:
          validate_source_audit(json.loads(args.verify.read_text(encoding="utf-8")))
          return 0
