@@ -1,0 +1,47 @@
+name: Repair PokeFlex audit interaction identities
+
+on:
+  push:
+    branches:
+      - science/pokeflex-probe-challenge-fold-audit-v1
+    paths:
+      - ".github/requests/repair-pokeflex-audit-interaction-ids-v1.json"
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Apply action-qualified identity repair
+        run: |
+          python3 scripts/maintenance/repair_pokeflex_audit_interaction_ids_v1.py
+          python3 -m py_compile \
+            scripts/remote/audit_pokeflex_probe_challenge_folds_gpuserver4090.py \
+            scripts/ci/verify_pokeflex_probe_challenge_fold_audit.py
+          grep -Fq 'take_id=f"{action_class}:{raw_take_id}"' \
+            scripts/remote/audit_pokeflex_probe_challenge_folds_gpuserver4090.py
+          grep -Fq 'technical_revision": 3' \
+            .github/requests/pokeflex-probe-challenge-fold-audit-gpuserver4090-v1.json
+
+      - name: Commit repair and retrigger audit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            scripts/remote/audit_pokeflex_probe_challenge_folds_gpuserver4090.py \
+            scripts/ci/verify_pokeflex_probe_challenge_fold_audit.py \
+            tests/test_pokeflex_probe_challenge_fold_audit.py \
+            docs/pokeflex_probe_challenge_fold_audit_v1.md \
+            .github/requests/pokeflex-probe-challenge-fold-audit-gpuserver4090-v1.json
+          git diff --cached --check
+          git commit -m 'Qualify PokeFlex interaction identities by action class'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
