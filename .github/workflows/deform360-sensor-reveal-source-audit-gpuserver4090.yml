@@ -1,0 +1,241 @@
+name: Deform360 sensor-reveal source audit
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/deform360-sensor-reveal-source-audit-gpuserver4090.yml"
+      - ".github/requests/deform360-sensor-reveal-source-audit-gpuserver4090-v1.json"
+      - "configs/causal4d_public/deform360_sensor_reveal_source_audit_v1.json"
+      - "src/causal4d_public/deform360_sensor_reveal_source.py"
+      - "tests/test_deform360_sensor_reveal_source.py"
+      - "docs/deform360_sensor_reveal_source_audit.md"
+      - "tests/test_self_hosted_workflow_policy.py"
+      - ".github/self-hosted-jobs.json"
+  push:
+    branches: [main]
+    paths:
+      - ".github/requests/deform360-sensor-reveal-source-audit-gpuserver4090-v1.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deform360-sensor-reveal-source-audit-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REQUEST: .github/requests/deform360-sensor-reveal-source-audit-gpuserver4090-v1.json
+  CONFIG: configs/causal4d_public/deform360_sensor_reveal_source_audit_v1.json
+  MODULE: src/causal4d_public/deform360_sensor_reveal_source.py
+  POINT_CLOUD_ROOT: /mnt/seagate10tb/florianpfaff/datasets/deform360/processed-repository/processed
+  EVIDENCE_DIR: build/deform360-sensor-reveal-source-audit
+
+jobs:
+  contract:
+    name: Validate frozen source-audit contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install focused dependencies
+        run: |
+          python -m pip install --disable-pip-version-check \
+            numpy==2.2.6 \
+            scipy==1.17.1 \
+            mypy==1.18.2 \
+            pytest==8.4.2 \
+            ruff==0.16.5
+
+      - name: Verify request, config, implementation, and tests
+        env:
+          PYTHONPATH: src
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          request_path = Path(
+              ".github/requests/"
+              "deform360-sensor-reveal-source-audit-gpuserver4090-v1.json"
+          )
+          request = json.loads(request_path.read_text(encoding="utf-8"))
+          stored = request.pop("request_sha256")
+          encoded = json.dumps(
+              request,
+              sort_keys=True,
+              separators=(",", ":"),
+              allow_nan=False,
+          ).encode("utf-8")
+          assert hashlib.sha256(encoded).hexdigest() == stored
+          assert request["schema"] == (
+              "causal4d/deform360-sensor-reveal-source-audit-request"
+          )
+          assert request["schema_version"] == 1
+          assert request["runner_label"] == "gpuserver4090"
+          assert request["dataset"]["object_id"] == "002-rope-silk"
+          assert request["dataset"]["source_episode_ids"] == [0, 2, 5, 6, 7, 9]
+          assert request["dataset"]["forbidden_episode_ids"] == [1, 3, 4, 8]
+          assert request["information_boundary"]["paper_claim_authorized"] is False
+
+          config = json.loads(Path(request["config_path"]).read_text(encoding="utf-8"))
+          assert config["config_sha256"] == request["config_sha256"]
+          assert config["protocol_id"] == request["protocol_id"]
+          assert config["source_episode_ids"] == request["dataset"]["source_episode_ids"]
+          assert config["forbidden_episode_ids"] == request["dataset"]["forbidden_episode_ids"]
+          PY
+          python -m ruff check \
+            "$MODULE" \
+            tests/test_deform360_sensor_reveal_source.py
+          python -m ruff format --check \
+            "$MODULE" \
+            tests/test_deform360_sensor_reveal_source.py
+          python -m mypy --strict "$MODULE"
+          python -m pytest -q tests/test_deform360_sensor_reveal_source.py
+
+  audit:
+    name: Audit source carriers on gpuserver4090
+    if: >-
+      github.event_name != 'pull_request' &&
+      github.ref == 'refs/heads/main'
+    needs: contract
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact reviewed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Verify exact clean revision and frozen request
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          request = json.loads(Path(
+              ".github/requests/"
+              "deform360-sensor-reveal-source-audit-gpuserver4090-v1.json"
+          ).read_text(encoding="utf-8"))
+          assert request["runner_label"] == "gpuserver4090"
+          assert request["information_boundary"]["source_only"] is True
+          assert request["information_boundary"]["forbidden_episode_payloads_read"] is False
+          assert request["information_boundary"]["held_target_payloads_read"] is False
+          PY
+
+      - name: Discover mounted source roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          replication_root="$(python3 scripts/remote/find_deform360_replication_root.py)"
+          aligned_root="${replication_root}/aligned"
+          test -d "$POINT_CLOUD_ROOT"
+          test -d "$aligned_root"
+          {
+            echo "REPLICATION_ROOT=$replication_root"
+            echo "ALIGNED_ROOT=$aligned_root"
+          } >> "$GITHUB_ENV"
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "workflow_run=${GITHUB_RUN_ID}"
+            echo "workflow_attempt=${GITHUB_RUN_ATTEMPT}"
+            echo "head_sha=${GITHUB_SHA}"
+            echo "point_cloud_root=${POINT_CLOUD_ROOT}"
+            echo "replication_root=${replication_root}"
+            echo "aligned_root=${aligned_root}"
+          } > runner.txt
+
+      - name: Prepare isolated runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv .runtime
+          .runtime/bin/python -m pip install --disable-pip-version-check numpy==2.2.6
+
+      - name: Run source-only audit twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          .runtime/bin/python "$MODULE" \
+            --point-cloud-root "$POINT_CLOUD_ROOT" \
+            --aligned-root "$ALIGNED_ROOT" \
+            --config "$CONFIG" \
+            --output "$EVIDENCE_DIR/result-a.json"
+          .runtime/bin/python "$MODULE" \
+            --point-cloud-root "$POINT_CLOUD_ROOT" \
+            --aligned-root "$ALIGNED_ROOT" \
+            --config "$CONFIG" \
+            --output "$EVIDENCE_DIR/result-b.json"
+          cmp "$EVIDENCE_DIR/result-a.json" "$EVIDENCE_DIR/result-b.json"
+          .runtime/bin/python "$MODULE" --verify "$EVIDENCE_DIR/result-a.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["EVIDENCE_DIR"]) / "result-a.json"
+          result = json.loads(path.read_text(encoding="utf-8"))
+          gates = result["capability_gates"]
+          routing = result.get("routing_diagnostic") or {}
+          lines = [
+              "# Deform360 sensor-reveal source audit",
+              "",
+              f"- Result: `{result['result_sha256']}`",
+              f"- Source episodes: `{len(result['dataset']['source_episode_ids'])}`",
+              f"- Reset cases: `{result['feature_case_count']}`",
+              f"- Common tactile groups: `{gates['common_tactile_group_count']}`",
+              f"- Ready for source-only policy fitting: `{gates['ready_for_source_only_sensor_reveal_pilot']}`",
+          ]
+          if routing.get("single_sensor_diagnostics"):
+              best = routing["single_sensor_diagnostics"][0]
+              lines.extend(
+                  [
+                      f"- Best grouped single sensor: `{best['sensor_name']}`",
+                      f"- Best grouped single-sensor accuracy: `{best['leave_one_episode_out']['accuracy']:.6f}`",
+                      f"- Grouped majority baseline: `{best['leave_one_episode_out']['training_majority_baseline_accuracy']:.6f}`",
+                  ]
+              )
+          summary = "\n".join(lines) + "\n"
+          (Path(os.environ["EVIDENCE_DIR"]) / "summary.md").write_text(
+              summary,
+              encoding="utf-8",
+          )
+          print(summary)
+          PY
+          cat "$EVIDENCE_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload source-only audit evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: deform360-sensor-reveal-source-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/deform360-sensor-reveal-source-audit/
+            runner.txt
+            .github/requests/deform360-sensor-reveal-source-audit-gpuserver4090-v1.json
+            configs/causal4d_public/deform360_sensor_reveal_source_audit_v1.json
+          if-no-files-found: error
+          retention-days: 90
