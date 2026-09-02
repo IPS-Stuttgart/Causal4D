@@ -120,9 +120,7 @@ def audit_decision_quotient_for_probes(
     members: list[list[int]] = []
     class_index: list[int | None] = [None] * loss_matrix.shape[0]
     for hypothesis in supported:
-        signature = tuple(
-            _canonical(value) for value in normalized[hypothesis]
-        )
+        signature = tuple(_canonical(value) for value in normalized[hypothesis])
         class_id = signatures.get(signature)
         if class_id is None:
             class_id = len(members)
