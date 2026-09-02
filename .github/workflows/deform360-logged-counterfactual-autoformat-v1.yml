@@ -1,0 +1,49 @@
+name: Apply logged-counterfactual Ruff formatting v1
+
+on:
+  push:
+    branches:
+      - science/deform360-logged-counterfactual-v1
+    paths:
+      - .github/workflows/deform360-logged-counterfactual-autoformat-v1.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: science/deform360-logged-counterfactual-v1
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Install pinned formatter
+        run: python -m pip install 'ruff==0.16.5'
+      - name: Format only the new counterfactual implementation
+        run: |
+          set -euo pipefail
+          python -m ruff format \
+            src/causal4d_public/deform360_logged_counterfactual.py \
+            scripts/experiments/deform360_logged_counterfactual_source_v1.py \
+            tests/test_deform360_logged_counterfactual.py
+          python -m ruff check \
+            src/causal4d_public/deform360_logged_counterfactual.py \
+            scripts/experiments/deform360_logged_counterfactual_source_v1.py \
+            tests/test_deform360_logged_counterfactual.py
+          rm .github/workflows/deform360-logged-counterfactual-autoformat-v1.yml
+      - name: Commit formatting and remove this one-shot workflow
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            src/causal4d_public/deform360_logged_counterfactual.py \
+            scripts/experiments/deform360_logged_counterfactual_source_v1.py \
+            tests/test_deform360_logged_counterfactual.py \
+            .github/workflows/deform360-logged-counterfactual-autoformat-v1.yml
+          git commit -m 'Format logged cross-intervention abduction study'
+          git push origin HEAD:science/deform360-logged-counterfactual-v1
