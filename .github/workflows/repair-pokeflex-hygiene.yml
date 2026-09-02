@@ -29,7 +29,7 @@ jobs:
       - name: Install policy test dependency
         run: python -m pip install --disable-pip-version-check pytest==8.4.2
 
-      - name: Apply deterministic hygiene repair
+      - name: Apply deterministic security and registry repair
         shell: bash
         run: |
           python3 - <<'PY'
@@ -42,6 +42,24 @@ jobs:
           )
           text = workflow.read_text(encoding="utf-8")
           text = text.replace(
+              """on:
+            push:
+              branches:
+                - main
+                - science/pokeflex-probe-challenge-fold-audit-v1
+              paths:
+                - \".github/requests/pokeflex-probe-challenge-fold-audit-gpuserver4090-v1.json\"
+            workflow_dispatch:
+          """.replace("          ", ""),
+              """on:
+            push:
+              branches: [main]
+              paths:
+                - \".github/requests/pokeflex-probe-challenge-fold-audit-gpuserver4090-v1.json\"
+            workflow_dispatch:
+          """.replace("          ", ""),
+          )
+          text = text.replace(
               "uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n",
               "uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n",
           )
@@ -49,7 +67,56 @@ jobs:
               "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a\n",
               "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0\n",
           )
+          text = text.replace(
+              """  audit:
+                name: Audit 170 ZIP central directories on gpuserver4090
+                needs: contract
+                runs-on: [self-hosted, Linux, X64, gpuserver4090]
+              """.replace("              ", ""),
+              """  audit:
+                name: Audit 170 ZIP central directories on gpuserver4090
+                if: github.ref == 'refs/heads/main'
+                needs: contract
+                runs-on: [self-hosted, Linux, X64, gpuserver4090]
+              """.replace("              ", ""),
+          )
+          text = text.replace(
+              """        with:
+                    persist-credentials: false
+              """.replace("              ", ""),
+              """        with:
+                    ref: ${{ github.sha }}
+                    persist-credentials: false
+                    clean: true
+              """.replace("              ", ""),
+          )
+          text = text.replace(
+              """      - name: Bind request and runner
+              """.replace("              ", ""),
+              """      - name: Verify exact reviewed revision
+                shell: bash
+                run: |
+                  set -euo pipefail
+                  test \"$(git rev-parse HEAD)\" = \"${GITHUB_SHA}\"
+                  test -z \"$(git status --porcelain=v1)\"
+
+              - name: Bind request and runner
+              """.replace("              ", ""),
+          )
           workflow.write_text(text, encoding="utf-8")
+
+          policy_path = Path("tests/test_self_hosted_workflow_policy.py")
+          policy = policy_path.read_text(encoding="utf-8")
+          marker = "REVIEWED_FILE_MAIN_TRIGGERS = {\n"
+          entry_text = (
+              '    "pokeflex-probe-challenge-fold-audit-gpuserver4090.yml": (\n'
+              '        ".github/requests/"\n'
+              '        "pokeflex-probe-challenge-fold-audit-gpuserver4090-v1.json"\n'
+              "    ),\n"
+          )
+          if entry_text not in policy:
+              policy = policy.replace(marker, marker + entry_text, 1)
+          policy_path.write_text(policy, encoding="utf-8")
 
           registry_path = Path(".github/self-hosted-jobs.json")
           registry = json.loads(registry_path.read_text(encoding="utf-8"))
@@ -93,9 +160,10 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
             .github/workflows/pokeflex-probe-challenge-fold-audit-gpuserver4090.yml \
-            .github/self-hosted-jobs.json
+            .github/self-hosted-jobs.json \
+            tests/test_self_hosted_workflow_policy.py
           if git diff --cached --quiet; then
             exit 0
           fi
-          git commit -m "Register and annotate PokeFlex self-hosted audit"
+          git commit -m "Secure and register PokeFlex self-hosted audit"
           git push origin "HEAD:${GITHUB_HEAD_REF}"
