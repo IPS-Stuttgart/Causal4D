@@ -29,7 +29,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install -e .
+          python -m pip install -e . 'ruff==0.16.5'
           python -m ruff check scripts/experiments/deform360_logged_counterfactual_score_matrix_v1.py
           python -m ruff format --check scripts/experiments/deform360_logged_counterfactual_score_matrix_v1.py
           mkdir -p build/deform360-logged-counterfactual-score-matrix-v1
