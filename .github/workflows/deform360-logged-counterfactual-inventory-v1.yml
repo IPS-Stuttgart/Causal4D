@@ -1,0 +1,132 @@
+name: Deform360 logged-counterfactual retained-artifact inventory v1
+
+on:
+  push:
+    branches:
+      - science/deform360-logged-counterfactual-v1
+    paths:
+      - .github/workflows/deform360-logged-counterfactual-inventory-v1.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver6000]
+    timeout-minutes: 20
+    env:
+      OUT: deform360-logged-counterfactual-inventory
+    steps:
+      - name: Check out exact research branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Inventory retained public Deform360 artifacts without opening raw media
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT"
+          OUT="$OUT" python3 - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          roots = [
+              Path('/mnt/lexar4tb/datasets/deform360'),
+              Path('/home/github-runner/.cache/workflows'),
+              Path('/home/github-runner/.cache/causal4d'),
+          ]
+          wanted = {
+              'source0_observation.json',
+              'source3_observation.json',
+              'source4_observation.json',
+              'source5_observation.json',
+              'source8_observation.json',
+              'source0_observation.npz',
+              'source3_observation.npz',
+              'source4_observation.npz',
+              'source5_observation.npz',
+              'source8_observation.npz',
+              'shared_forward_fit.json',
+              'held_out_predictions.json',
+              'target_prefix_geometry.json',
+              'target_future_geometry.json',
+              'held_out_evaluation.json',
+              'contact_model.json',
+          }
+
+          def sha256(path: Path) -> str:
+              digest = hashlib.sha256()
+              with path.open('rb') as stream:
+                  for block in iter(lambda: stream.read(1024 * 1024), b''):
+                      digest.update(block)
+              return digest.hexdigest()
+
+          records = []
+          for root in roots:
+              if not root.is_dir():
+                  continue
+              # Bound traversal to relevant subtrees. We inspect file names/metadata only;
+              # raw video, tactile, target geometry, and prediction payloads are not read.
+              for path in root.rglob('*'):
+                  if not path.is_file() or path.is_symlink() or path.name not in wanted:
+                      continue
+                  stat = path.stat()
+                  record = {
+                      'path': str(path),
+                      'name': path.name,
+                      'bytes': int(stat.st_size),
+                      'mtime_ns': int(stat.st_mtime_ns),
+                  }
+                  if path.suffix == '.json' and stat.st_size <= 5_000_000:
+                      record['sha256'] = sha256(path)
+                  records.append(record)
+
+          records.sort(key=lambda row: (row['name'], row['path']))
+          by_name = {}
+          for record in records:
+              by_name.setdefault(record['name'], []).append(record['path'])
+          result = {
+              'schema': 'causal4d.deform360-logged-counterfactual-retained-inventory',
+              'schema_version': 1,
+              'runner_name': os.environ.get('RUNNER_NAME'),
+              'roots_checked': [str(root) for root in roots],
+              'records': records,
+              'by_name': by_name,
+              'decision': {
+                  'complete_source_observation_set_found': all(
+                      f'source{i}_observation.json' in by_name and
+                      f'source{i}_observation.npz' in by_name
+                      for i in (0, 3, 4, 5, 8)
+                  ),
+                  'shared_forward_fit_found': 'shared_forward_fit.json' in by_name,
+                  'can_run_source_only_logged_counterfactual_without_raw_reprocessing': False,
+              },
+              'information_boundary': {
+                  'raw_media_opened': False,
+                  'tactile_payload_opened': False,
+                  'target_future_payload_opened': False,
+                  'target_scores_read': False,
+                  'file_names_and_metadata_only': True,
+              },
+          }
+          result['decision']['can_run_source_only_logged_counterfactual_without_raw_reprocessing'] = bool(
+              result['decision']['complete_source_observation_set_found']
+          )
+          output = Path(os.environ['OUT']) / 'inventory.json'
+          output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps(result['decision'], indent=2, sort_keys=True))
+          PY
+
+      - name: Upload bounded inventory
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: deform360-logged-counterfactual-inventory-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.OUT }}/inventory.json
+          if-no-files-found: error
+          retention-days: 30
