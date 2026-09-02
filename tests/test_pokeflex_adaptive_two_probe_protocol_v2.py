@@ -96,7 +96,11 @@ def synthetic_audit(payload: dict) -> dict:
             "dropping_count": 54,
             "object_count": 18,
         },
-        "dataset": {"metadata_identity_sha256": "a" * 64},
+        "dataset": {
+            "metadata_identity_sha256": payload["dataset"][
+                "metadata_identity_sha256"
+            ]
+        },
         "object_panels": panels,
         "archives": archives,
     }
@@ -128,6 +132,18 @@ def test_protocol_forbids_preselection_response_access() -> None:
         protocol_verifier.canonical_bytes(canonical)
     ).hexdigest()
     with pytest.raises(ValueError, match="first response exposed"):
+        protocol_verifier.verify_protocol(payload)
+
+
+def test_protocol_rejects_archive_roster_identity_tamper() -> None:
+    payload = protocol()
+    payload["dataset"]["metadata_identity_sha256"] = "0" * 64
+    canonical = dict(payload)
+    canonical.pop("protocol_sha256")
+    payload["protocol_sha256"] = protocol_verifier.hashlib.sha256(
+        protocol_verifier.canonical_bytes(canonical)
+    ).hexdigest()
+    with pytest.raises(ValueError, match="metadata roster identity changed"):
         protocol_verifier.verify_protocol(payload)
 
 
