@@ -1,0 +1,84 @@
+name: Robust active decision identification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/robust-active-decision-identification.yml"
+      - "src/causal4d/active_decision_calibration.py"
+      - "src/causal4d/robust_active_decision_identification.py"
+      - "tests/test_active_decision_calibration.py"
+      - "tests/test_robust_active_decision_identification.py"
+      - "scripts/experiments/robust_active_decision_identification.py"
+      - "docs/robust_active_decision_identification.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/robust-active-decision-identification.yml"
+      - "src/causal4d/active_decision_calibration.py"
+      - "src/causal4d/robust_active_decision_identification.py"
+      - "tests/test_active_decision_calibration.py"
+      - "tests/test_robust_active_decision_identification.py"
+      - "scripts/experiments/robust_active_decision_identification.py"
+      - "docs/robust_active_decision_identification.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: robust-active-decision-identification-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install package and development checks
+        run: |
+          python -m pip install --disable-pip-version-check -e ".[dev]"
+          python -m pip check
+
+      - name: Validate focused source and tests
+        run: |
+          files=(
+            src/causal4d/active_decision_calibration.py
+            src/causal4d/robust_active_decision_identification.py
+            tests/test_active_decision_calibration.py
+            tests/test_robust_active_decision_identification.py
+            scripts/experiments/robust_active_decision_identification.py
+          )
+          python -m ruff check "${files[@]}"
+          python -m ruff format --check "${files[@]}"
+          python -m mypy --no-site-packages \
+            src/causal4d/active_decision_calibration.py \
+            src/causal4d/robust_active_decision_identification.py
+          python -m pytest -q \
+            tests/test_active_decision_calibration.py \
+            tests/test_robust_active_decision_identification.py
+
+      - name: Execute deterministic robust mechanism study
+        run: |
+          python scripts/experiments/robust_active_decision_identification.py \
+            --output build/robust-active-decision-identification/result.json
+          python -m json.tool \
+            build/robust-active-decision-identification/result.json >/dev/null
+
+      - name: Upload content-bound result
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
+        with:
+          name: robust-active-decision-identification-${{ github.sha }}
+          path: build/robust-active-decision-identification/result.json
+          if-no-files-found: error
+          retention-days: 30
