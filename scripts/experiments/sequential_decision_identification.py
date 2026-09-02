@@ -286,10 +286,9 @@ def run() -> dict[str, Any]:
         "decision_quotient_is_not_probe_lumpable": not result[
             "decision_quotient_probe_audit"
         ]["sequentially_sufficient"],
-        "decision_quotient_has_two_classes": result[
-            "decision_quotient_probe_audit"
-        ]["decision_class_count"]
-        == 2,
+        "decision_quotient_has_two_classes": (
+            result["decision_quotient_probe_audit"]["decision_class_count"] == 2
+        ),
         "probe_action_quotient_strictly_refines_decision_quotient": result[
             "probe_action_quotient"
         ]["quotient_classes"]
