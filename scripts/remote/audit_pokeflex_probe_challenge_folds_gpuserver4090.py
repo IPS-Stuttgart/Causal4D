@@ -17,7 +17,6 @@ import json
 import os
 from pathlib import Path
 import re
-import sys
 from typing import Any, Iterable
 import zipfile
 
