@@ -97,9 +97,7 @@ def synthetic_audit(payload: dict) -> dict:
             "object_count": 18,
         },
         "dataset": {
-            "metadata_identity_sha256": payload["dataset"][
-                "metadata_identity_sha256"
-            ]
+            "metadata_identity_sha256": payload["dataset"]["metadata_identity_sha256"]
         },
         "object_panels": panels,
         "archives": archives,
