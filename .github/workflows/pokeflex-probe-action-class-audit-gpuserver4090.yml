@@ -1,0 +1,174 @@
+name: PokeFlex source-only probe action-class audit
+
+on:
+  push:
+    branches:
+      - science/pokeflex-sequential-probe-source-v1
+    paths:
+      - ".github/requests/pokeflex-probe-action-class-audit-gpuserver4090-v1.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pokeflex-probe-action-class-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Validate source-only action audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Install focused dependencies
+        run: |
+          python -m pip install --disable-pip-version-check \
+            numpy==2.2.6 \
+            pytest==8.4.2 \
+            ruff==0.16.5
+
+      - name: Validate request and source boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path(
+              ".github/requests/"
+              "pokeflex-probe-action-class-audit-gpuserver4090-v1.json"
+          )
+          request = json.loads(path.read_text(encoding="utf-8"))
+          assert request["schema"] == (
+              "causal4d/pokeflex-probe-action-class-audit-request"
+          )
+          assert request["schema_version"] == 1
+          assert request["runner_label"] == "gpuserver4090"
+          assert request["take_indices"] == [1, 2, 3, 4, 5, 6]
+          assert len(request["source_and_calibration_objects"]) == 12
+          assert len(request["target_objects_excluded"]) == 6
+          assert not (
+              set(request["source_and_calibration_objects"])
+              & set(request["target_objects_excluded"])
+          )
+          assert request["information_boundary"] == {
+              "allowed_payload": (
+                  "source/calibration poking robot_data.json only"
+              ),
+              "challenge_outcome_allowed": False,
+              "drop_archive_open_allowed": False,
+              "image_member_open_allowed": False,
+              "mesh_member_open_allowed": False,
+              "target_archive_open_allowed": False,
+          }
+          PY
+
+      - name: Lint, format, and test
+        run: |
+          python -m py_compile \
+            scripts/remote/audit_pokeflex_probe_action_classes_gpuserver4090.py \
+            scripts/ci/verify_pokeflex_probe_action_class_audit.py
+          python -m ruff check \
+            scripts/remote/audit_pokeflex_probe_action_classes_gpuserver4090.py \
+            scripts/ci/verify_pokeflex_probe_action_class_audit.py \
+            tests/test_pokeflex_probe_action_class_audit.py
+          python -m ruff format --check \
+            scripts/remote/audit_pokeflex_probe_action_classes_gpuserver4090.py \
+            scripts/ci/verify_pokeflex_probe_action_class_audit.py \
+            tests/test_pokeflex_probe_action_class_audit.py
+          pytest -q tests/test_pokeflex_probe_action_class_audit.py
+
+  audit:
+    name: Audit six common real probe actions on gpuserver4090
+    needs: contract
+    runs-on: [self-hosted, Linux, X64, gpuserver4090]
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Create isolated numerical runtime
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pokeflex-action-audit-venv"
+          "$RUNNER_TEMP/pokeflex-action-audit-venv/bin/python" \
+            -m pip install --disable-pip-version-check numpy==2.2.6
+
+      - name: Run source-only action-class audit
+        id: scientific
+        shell: bash
+        run: |
+          mkdir -p build/pokeflex-probe-action-class-audit
+          set +e
+          "$RUNNER_TEMP/pokeflex-action-audit-venv/bin/python" \
+            scripts/remote/audit_pokeflex_probe_action_classes_gpuserver4090.py \
+            --root /mnt/seagate10tb/florianpfaff/datasets/pokeflex \
+            --request \
+              .github/requests/pokeflex-probe-action-class-audit-gpuserver4090-v1.json \
+            --output-dir build/pokeflex-probe-action-class-audit/result
+          rc=$?
+          set -e
+          echo "return_code=$rc" >> "$GITHUB_OUTPUT"
+          echo "$rc" > build/pokeflex-probe-action-class-audit/return_code.txt
+
+      - name: Verify result and boundary
+        if: always() && steps.scientific.outputs.return_code != ''
+        run: |
+          "$RUNNER_TEMP/pokeflex-action-audit-venv/bin/python" \
+            scripts/ci/verify_pokeflex_probe_action_class_audit.py \
+            build/pokeflex-probe-action-class-audit/result/result.json \
+            --output-json \
+              build/pokeflex-probe-action-class-audit/verification.json
+
+      - name: Record runner provenance
+        if: always()
+        run: |
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "workflow_run=${GITHUB_RUN_ID}"
+            echo "workflow_attempt=${GITHUB_RUN_ATTEMPT}"
+            echo "head_sha=${GITHUB_SHA}"
+          } > build/pokeflex-probe-action-class-audit/runner.txt
+
+      - name: Publish scientific summary
+        if: always()
+        run: |
+          if test -f build/pokeflex-probe-action-class-audit/result/result.md; then
+            cat build/pokeflex-probe-action-class-audit/result/result.md \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload source-only evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pokeflex-probe-action-class-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/pokeflex-probe-action-class-audit/
+            .github/requests/pokeflex-probe-action-class-audit-gpuserver4090-v1.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce technical execution
+        if: always()
+        run: |
+          rc="$(cat build/pokeflex-probe-action-class-audit/return_code.txt)"
+          if test "$rc" -ne 0 && test "$rc" -ne 3; then
+            echo "Technical execution failed with code $rc" >&2
+            exit "$rc"
+          fi
