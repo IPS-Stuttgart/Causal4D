@@ -5,8 +5,10 @@ on:
     paths:
       - ".github/workflows/active-decision-identification.yml"
       - "src/causal4d/active_decision_identification.py"
+      - "src/causal4d/probe_quotient_audit.py"
       - "src/causal4d/sequential_decision_identification.py"
       - "tests/test_active_decision_identification.py"
+      - "tests/test_probe_quotient_audit.py"
       - "tests/test_sequential_decision_identification.py"
       - "scripts/experiments/active_decision_identification.py"
       - "scripts/experiments/sequential_decision_identification.py"
@@ -16,8 +18,10 @@ on:
     paths:
       - ".github/workflows/active-decision-identification.yml"
       - "src/causal4d/active_decision_identification.py"
+      - "src/causal4d/probe_quotient_audit.py"
       - "src/causal4d/sequential_decision_identification.py"
       - "tests/test_active_decision_identification.py"
+      - "tests/test_probe_quotient_audit.py"
       - "tests/test_sequential_decision_identification.py"
       - "scripts/experiments/active_decision_identification.py"
       - "scripts/experiments/sequential_decision_identification.py"
@@ -58,15 +62,19 @@ jobs:
         run: |
           python -m ruff check \
             src/causal4d/active_decision_identification.py \
+            src/causal4d/probe_quotient_audit.py \
             src/causal4d/sequential_decision_identification.py \
             tests/test_active_decision_identification.py \
+            tests/test_probe_quotient_audit.py \
             tests/test_sequential_decision_identification.py \
             scripts/experiments/active_decision_identification.py \
             scripts/experiments/sequential_decision_identification.py
           python -m ruff format --check \
             src/causal4d/active_decision_identification.py \
+            src/causal4d/probe_quotient_audit.py \
             src/causal4d/sequential_decision_identification.py \
             tests/test_active_decision_identification.py \
+            tests/test_probe_quotient_audit.py \
             tests/test_sequential_decision_identification.py \
             scripts/experiments/active_decision_identification.py \
             scripts/experiments/sequential_decision_identification.py
@@ -77,6 +85,7 @@ jobs:
         run: |
           pytest -q \
             tests/test_active_decision_identification.py \
+            tests/test_probe_quotient_audit.py \
             tests/test_sequential_decision_identification.py
 
       - name: Execute deterministic mechanism studies twice
