@@ -1,6 +1,6 @@
 # Public real-world dataset probe
 
-Request: `2026-09-01-public-realworld-probe-v2-deform-dlo45-present`
+Request: `2026-09-02-public-realworld-probe-v4-pokeflex-standalone-import`
 
 This report is metadata/schema qualification only. It does not authorize a paper claim.
 

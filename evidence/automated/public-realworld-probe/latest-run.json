@@ -1,5 +1,5 @@
 {
-  "probed_revision": "aaefaa80cfbf03f230221bf881404b13e7e554e7",
+  "probed_revision": "47e414cd0f332c2cac7fc72626a1b01f2f24847c",
   "ranking": [
     {
       "dataset": "tracking_cloth",
@@ -28,6 +28,6 @@
     }
   ],
   "schema_version": 1,
-  "workflow_run_id": 33473801749,
-  "workflow_run_url": "https://github.com/IPS-Stuttgart/Causal4D/actions/runs/33473801749"
+  "workflow_run_id": 33589980513,
+  "workflow_run_url": "https://github.com/IPS-Stuttgart/Causal4D/actions/runs/33589980513"
 }
