@@ -11,6 +11,10 @@ REGISTRY = ROOT / ".github" / "self-hosted-jobs.json"
 JOB_HEADER = re.compile(r"^  (?P<job>[A-Za-z0-9_-]+):\s*$")
 PINNED_ACTION = re.compile(r"[0-9a-f]{40}")
 REVIEWED_FILE_MAIN_TRIGGERS = {
+    "pokeflex-probe-challenge-fold-audit-gpuserver4090.yml": (
+        ".github/requests/"
+        "pokeflex-probe-challenge-fold-audit-gpuserver4090-v1.json"
+    ),
     "deform-dlo45-public-gpuserver4090.yml": (
         "ops/deform-dlo45-public-gpuserver4090-request.json"
     ),
