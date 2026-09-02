@@ -14,6 +14,7 @@
   },
   "next_stage_if_passed": "freeze-source-only-action-and-response-carrier-contract",
   "request_id": "pokeflex-probe-challenge-fold-audit-gpuserver4090-v1",
+  "retry_reason": "remove unused import before any self-hosted or dataset step",
   "roots": [
     "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
     "/home/github-runner/.cache/datasets/pokeflex",
@@ -31,5 +32,6 @@
       "held-drop-response"
     ],
     "salt": "PokeFlex-active-probe-folds-v1-2026-09-02"
-  }
+  },
+  "technical_revision": 2
 }
