@@ -83,12 +83,8 @@ class ParameterBox:
             raise ValueError("box bounds must be finite")
         if np.any(lower > upper):
             raise ValueError("box lower bounds must not exceed upper bounds")
-        object.__setattr__(
-            self, "lower", tuple(_canonical(value) for value in lower)
-        )
-        object.__setattr__(
-            self, "upper", tuple(_canonical(value) for value in upper)
-        )
+        object.__setattr__(self, "lower", tuple(_canonical(value) for value in lower))
+        object.__setattr__(self, "upper", tuple(_canonical(value) for value in upper))
 
     @property
     def dimension(self) -> int:
@@ -131,9 +127,7 @@ class ParameterBox:
             return False
         lower = np.asarray(self.lower, dtype=np.float64)
         upper = np.asarray(self.upper, dtype=np.float64)
-        return bool(
-            np.all(values >= lower - _ATOL) and np.all(values <= upper + _ATOL)
-        )
+        return bool(np.all(values >= lower - _ATOL) and np.all(values <= upper + _ATOL))
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -353,9 +347,7 @@ def certify_continuous_decision(
         maximum_evaluations, name="maximum_evaluations"
     )
     depth_limit = _positive_integer(maximum_depth, name="maximum_depth")
-    minimum_width = _finite_nonnegative(
-        minimum_box_width, name="minimum_box_width"
-    )
+    minimum_width = _finite_nonnegative(minimum_box_width, name="minimum_box_width")
 
     initial = _evaluate_box(domain, 0, loss_oracle, lipschitz)
     active: list[_EvaluatedBox] = [initial]
@@ -416,8 +408,7 @@ def certify_continuous_decision(
             index, item = entry
             unresolved_upper = max(item.regret_upper[action] for action in unresolved)
             unresolved_gap = max(
-                item.regret_upper[action] - item.regret[action]
-                for action in unresolved
+                item.regret_upper[action] - item.regret[action] for action in unresolved
             )
             return (
                 unresolved_upper - tolerance,
