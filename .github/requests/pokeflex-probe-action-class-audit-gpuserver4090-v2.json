@@ -1,0 +1,45 @@
+{
+  "dataset_root": "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+  "gate_thresholds": {
+    "minimum_between_to_within_ratio": 1.2,
+    "minimum_loo_take_accuracy": 0.7,
+    "minimum_variable_response_take_classes": 5
+  },
+  "information_boundary": {
+    "allowed_payload": "source/calibration poking robot_data.json only",
+    "challenge_outcome_allowed": false,
+    "drop_archive_open_allowed": false,
+    "image_member_open_allowed": false,
+    "mesh_member_open_allowed": false,
+    "target_archive_open_allowed": false
+  },
+  "next_stage_if_passed": "run-source-only-sequential-probe-to-drop-qualification",
+  "request_id": "pokeflex-probe-action-class-audit-gpuserver4090-v2",
+  "runner_label": "gpuserver4090",
+  "schema": "causal4d/pokeflex-probe-action-class-audit-request",
+  "schema_version": 1,
+  "source_and_calibration_objects": [
+    "3dPrintedHeart",
+    "3dPrintedPyramid",
+    "FoamDice",
+    "FoamHalfSphere",
+    "PlushDice",
+    "PlushMoon",
+    "PlushTurtle",
+    "PlushVolleyball",
+    "ToiletPaperRoll",
+    "3dPrintedPizza",
+    "FoamCylinder",
+    "PlushOctopus"
+  ],
+  "take_indices": [1, 2, 3, 4, 5, 6],
+  "target_objects_excluded": [
+    "3dPrintedBunny",
+    "3dPrintedCylinder",
+    "Sponge",
+    "MemoryFoam",
+    "Beanbag",
+    "Pillow"
+  ],
+  "technical_revision": 2
+}
