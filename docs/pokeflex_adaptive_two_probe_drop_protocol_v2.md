@@ -204,6 +204,20 @@ The analysis reports raw query loss, cost-adjusted loss, mean probe count,
 cumulative normalized probe cost, and the fractions of decisions stopping after
 zero, one, and two probes.
 
+## Provenance
+
+The registered protocol binds two complementary identities from the successful
+metadata-only audit:
+
+- the final audit record ID
+  `a3e0f70e7d0d222cc6f78b8db8be381c60133f28c87bbf722b6ce5f795dff8e3`;
+- the stable 170-archive roster identity
+  `940bfeb33a12403c9e2e3f5c604c03e7ff967023b8e2a808d19324f358582e2f`.
+
+The first includes the registered eligibility threshold; the second identifies
+the classified archive roster independently of that threshold. Both must match
+before structural or payload-bearing stages may proceed.
+
 ## Claim boundary
 
 A positive result supports:
@@ -218,4 +232,4 @@ full-state uncertainty, deployment safety, or closed-loop manipulation success.
 
 The machine-readable owner is
 `configs/causal4d_public/pokeflex_adaptive_two_probe_drop_protocol_v2.json`.
-Its canonical SHA-256 is `698c2b5d8f41527f14868ca6f35268637990b8c23942fb224f998ba70f76f1ea`.
+Its canonical SHA-256 is `f33b190d0391f8782b990f50a521f69085ee3df947a92e6b4d7e3be80de8d9e3`.
