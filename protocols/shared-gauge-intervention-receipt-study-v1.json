@@ -1,0 +1,47 @@
+{
+  "schema": "causal4d.shared-gauge-intervention-receipt-study-protocol",
+  "schema_version": 1,
+  "protocol_id": "shared-gauge-intervention-receipt-study-v1",
+  "scientific_question": "Can state and action transformations be bound to one finite physical gauge and can realized-action mismatch be exported as an auditable pairwise regret margin?",
+  "group": {
+    "name": "C4 shared planar frame",
+    "element_ids": ["r0", "r90", "r180", "r270"],
+    "multiplication": "addition modulo four",
+    "state_representation": "planar rotations",
+    "action_representation": "planar rotations",
+    "state_metric": "identity",
+    "action_metric_diagonal": [2.0, 0.5]
+  },
+  "action_templates": [
+    [1.0, 0.0],
+    [0.0, 1.0],
+    [0.0, 0.0]
+  ],
+  "realization": {
+    "action_0_shift_world_x": 0.035355339059327376,
+    "declared_radius_by_action": [0.05, 0.0, 0.0],
+    "loss_lipschitz_by_action": [2.0, 3.0, 1.0],
+    "radius_scope": "deterministic-complete",
+    "expected_one_action_loss_margin": [0.1, 0.0, 0.0]
+  },
+  "negative_controls": [
+    "permuted state/action group ordering",
+    "command orbit inconsistent with the registered action representation",
+    "declared radius smaller than the observed metric discrepancy"
+  ],
+  "registered_requirements": {
+    "group_contract_verified": true,
+    "commanded_orbit_verified": true,
+    "realization_bound_verified": true,
+    "observed_radius_by_action": [0.05, 0.0, 0.0],
+    "pairwise_margin": [
+      [0.0, 0.1, 0.1],
+      [0.1, 0.0, 0.0],
+      [0.1, 0.0, 0.0]
+    ],
+    "all_negative_controls_rejected": true,
+    "byte_identical_replay_required": true
+  },
+  "statistical_status": "deterministic controlled contract study",
+  "claim_boundary": "The group, representations, metrics, command bank and realization envelope are supplied. The protocol does not discover a symmetry, validate a learned state provider or robot actuator, establish continuous-group coverage, calibrate target error, or certify deployment safety."
+}
