@@ -1,0 +1,124 @@
+{
+  "schema": "causal4d/pokeflex-active-probe-protocol",
+  "schema_version": 2,
+  "protocol_id": "pokeflex-active-probe-primary6-replication3-v2",
+  "dataset": {
+    "name": "PokeFlex",
+    "archive_count": 170,
+    "poking_archive_count": 116,
+    "dropping_archive_count": 54,
+    "physical_object_count": 18
+  },
+  "split": {
+    "salt": "causal4d-pokeflex-logged-active-probe-v2-2026-09-02",
+    "source_object_count": 9,
+    "primary_target_object_count": 6,
+    "replication_target_object_count": 3,
+    "outcome_calibration_object_count": 0,
+    "source_hyperparameter_selection": "nested-leave-one-source-object-out"
+  },
+  "registered_queries": [
+    "held-poke-local-response",
+    "held-drop-impact-geometry",
+    "held-drop-settled-geometry"
+  ],
+  "candidate_probe_count": 4,
+  "initial_state_admission": {
+    "certificate_schema": "causal4d/pokeflex-initial-state-matching",
+    "minimum_compatible_probe_count": 3,
+    "source_frozen_caliper": true,
+    "target_outcome_free": true
+  },
+  "policy_panel": [
+    "no-probe",
+    "random-safe-expected",
+    "source-fixed-safe",
+    "generic-mutual-information",
+    "action-only-query-heuristic",
+    "task-conditioned-decision-value",
+    "within-object-dependence-destroyed",
+    "matched-wrong-object-response",
+    "double-placebo",
+    "oracle-diagnostic-only"
+  ],
+  "baseline_parity": {
+    "same_candidate_probe_set": true,
+    "same_source_objects": true,
+    "same_initial_state_information": true,
+    "same_probe_costs": true,
+    "same_probe_risk_limits": true,
+    "one_selected_response_budget": true,
+    "oracle_excluded_from_primary_gate": true
+  },
+  "custody": {
+    "historical_exposure_scan_required": true,
+    "target_selection_before_response_reveal": true,
+    "selected_probe_response_only": true,
+    "unselected_target_probe_responses_forbidden": true,
+    "challenge_outcomes_forbidden_before_prediction_seal": true,
+    "one_joint_prediction_seal_for_primary_and_replication": true,
+    "score_primary_before_replication": true,
+    "replication_scoring_requires_primary_pass": true,
+    "prediction_changes_between_panels_forbidden": true,
+    "target_retry_forbidden": true
+  },
+  "source_gate": {
+    "minimum_gain_vs_fixed": 0.02,
+    "minimum_gain_vs_generic_information": 0.02,
+    "minimum_gain_vs_dependence_destroyed": 0.02,
+    "minimum_object_win_fraction": 0.60,
+    "minimum_query_probe_switch_fraction": 0.25,
+    "cost_adjusted_gain_must_be_positive": true
+  },
+  "primary_gate": {
+    "minimum_objects": 6,
+    "positive_gain_required_against": [
+      "no-probe",
+      "source-fixed-safe",
+      "generic-mutual-information",
+      "within-object-dependence-destroyed",
+      "matched-wrong-object-response"
+    ],
+    "minimum_wins_out_of_six_against_main_baselines": 5,
+    "positive_object_bootstrap_lower_bound_required_against": [
+      "source-fixed-safe",
+      "within-object-dependence-destroyed"
+    ],
+    "minimum_distinct_nonfallback_probes": 2,
+    "minimum_query_probe_switch_fraction": 0.3333333333333333,
+    "cost_adjusted_gain_must_be_positive": true
+  },
+  "replication_gate": {
+    "minimum_objects": 3,
+    "positive_gain_required_against": [
+      "source-fixed-safe",
+      "generic-mutual-information"
+    ],
+    "minimum_wins_out_of_three": 2,
+    "maximum_worst_object_loss_ratio": 1.25
+  },
+  "combined_gate": {
+    "minimum_wins_out_of_nine_against_fixed": 8,
+    "minimum_wins_out_of_nine_against_generic_information": 8,
+    "maximum_exact_one_sided_sign_pvalue": 0.01953125,
+    "primary_gate_required": true,
+    "replication_gate_required": true
+  },
+  "statistics": {
+    "primary_unit": "physical-object",
+    "frame_pseudoreplication_forbidden": true,
+    "confidence_interval": "paired-object-bootstrap",
+    "sign_test": "exact-one-sided",
+    "queries_reported_separately": true,
+    "aggregate_reported_in_addition": true
+  },
+  "claim_boundary": {
+    "offline_logged_active_probing_only": true,
+    "identical_microscopic_reset_claim": false,
+    "individual_counterfactual_claim": false,
+    "online_closed_loop_claim": false,
+    "deployment_safety_claim": false,
+    "unique_material_identification_claim": false,
+    "general_state_of_the_art_claim": false
+  }
+}
