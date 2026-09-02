@@ -1,0 +1,35 @@
+{
+  "schema": "causal4d/pokeflex-initial-state-matching-request",
+  "schema_version": 1,
+  "request_id": "pokeflex-initial-state-matching-gpuserver4090-v1",
+  "runner_label": "gpuserver4090",
+  "dataset_root": "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+  "salt": "causal4d-pokeflex-logged-active-probe-v1",
+  "expected": {
+    "archive_count": 170,
+    "poking_archive_count": 116,
+    "dropping_archive_count": 54,
+    "object_count": 18
+  },
+  "split": {
+    "source_count": 9,
+    "calibration_count": 3,
+    "target_count": 6
+  },
+  "matching": {
+    "candidate_probe_count": 4,
+    "source_caliper_quantile": 0.95,
+    "minimum_matching_candidates": 3,
+    "minimum_calibration_query_fraction": 0.8,
+    "minimum_target_query_fraction": 0.8
+  },
+  "information_boundary": {
+    "earliest_dynamic_mesh_only": true,
+    "terminal_mesh_allowed": false,
+    "robot_record_allowed": false,
+    "force_torque_allowed": false,
+    "probe_response_allowed": false,
+    "challenge_outcome_allowed": false
+  },
+  "next_stage_if_passed": "source-only-policy-qualification"
+}
