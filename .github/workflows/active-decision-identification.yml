@@ -7,12 +7,21 @@ on:
       - "src/causal4d/active_decision_identification.py"
       - "src/causal4d/probe_quotient_audit.py"
       - "src/causal4d/sequential_decision_identification.py"
+      - "src/causal4d/_sensor_reveal_common.py"
+      - "src/causal4d/_sensor_reveal_case.py"
+      - "src/causal4d/_sensor_reveal_submission.py"
+      - "src/causal4d/_sensor_reveal_execution.py"
+      - "src/causal4d/sensor_reveal_challenge.py"
+      - "src/causal4d/sensor_reveal_verifier.py"
       - "tests/test_active_decision_identification.py"
       - "tests/test_probe_quotient_audit.py"
       - "tests/test_sequential_decision_identification.py"
+      - "tests/test_sensor_reveal_challenge.py"
       - "scripts/experiments/active_decision_identification.py"
       - "scripts/experiments/sequential_decision_identification.py"
+      - "scripts/experiments/proof_carrying_sensor_reveal.py"
       - "docs/active_decision_identification.md"
+      - "docs/proof_carrying_sensor_reveal.md"
   push:
     branches: [main]
     paths:
@@ -20,12 +29,21 @@ on:
       - "src/causal4d/active_decision_identification.py"
       - "src/causal4d/probe_quotient_audit.py"
       - "src/causal4d/sequential_decision_identification.py"
+      - "src/causal4d/_sensor_reveal_common.py"
+      - "src/causal4d/_sensor_reveal_case.py"
+      - "src/causal4d/_sensor_reveal_submission.py"
+      - "src/causal4d/_sensor_reveal_execution.py"
+      - "src/causal4d/sensor_reveal_challenge.py"
+      - "src/causal4d/sensor_reveal_verifier.py"
       - "tests/test_active_decision_identification.py"
       - "tests/test_probe_quotient_audit.py"
       - "tests/test_sequential_decision_identification.py"
+      - "tests/test_sensor_reveal_challenge.py"
       - "scripts/experiments/active_decision_identification.py"
       - "scripts/experiments/sequential_decision_identification.py"
+      - "scripts/experiments/proof_carrying_sensor_reveal.py"
       - "docs/active_decision_identification.md"
+      - "docs/proof_carrying_sensor_reveal.md"
   workflow_dispatch:
 
 permissions:
@@ -64,20 +82,36 @@ jobs:
             src/causal4d/active_decision_identification.py \
             src/causal4d/probe_quotient_audit.py \
             src/causal4d/sequential_decision_identification.py \
+            src/causal4d/_sensor_reveal_common.py \
+            src/causal4d/_sensor_reveal_case.py \
+            src/causal4d/_sensor_reveal_submission.py \
+            src/causal4d/_sensor_reveal_execution.py \
+            src/causal4d/sensor_reveal_challenge.py \
+            src/causal4d/sensor_reveal_verifier.py \
             tests/test_active_decision_identification.py \
             tests/test_probe_quotient_audit.py \
             tests/test_sequential_decision_identification.py \
+            tests/test_sensor_reveal_challenge.py \
             scripts/experiments/active_decision_identification.py \
-            scripts/experiments/sequential_decision_identification.py
+            scripts/experiments/sequential_decision_identification.py \
+            scripts/experiments/proof_carrying_sensor_reveal.py
           python -m ruff format --check \
             src/causal4d/active_decision_identification.py \
             src/causal4d/probe_quotient_audit.py \
             src/causal4d/sequential_decision_identification.py \
+            src/causal4d/_sensor_reveal_common.py \
+            src/causal4d/_sensor_reveal_case.py \
+            src/causal4d/_sensor_reveal_submission.py \
+            src/causal4d/_sensor_reveal_execution.py \
+            src/causal4d/sensor_reveal_challenge.py \
+            src/causal4d/sensor_reveal_verifier.py \
             tests/test_active_decision_identification.py \
             tests/test_probe_quotient_audit.py \
             tests/test_sequential_decision_identification.py \
+            tests/test_sensor_reveal_challenge.py \
             scripts/experiments/active_decision_identification.py \
-            scripts/experiments/sequential_decision_identification.py
+            scripts/experiments/sequential_decision_identification.py \
+            scripts/experiments/proof_carrying_sensor_reveal.py
 
       - name: Run focused tests
         env:
@@ -86,7 +120,8 @@ jobs:
           pytest -q \
             tests/test_active_decision_identification.py \
             tests/test_probe_quotient_audit.py \
-            tests/test_sequential_decision_identification.py
+            tests/test_sequential_decision_identification.py \
+            tests/test_sensor_reveal_challenge.py
 
       - name: Execute deterministic mechanism studies twice
         env:
@@ -107,10 +142,19 @@ jobs:
           cmp \
             build/active-decision-identification/sequential-a.json \
             build/active-decision-identification/sequential-b.json
+          python scripts/experiments/proof_carrying_sensor_reveal.py \
+            --output build/active-decision-identification/sensor-reveal-a.json
+          python scripts/experiments/proof_carrying_sensor_reveal.py \
+            --output build/active-decision-identification/sensor-reveal-b.json
+          cmp \
+            build/active-decision-identification/sensor-reveal-a.json \
+            build/active-decision-identification/sensor-reveal-b.json
           python -m json.tool \
             build/active-decision-identification/one-step-a.json >/dev/null
           python -m json.tool \
             build/active-decision-identification/sequential-a.json >/dev/null
+          python -m json.tool \
+            build/active-decision-identification/sensor-reveal-a.json >/dev/null
 
       - name: Upload deterministic results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
@@ -119,5 +163,6 @@ jobs:
           path: |
             build/active-decision-identification/one-step-a.json
             build/active-decision-identification/sequential-a.json
+            build/active-decision-identification/sensor-reveal-a.json
           if-no-files-found: error
           retention-days: 30
