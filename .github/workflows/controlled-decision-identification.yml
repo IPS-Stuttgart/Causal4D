@@ -1,0 +1,92 @@
+name: Controlled decision identification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/controlled-decision-identification.yml"
+      - "src/causal4d/controlled_decision_identification.py"
+      - "tests/test_controlled_decision_identification.py"
+      - "scripts/experiments/controlled_decision_identification.py"
+      - "docs/controlled_decision_identification.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/controlled-decision-identification.yml"
+      - "src/causal4d/controlled_decision_identification.py"
+      - "tests/test_controlled_decision_identification.py"
+      - "scripts/experiments/controlled_decision_identification.py"
+      - "docs/controlled_decision_identification.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: controlled-decision-identification-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install focused dependencies
+        run: |
+          python -m pip install --disable-pip-version-check \
+            numpy==2.2.6 \
+            pytest==8.4.2 \
+            ruff==0.16.5
+
+      - name: Lint and verify formatting
+        run: |
+          python -m ruff check \
+            src/causal4d/controlled_decision_identification.py \
+            tests/test_controlled_decision_identification.py \
+            scripts/experiments/controlled_decision_identification.py
+          python -m ruff format --check \
+            src/causal4d/controlled_decision_identification.py \
+            tests/test_controlled_decision_identification.py \
+            scripts/experiments/controlled_decision_identification.py
+
+      - name: Run controlled and passive decision tests
+        env:
+          PYTHONPATH: src
+        run: |
+          pytest -q \
+            tests/test_controlled_decision_identification.py \
+            tests/test_sequential_decision_identification.py \
+            tests/test_probe_quotient_audit.py
+
+      - name: Execute deterministic dual-control study twice
+        env:
+          PYTHONPATH: src
+        run: |
+          mkdir -p build/controlled-decision-identification
+          python scripts/experiments/controlled_decision_identification.py \
+            --output build/controlled-decision-identification/result-a.json
+          python scripts/experiments/controlled_decision_identification.py \
+            --output build/controlled-decision-identification/result-b.json
+          cmp \
+            build/controlled-decision-identification/result-a.json \
+            build/controlled-decision-identification/result-b.json
+          python -m json.tool \
+            build/controlled-decision-identification/result-a.json >/dev/null
+
+      - name: Upload deterministic result
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: controlled-decision-identification-${{ github.sha }}
+          path: build/controlled-decision-identification/result-a.json
+          if-no-files-found: error
+          retention-days: 30
