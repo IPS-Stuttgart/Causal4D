@@ -270,9 +270,7 @@ def evaluate_certificate_probe(
             action_names,
             fallback_action_name=fallback_action_name,
         )
-        expected_regret += (
-            outcome.probability * posterior.minimax_worst_case_regret
-        )
+        expected_regret += outcome.probability * posterior.minimax_worst_case_regret
         if not posterior.used_exact_fallback:
             certification_probability += outcome.probability
             if posterior.certificate_level == "robustly-optimal":
@@ -393,8 +391,7 @@ def plan_active_decision(
     elif not any(report.safe for report in reports):
         reason = "no-safe-probe"
     elif not any(
-        report.certification_probability
-        >= certification_threshold - _NUMERICAL_ATOL
+        report.certification_probability >= certification_threshold - _NUMERICAL_ATOL
         for report in reports
     ):
         reason = "no-probe-meets-certification-probability"
