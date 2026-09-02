@@ -19,6 +19,8 @@ from numbers import Real
 
 import numpy as np
 
+from .immutable_array import readonly_array
+
 ACTIVE_DECISION_CALIBRATION_VERSION = 1
 ACTIVE_DECISION_CALIBRATION_CLAIM_BOUNDARY = (
     "The split-conformal margin has finite-sample group-marginal coverage only "
@@ -384,12 +386,10 @@ def apply_complete_group_regret_margin(
         structural_regret_bounds,
         name="structural_regret_bounds",
     )
-    result = np.asarray(
+    return readonly_array(
         structural + calibration.require_finite_margin(),
         dtype=np.float64,
     )
-    result.setflags(write=False)
-    return result
 
 
 __all__ = [
