@@ -1,0 +1,224 @@
+{
+  "claim_boundary": [
+    "A positive result supports offline task-conditioned selection of one logged physical poke for held cross-intervention drop queries.",
+    "It does not establish online probe execution, same-state counterfactual outcomes, unique material identification, calibrated full-state uncertainty, deployment safety, or closed-loop manipulation success.",
+    "If exact drop-outcome freshness cannot be established, the evidence class is retrospective real-data mechanism evidence."
+  ],
+  "dataset": {
+    "expected_archive_count": 170,
+    "expected_dropping_count": 54,
+    "expected_object_count": 18,
+    "expected_poking_count": 116,
+    "metadata_audit_request_id": "pokeflex-probe-challenge-fold-audit-gpuserver4090-v1",
+    "name": "PokeFlex"
+  },
+  "evidence_class": {
+    "online_execution": false,
+    "primary_challenge": "prospective-only-if-exact-drop-exposure-scan-passes",
+    "probe_panel": "retrospective-logged-physical-pokes",
+    "same-microscopic-state-counterfactual": false
+  },
+  "object_split": {
+    "calibration_objects_per_family": 1,
+    "calibration_selection_rule": "within each family remove target object_ids, sort by SHA256(salt,NUL,calibration,NUL,object_id); take first one",
+    "expected_if_all_18_objects_are_eligible": {
+      "calibration": {
+        "foam": [
+          "FoamCylinder"
+        ],
+        "printed": [
+          "3dPrintedPizza"
+        ],
+        "soft": [
+          "PlushOctopus"
+        ]
+      },
+      "source": [
+        "3dPrintedHeart",
+        "3dPrintedPyramid",
+        "FoamDice",
+        "FoamHalfSphere",
+        "PlushDice",
+        "PlushMoon",
+        "PlushTurtle",
+        "PlushVolleyball",
+        "ToiletPaperRoll"
+      ],
+      "target": {
+        "foam": [
+          "Sponge",
+          "MemoryFoam"
+        ],
+        "printed": [
+          "3dPrintedBunny",
+          "3dPrintedCylinder"
+        ],
+        "soft": [
+          "Beanbag",
+          "Pillow"
+        ]
+      }
+    },
+    "family_rules": [
+      {
+        "family": "printed",
+        "rule": "object_id starts with 3dPrinted"
+      },
+      {
+        "family": "foam",
+        "rule": "object_id contains Foam or equals Sponge or ToiletPaperRoll"
+      },
+      {
+        "family": "soft",
+        "rule": "all remaining registered object_ids"
+      }
+    ],
+    "minimum_primary_target_objects": 6,
+    "replacement_after_outcome_access": false,
+    "selection_salt": "PokeFlex-active-drop-target-v1-2026-09-02",
+    "source_objects": "all remaining eligible objects",
+    "target_objects_per_family": 2,
+    "target_selection_rule": "within each family sort eligible object_ids by SHA256(salt,NUL,target,NUL,object_id); take first two"
+  },
+  "policies": [
+    "no-probe",
+    "deterministic-random-safe",
+    "source-fixed-safe",
+    "generic-latent-information",
+    "task-conditioned-query-value",
+    "dependence-destroyed-task-value",
+    "target-outcome-oracle-diagnostic"
+  ],
+  "primary_analysis": {
+    "dependence_attribution_endpoint": "loss of task-conditioned advantage under object-matched probe-query dependence destruction",
+    "nested_units": [
+      "drop repetitions",
+      "frames",
+      "mesh vertices",
+      "query coordinates"
+    ],
+    "paired_object_bootstrap": {
+      "confidence_level": 0.95,
+      "resamples": 100000,
+      "seed": 20260902
+    },
+    "pool_frames_as_independent": false,
+    "pool_vertices_as_independent": false,
+    "primary_comparisons": [
+      "task-conditioned-query-value versus no-probe",
+      "task-conditioned-query-value versus source-fixed-safe",
+      "task-conditioned-query-value versus generic-latent-information"
+    ],
+    "statistical_unit": "physical object",
+    "task_dependence_endpoint": "fraction of target objects receiving different selected probes for the two registered queries"
+  },
+  "protocol_id": "pokeflex-task-conditioned-drop-protocol-v1",
+  "protocol_sha256": "4788fcc012c7809266d041adda50ac5333f5f21f0b828a9d088cca6253df49b9",
+  "registered_queries": [
+    {
+      "components": [
+        "maximum template-diagonal-normalized bounding-box compression",
+        "time to maximum compression",
+        "rebound ratio"
+      ],
+      "primary_loss": "source-standardized squared error",
+      "query_id": "drop-impact-geometry"
+    },
+    {
+      "components": [
+        "final template-diagonal-normalized symmetric Chamfer distance to initial mesh",
+        "final bounding-box compression",
+        "final centroid drift"
+      ],
+      "primary_loss": "source-standardized squared error",
+      "query_id": "drop-settled-geometry"
+    }
+  ],
+  "risk_and_cost": {
+    "no_safe_positive_value_behavior": "exact no-probe fallback",
+    "probe_cost_features": [
+      "path length",
+      "duration",
+      "predicted force impulse"
+    ],
+    "risk_features": [
+      "source-predicted peak force",
+      "source-predicted force impulse"
+    ],
+    "risk_thresholds": "frozen on source and calibration objects"
+  },
+  "schema": "causal4d/pokeflex-task-conditioned-drop-protocol",
+  "schema_version": 1,
+  "secondary_analysis": {
+    "all_object_cross_fitting": true,
+    "cannot_upgrade_primary_freshness": true,
+    "status": "retrospective-secondary-only"
+  },
+  "semantic_carriers": {
+    "action_descriptor": {
+      "allowed_fields": [
+        "frame",
+        "T_WT"
+      ],
+      "boundary": "isolated semantic slicer; byte-level carrier co-location is acknowledged",
+      "carrier": "robot_data.json",
+      "descriptor": [
+        "tool-path displacement and length",
+        "approach direction",
+        "pose-derived speed profile",
+        "tool location relative to the initial mesh"
+      ],
+      "forbidden_fields": [
+        "forces",
+        "torques",
+        "contact_response",
+        "future_mesh"
+      ]
+    },
+    "drop_outcome": {
+      "allowed_only_after_joint_prediction_seal": true,
+      "material_vertex_identity_required": false
+    },
+    "selected_probe_response": {
+      "allowed_after_selection": [
+        "force trajectory",
+        "pose trajectory",
+        "geometry-invariant mesh-response summaries"
+      ],
+      "material_vertex_identity_required": false
+    }
+  },
+  "source_gate": {
+    "failed_gate_behavior": "stop before target probe selection or target drop access",
+    "required": [
+      "both registered queries have positive task-conditioned calibration value",
+      "task-conditioned mean calibration loss is lower than no-probe",
+      "task-conditioned mean calibration loss is no worse than source-fixed-safe",
+      "task-conditioned mean calibration loss is no worse than generic-latent-information",
+      "dependence destruction removes at least half of the task-conditioned advantage over no-probe",
+      "at least two distinct probes are selected across calibration objects for at least one registered query",
+      "all unsafe probes are rejected and all zero-value cases return exact no-probe fallback"
+    ],
+    "target_drop_outcomes_opened": false
+  },
+  "stages": [
+    "metadata-only fold audit",
+    "exact historical exposure scan for every target drop take",
+    "source-object model fitting",
+    "calibration-object model and threshold selection",
+    "target action-descriptor slicing and probe selection",
+    "selected-probe response reveal",
+    "joint sealing of all target drop-query predictions",
+    "single target drop-outcome opening and scoring"
+  ],
+  "status": "registered-pending-metadata-and-exposure-gates",
+  "take_roles": {
+    "minimum_target_drops_per_object": 2,
+    "target_candidate_probe_count": 4,
+    "target_candidate_probe_rule": "sort complete target-object poking take_ids by SHA256(salt,NUL,probe,NUL,object_id,NUL,take_id); take first four",
+    "target_drop_outcome_available_before_prediction_seal": false,
+    "target_drop_rule": "all complete dropping takes of each primary target object are held challenges",
+    "target_probe_response_available_before_selection": false,
+    "unselected_target_probe_response_available": false
+  }
+}
