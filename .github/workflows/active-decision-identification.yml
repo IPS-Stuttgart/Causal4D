@@ -5,16 +5,22 @@ on:
     paths:
       - ".github/workflows/active-decision-identification.yml"
       - "src/causal4d/active_decision_identification.py"
+      - "src/causal4d/sequential_decision_identification.py"
       - "tests/test_active_decision_identification.py"
+      - "tests/test_sequential_decision_identification.py"
       - "scripts/experiments/active_decision_identification.py"
+      - "scripts/experiments/sequential_decision_identification.py"
       - "docs/active_decision_identification.md"
   push:
     branches: [main]
     paths:
       - ".github/workflows/active-decision-identification.yml"
       - "src/causal4d/active_decision_identification.py"
+      - "src/causal4d/sequential_decision_identification.py"
       - "tests/test_active_decision_identification.py"
+      - "tests/test_sequential_decision_identification.py"
       - "scripts/experiments/active_decision_identification.py"
+      - "scripts/experiments/sequential_decision_identification.py"
       - "docs/active_decision_identification.md"
   workflow_dispatch:
 
@@ -45,26 +51,64 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check \
             numpy==2.2.6 \
-            pytest==8.4.2
+            pytest==8.4.2 \
+            ruff==0.16.5
+
+      - name: Lint and format exact decision code
+        run: |
+          python -m ruff check \
+            src/causal4d/active_decision_identification.py \
+            src/causal4d/sequential_decision_identification.py \
+            tests/test_active_decision_identification.py \
+            tests/test_sequential_decision_identification.py \
+            scripts/experiments/active_decision_identification.py \
+            scripts/experiments/sequential_decision_identification.py
+          python -m ruff format --check \
+            src/causal4d/active_decision_identification.py \
+            src/causal4d/sequential_decision_identification.py \
+            tests/test_active_decision_identification.py \
+            tests/test_sequential_decision_identification.py \
+            scripts/experiments/active_decision_identification.py \
+            scripts/experiments/sequential_decision_identification.py
 
       - name: Run focused tests
         env:
           PYTHONPATH: src
-        run: pytest -q tests/test_active_decision_identification.py
+        run: |
+          pytest -q \
+            tests/test_active_decision_identification.py \
+            tests/test_sequential_decision_identification.py
 
-      - name: Execute deterministic mechanism study
+      - name: Execute deterministic mechanism studies twice
         env:
           PYTHONPATH: src
         run: |
+          mkdir -p build/active-decision-identification
           python scripts/experiments/active_decision_identification.py \
-            --output build/active-decision-identification/result.json
+            --output build/active-decision-identification/one-step-a.json
+          python scripts/experiments/active_decision_identification.py \
+            --output build/active-decision-identification/one-step-b.json
+          cmp \
+            build/active-decision-identification/one-step-a.json \
+            build/active-decision-identification/one-step-b.json
+          python scripts/experiments/sequential_decision_identification.py \
+            --output build/active-decision-identification/sequential-a.json
+          python scripts/experiments/sequential_decision_identification.py \
+            --output build/active-decision-identification/sequential-b.json
+          cmp \
+            build/active-decision-identification/sequential-a.json \
+            build/active-decision-identification/sequential-b.json
           python -m json.tool \
-            build/active-decision-identification/result.json >/dev/null
+            build/active-decision-identification/one-step-a.json >/dev/null
+          python -m json.tool \
+            build/active-decision-identification/sequential-a.json >/dev/null
 
-      - name: Upload result
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
+      - name: Upload deterministic results
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
           name: active-decision-identification-${{ github.sha }}
-          path: build/active-decision-identification/result.json
+          path: |
+            build/active-decision-identification/one-step-a.json
+            build/active-decision-identification/sequential-a.json
           if-no-files-found: error
           retention-days: 30
