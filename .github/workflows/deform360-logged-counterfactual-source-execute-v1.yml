@@ -25,6 +25,7 @@ jobs:
       COUNTERFACTUAL_PROTOCOL: protocols/deform360_logged_counterfactual_source_v1.json
       PINNED_DEFORM360_SHA: 0fe36f0b7a7a917ba62b5f8cee707299a9a4a317
       OUT_ROOT: /home/github-runner/.cache/workflows/causal4d-logged-counterfactual-source-v1
+      OPENCV_SITE: /home/github-runner/.cache/causal4d/runtime/opencv-contrib-python-headless-4.10.0.84-py312
     steps:
       - name: Check out exact research revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -56,7 +57,7 @@ jobs:
           mkdir -p "$out/logs" "$out/episodes"
           echo "RUN_OUT=$out" >> "$GITHUB_ENV"
 
-      - name: Select runtime and provision only OpenCV in an isolated target
+      - name: Select runtime and provision isolated OpenCV cache
         shell: bash
         run: |
           set -euo pipefail
@@ -75,13 +76,13 @@ jobs:
             fi
           done
           test -n "$selected"
-          site="$RUNNER_TEMP/causal4d-counterfactual-site-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          mkdir -p "$site"
-          if ! "$selected" -c 'import cv2' >/dev/null 2>&1; then
-            "$selected" -m pip install --disable-pip-version-check --no-input --no-cache-dir \
-              --no-deps --target "$site" 'opencv-contrib-python-headless==4.10.0.84'
+          mkdir -p "$OPENCV_SITE"
+          if ! PYTHONPATH="$OPENCV_SITE" "$selected" -c 'import cv2' >/dev/null 2>&1; then
+            rm -rf "$OPENCV_SITE"/*
+            "$selected" -m pip install --disable-pip-version-check --no-input \
+              --no-deps --target "$OPENCV_SITE" 'opencv-contrib-python-headless==4.10.0.84'
           fi
-          export PYTHONPATH="$site:$PWD/src:$PWD/_deform360"
+          export PYTHONPATH="$OPENCV_SITE:$PWD/src:$PWD/_deform360"
           "$selected" - <<'PY'
           import cv2, h5py, numpy, scipy
           import deform360
@@ -90,7 +91,6 @@ jobs:
           PY
           echo "RUN_PYTHON=$selected" >> "$GITHUB_ENV"
           echo "PYTHONPATH=$PYTHONPATH" >> "$GITHUB_ENV"
-          echo "RUNTIME_SITE=$site" >> "$GITHUB_ENV"
 
       - name: Create target-closed preflight and contact model
         shell: bash
@@ -113,7 +113,7 @@ jobs:
           for episode in 0 3 4 5 8; do
             ep="$RUN_OUT/episodes/source${episode}"
             mkdir -p "$ep"
-            "$RUN_PYTHON" scripts/remote/rebind_deform360_retained_source_masks.py \
+            "$RUN_PYTHON" scripts/remote/rebind_deform360_retained_source_masks_v2.py \
               "$PROCESSED_ROOT" "$episode" "$RUN_OUT/preflight.json" \
               "$ep/views.json" "$ep/masks.json" \
               --config "$PROTOCOL_CONFIG" \
@@ -225,9 +225,3 @@ jobs:
           path: ${{ env.RUN_OUT }}
           if-no-files-found: error
           retention-days: 90
-
-      - name: Remove isolated OpenCV target
-        if: always()
-        shell: bash
-        run: |
-          rm -rf "${RUNTIME_SITE:-}"
