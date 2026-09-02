@@ -1,8 +1,8 @@
 """Causally strict logged cross-intervention evaluation for Deform360 rope.
 
-Factual interaction A may be consumed completely for abduction.  Challenge
+Factual interaction A may be consumed completely for abduction. Challenge
 interaction B contributes only its observed prefix geometry/contact state and
-its released future controller trajectory to prediction.  B future geometry is
+its released future controller trajectory to prediction. B future geometry is
 reserved for scoring, and future tactile/contact annotations are never consumed
 by the predictive branch.
 """
@@ -24,11 +24,7 @@ from .deform360_logged_counterfactual import (
     logged_counterfactual_artifact_sha256,
 )
 from .deform360_rope_dynamics import RopeDynamicsObservation, rollout_rope_dynamics
-from .deform360_rope_fit import (
-    RopeForwardFitConfig,
-    _candidate_parameters,
-    _mean_chamfer_m,
-)
+from .deform360_rope_fit import RopeForwardFitConfig, _candidate_parameters
 from .deform360_rope_observations import (
     DEFORM360_ROPE_OBSERVATION_SCHEMA_VERSION,
     load_source_rope_dynamics_observation,
