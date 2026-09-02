@@ -77,6 +77,14 @@ and all registered probe conditional laws. A decision-only quotient is generally
 insufficient for sequential acquisition because hypotheses with identical
 terminal decisions may require different next probes.
 
+More precisely, a passive decision quotient is sequentially sufficient for the
+registered probe roster if and only if every probe likelihood row is constant
+inside every decision class. This is the finite controlled-state lumpability
+condition: only then can every class posterior be updated from class mass and the
+probe outcome without restoring hidden within-class state. The executable
+`audit_decision_quotient_for_probes` routine either certifies this condition or
+returns concrete decision-equivalent hypothesis pairs with different probe laws.
+
 The theorem is deliberately interface-relative. It does not preserve arbitrary
 future losses, unregistered probes, or unrestricted physical-state covariance.
 
@@ -110,8 +118,11 @@ to the observed route. Every terminal leaf certifies the correct action while
 eight complete hypotheses remain compatible. Thus decision identification is
 strictly weaker than complete-state identification.
 
-The probe--action quotient reduces the 32 complete hypotheses to 16 classes and
-reproduces the complete adaptive policy and both cost criteria exactly.
+The passive decision quotient has only two classes, but it fails the probe
+lumpability audit because route and local-probe likelihoods vary within those
+classes. The probe--action quotient refines it to 16 classes, removes one
+irrelevant duplicated microstate bit, and reproduces the complete adaptive policy
+and both cost criteria exactly.
 
 ## One-step certificate composition
 
