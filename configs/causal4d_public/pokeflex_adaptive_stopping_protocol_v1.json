@@ -1,0 +1,67 @@
+{
+  "schema": "causal4d/pokeflex-adaptive-stopping-protocol",
+  "schema_version": 1,
+  "protocol_id": "pokeflex-query-directed-anytime-two-probe-v1",
+  "role": "secondary-after-positive-one-probe-primary",
+  "maximum_probe_count": 2,
+  "stopping_rule": {
+    "act_when_worst_case_decision_regret_at_most_epsilon": true,
+    "probe_only_when_expected_regret_reduction_exceeds_cost": true,
+    "fallback_when_no_safe_positive_value_probe_exists": true,
+    "epsilon_selected_on_source_objects_only": true,
+    "probe_cost_weight_selected_on_source_objects_only": true
+  },
+  "policy_panel": [
+    "no-probe",
+    "source-fixed-probe-order",
+    "random-safe-with-stopping",
+    "greedy-generic-mutual-information-with-stopping",
+    "greedy-task-conditioned-regret-reduction-with-stopping",
+    "dependence-destroyed-task-policy",
+    "oracle-diagnostic-only"
+  ],
+  "custody": {
+    "same_joint_prediction_seal_as_one_probe_study": true,
+    "maximum_two_selected_responses_per_policy_query": true,
+    "unselected_response_reads_forbidden": true,
+    "challenge_outcomes_forbidden_before_prediction_seal": true,
+    "target_policy_or_threshold_changes_forbidden": true,
+    "target_retry_forbidden": true
+  },
+  "primary_endpoints": [
+    "object-balanced-downstream-decision-regret",
+    "area-under-regret-versus-probe-cost-curve",
+    "mean-probe-count",
+    "decision-certification-rate",
+    "fallback-rate",
+    "harmful-nonfallback-rate"
+  ],
+  "source_gate": {
+    "minimum_regret_cost_auc_gain_vs_generic_information": 0.02,
+    "maximum_mean_probe_count_ratio_vs_generic_information": 1.0,
+    "minimum_dependence_placebo_advantage_collapse_fraction": 0.5,
+    "minimum_probe_count_diversity": 2
+  },
+  "target_success": {
+    "positive_object_balanced_regret_gain_vs_fixed_order": true,
+    "positive_object_balanced_regret_gain_vs_generic_information": true,
+    "positive_regret_cost_auc_gain_vs_generic_information": true,
+    "mean_probe_count_no_greater_than_generic_information": true,
+    "minimum_certified_objects_out_of_nine": 7,
+    "maximum_harmful_nonfallback_objects": 1
+  },
+  "statistics": {
+    "primary_unit": "physical-object",
+    "queries_reported_separately": true,
+    "paired_object_bootstrap": true,
+    "exact_object_sign_test": true,
+    "frame_pseudoreplication_forbidden": true
+  },
+  "claim_boundary": {
+    "offline_reset_matched_multi_observation_acquisition": true,
+    "physical_sequential_execution_claim": false,
+    "identical_state_after_first_probe_claim": false,
+    "deployment_safety_claim": false,
+    "general_state_of_the_art_claim": false
+  }
+}
