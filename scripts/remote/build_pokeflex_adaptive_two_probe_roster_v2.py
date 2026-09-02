@@ -61,9 +61,7 @@ def salted_order(
 
 
 def role_map(protocol: dict[str, Any]) -> dict[str, str]:
-    registered = protocol["object_split"][
-        "expected_if_all_18_objects_are_eligible"
-    ]
+    registered = protocol["object_split"]["expected_if_all_18_objects_are_eligible"]
     roles: dict[str, str] = {}
     for values in registered["target"].values():
         for object_id in values:
@@ -77,9 +75,7 @@ def role_map(protocol: dict[str, Any]) -> dict[str, str]:
 
 
 def family_map(protocol: dict[str, Any]) -> dict[str, str]:
-    registered = protocol["object_split"][
-        "expected_if_all_18_objects_are_eligible"
-    ]
+    registered = protocol["object_split"]["expected_if_all_18_objects_are_eligible"]
     families: dict[str, str] = {}
     for family, values in registered["target"].items():
         for object_id in values:
@@ -148,17 +144,12 @@ def build_roster(
     require(len(roles) == 18, "protocol roles do not cover 18 objects")
     require(set(roles) == set(families), "family and role maps disagree")
 
-    panels = {
-        panel["object_id"]: panel for panel in audit["object_panels"]
-    }
+    panels = {panel["object_id"]: panel for panel in audit["object_panels"]}
     require(set(panels) == set(roles), "audit object roster changed")
 
     drops_by_object: dict[str, list[str]] = defaultdict(list)
     for archive in audit["archives"]:
-        if (
-            archive["action_class"] == "dropping"
-            and archive["has_state_carrier"]
-        ):
+        if archive["action_class"] == "dropping" and archive["has_state_carrier"]:
             drops_by_object[archive["object_id"]].append(archive["take_id"])
 
     roles_config = protocol["take_roles"]
@@ -197,9 +188,7 @@ def build_roster(
         )
         checks[f"{object_id}:minimum-complete-pokes"] = enough_pokes
         checks[f"{object_id}:exact-four-probe-library"] = exact_library
-        checks[f"{object_id}:twelve-ordered-two-probe-paths"] = (
-            exact_pair_count
-        )
+        checks[f"{object_id}:twelve-ordered-two-probe-paths"] = exact_pair_count
         checks[f"{object_id}:target-drop-support"] = enough_drops
         objects.append(
             {
@@ -215,10 +204,7 @@ def build_roster(
                 "complete_drop_take_ids": drops,
                 "complete_drop_count": len(drops),
                 "structurally_feasible": (
-                    enough_pokes
-                    and exact_library
-                    and exact_pair_count
-                    and enough_drops
+                    enough_pokes and exact_library and exact_pair_count and enough_drops
                 ),
             }
         )
@@ -246,9 +232,7 @@ def build_roster(
         if item["role"] == "target"
     )
     checks["all-targets-have-at-least-two-drop-challenges"] = all(
-        item["complete_drop_count"] >= 2
-        for item in objects
-        if item["role"] == "target"
+        item["complete_drop_count"] >= 2 for item in objects if item["role"] == "target"
     )
     proceed = all(checks.values())
 
@@ -263,9 +247,7 @@ def build_roster(
         "protocol_id": PROTOCOL_ID,
         "protocol_sha256": protocol["protocol_sha256"],
         "metadata_audit_id": audit["audit_id"],
-        "metadata_identity_sha256": audit["dataset"][
-            "metadata_identity_sha256"
-        ],
+        "metadata_identity_sha256": audit["dataset"]["metadata_identity_sha256"],
         "information_boundary": {
             "archive_member_payload_opened": False,
             "archive_member_payload_bytes_read": 0,
