@@ -45,18 +45,26 @@ jobs:
               raise SystemExit("expected NumPy import anchor not found")
           text = text.replace(import_old, import_new, 1)
 
-          body_old = '''    result = np.asarray(
-        structural + calibration.require_finite_margin(),
-        dtype=np.float64,
-    )
-    result.setflags(write=False)
-    return result
-'''
-          body_new = '''    return readonly_array(
-        structural + calibration.require_finite_margin(),
-        dtype=np.float64,
-    )
-'''
+          body_old = "\n".join(
+              (
+                  "    result = np.asarray(",
+                  "        structural + calibration.require_finite_margin(),",
+                  "        dtype=np.float64,",
+                  "    )",
+                  "    result.setflags(write=False)",
+                  "    return result",
+                  "",
+              )
+          )
+          body_new = "\n".join(
+              (
+                  "    return readonly_array(",
+                  "        structural + calibration.require_finite_margin(),",
+                  "        dtype=np.float64,",
+                  "    )",
+                  "",
+              )
+          )
           if body_old not in text:
               raise SystemExit("expected reversible write-flag block not found")
           text = text.replace(body_old, body_new, 1)
