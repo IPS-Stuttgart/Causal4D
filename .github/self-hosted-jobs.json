@@ -299,6 +299,20 @@
       "workflow": "optional-integrations.yml"
     },
     {
+      "authorization_model": "reviewed-file-main",
+      "dataset_access": "verified-public-pokeflex-zip-central-directory-metadata-only",
+      "job": "audit",
+      "purpose": "Metadata-only PokeFlex probe/challenge fold feasibility audit",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "gpuserver4090"
+      ],
+      "secrets_allowed": false,
+      "workflow": "pokeflex-probe-challenge-fold-audit-gpuserver4090.yml"
+    },
+    {
       "authorization_model": "main-only",
       "dataset_access": "verified-public-pokeflex-development-robot-records-only",
       "job": "evaluate",
