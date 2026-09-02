@@ -7,13 +7,17 @@ from causal4d_public.deform360_logged_counterfactual import (
     _factual_partner_map,
     _factual_posterior,
     _permutation_shift,
-    evaluate_logged_cross_intervention_abduction,
+)
+from causal4d_public.deform360_logged_counterfactual_strict import (
+    _strict_challenge_bank,
+    evaluate_logged_cross_intervention_abduction_strict,
 )
 from causal4d_public.deform360_rope_dynamics import (
     RopeDynamicsObservation,
     SharedRopeDynamicsParameters,
     rollout_rope_dynamics,
 )
+from causal4d_public.deform360_rope_fit import RopeForwardFitConfig
 
 
 def _synthetic_observation(
@@ -96,6 +100,33 @@ def test_primary_pairing_never_uses_the_challenge_itself() -> None:
     assert all(challenge != factual for challenge, factual in mapping.items())
 
 
+def test_strict_challenge_ignores_future_contact_annotations() -> None:
+    original = _synthetic_observation(0, np.asarray([0.0, 1.0, 0.0]))
+    altered_active = np.asarray(original.contact_active).copy()
+    altered_active[7:, 0] = False
+    altered = RopeDynamicsObservation(
+        episode_id=original.episode_id,
+        positions_m=original.positions_m,
+        controller_positions_m=original.controller_positions_m,
+        contact_active=altered_active,
+        contact_node_indices=(0,),
+        contact_offsets_m=np.asarray([[100.0, -100.0, 50.0]]),
+        dt_seconds=original.dt_seconds,
+    )
+    config = RopeForwardFitConfig(prefix_frame_count=6)
+    bank_original = _strict_challenge_bank(original, forward_config=config)
+    bank_altered = _strict_challenge_bank(altered, forward_config=config)
+    assert np.array_equal(
+        bank_original["candidate_rollouts"], bank_altered["candidate_rollouts"]
+    )
+    assert (
+        bank_original["challenge_contact_realization"][
+            "future_contact_annotations_read_for_prediction"
+        ]
+        is False
+    )
+
+
 def test_source_evaluator_uses_distinct_logged_interventions() -> None:
     observations = [
         _synthetic_observation(0, np.asarray([0.0, 1.0, 0.0])),
@@ -103,7 +134,7 @@ def test_source_evaluator_uses_distinct_logged_interventions() -> None:
         _synthetic_observation(2, np.asarray([0.0, -1.0, 0.0])),
         _synthetic_observation(3, np.asarray([0.0, 0.6, 0.8])),
     ]
-    result = evaluate_logged_cross_intervention_abduction(
+    result = evaluate_logged_cross_intervention_abduction_strict(
         observations,
         protocol_id="synthetic-logged-counterfactual-v1",
         config=LoggedCounterfactualConfig(
@@ -121,4 +152,8 @@ def test_source_evaluator_uses_distinct_logged_interventions() -> None:
         row["permutation_preserves_weight_multiset"]
         for row in result["all_ordered_pairs"]
     )
-    assert result["event_specific_latent_policy"].startswith("challenge contact")
+    assert "B prefix geometry/contact realization" in result["challenge_intervention"]
+    assert all(
+        not diagnostics["future_contact_annotations_read_for_prediction"]
+        for diagnostics in result["challenge_contact_diagnostics"].values()
+    )
