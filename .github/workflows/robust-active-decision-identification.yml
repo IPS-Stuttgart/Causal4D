@@ -61,7 +61,7 @@ jobs:
           )
           python -m ruff check "${files[@]}"
           python -m ruff format --check "${files[@]}"
-          python -m mypy \
+          python -m mypy --no-site-packages \
             src/causal4d/active_decision_calibration.py \
             src/causal4d/robust_active_decision_identification.py
           python -m pytest -q \
