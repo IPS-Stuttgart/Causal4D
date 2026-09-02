@@ -7,9 +7,9 @@ import argparse
 import json
 from pathlib import Path
 
-from causal4d_public.deform360_logged_counterfactual import (
-    LoggedCounterfactualConfig,
-    build_logged_counterfactual_source_artifact,
+from causal4d_public.deform360_logged_counterfactual import LoggedCounterfactualConfig
+from causal4d_public.deform360_logged_counterfactual_strict import (
+    build_logged_counterfactual_source_artifact_strict,
 )
 
 
@@ -29,7 +29,7 @@ def main() -> None:
     payloads = [
         json.loads(path.read_text(encoding="utf-8")) for path in args.observation_json
     ]
-    result = build_logged_counterfactual_source_artifact(
+    result = build_logged_counterfactual_source_artifact_strict(
         payloads,
         protocol_id=args.protocol_id,
         config=LoggedCounterfactualConfig(),
