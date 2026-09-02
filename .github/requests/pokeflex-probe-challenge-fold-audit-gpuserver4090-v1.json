@@ -1,0 +1,44 @@
+{
+  "expected": {
+    "archive_count": 170,
+    "dropping_count": 54,
+    "poking_count": 116
+  },
+  "information_boundary": {
+    "archive_member_decompression_allowed": false,
+    "archive_member_extraction_allowed": false,
+    "archive_member_open_allowed": false,
+    "challenge_outcome_allowed": false,
+    "probe_response_payload_allowed": false,
+    "zip_central_directory_metadata_only": true
+  },
+  "next_stage_if_passed": "freeze-source-only-action-and-response-carrier-contract",
+  "prior_run": {
+    "archive_member_payload_opened": false,
+    "audit_id": "73d63e1d1980c723346b55288ef75a3535bde814d5d2603bcc6d4c0a21cb68fc",
+    "dataset_gate_passed": true,
+    "failure_stage": "post-audit verifier only",
+    "workflow_run_id": 33589834614
+  },
+  "request_id": "pokeflex-probe-challenge-fold-audit-gpuserver4090-v1",
+  "retry_reason": "direct file-change launch after the action-qualified identity repair; GitHub suppresses workflow chaining from GITHUB_TOKEN-authored pushes",
+  "roots": [
+    "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+    "/home/github-runner/.cache/datasets/pokeflex",
+    "/home/github-runner/.cache/workflows/pokeflex"
+  ],
+  "runner_label": "gpuserver4090",
+  "schema": "causal4d/pokeflex-probe-challenge-fold-audit-request",
+  "schema_version": 1,
+  "selection": {
+    "minimum_candidate_pokes": 3,
+    "minimum_drops": 2,
+    "minimum_eligible_objects": 12,
+    "query_ids": [
+      "held-poke-response",
+      "held-drop-response"
+    ],
+    "salt": "PokeFlex-active-probe-folds-v1-2026-09-02"
+  },
+  "technical_revision": 4
+}
