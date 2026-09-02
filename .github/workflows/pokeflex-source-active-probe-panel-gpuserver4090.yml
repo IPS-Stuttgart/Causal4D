@@ -1,0 +1,157 @@
+name: PokeFlex source active-probe panel
+
+on:
+  push:
+    branches:
+      - science/pokeflex-sequential-probe-source-v1
+    paths:
+      - ".github/requests/pokeflex-source-active-probe-panel-gpuserver4090-v1.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pokeflex-source-active-probe-panel-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Validate source active-probe panel contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Install focused dependencies
+        run: |
+          python -m pip install --disable-pip-version-check \
+            numpy==2.2.6 \
+            scipy==1.15.3 \
+            ruff==0.16.5
+
+      - name: Validate request, compile, and lint
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          request = json.loads(
+              Path(
+                  ".github/requests/"
+                  "pokeflex-source-active-probe-panel-gpuserver4090-v1.json"
+              ).read_text(encoding="utf-8")
+          )
+          assert request["schema"] == (
+              "causal4d/pokeflex-source-active-probe-panel-request"
+          )
+          assert request["schema_version"] == 1
+          assert request["continuous_action_interface"]["gate_passed"] is True
+          assert request["continuous_action_interface"]["content_sha256"] == (
+              "d94815f7bb832fc18350a6a42f624cf8bdced5e5914cf58977927bbbfd53e577"
+          )
+          assert len(request["source_objects"]) == 9
+          assert len(request["calibration_objects"]) == 3
+          assert len(request["target_objects_excluded"]) == 6
+          assert set(request["source_objects"]).isdisjoint(request["calibration_objects"])
+          assert set(request["source_and_calibration_objects"]) == (
+              set(request["source_objects"]) | set(request["calibration_objects"])
+          )
+          assert set(request["source_and_calibration_objects"]).isdisjoint(
+              request["target_objects_excluded"]
+          )
+          assert request["poking_take_indices"] == [1, 2, 3, 4, 5, 6]
+          assert request["dropping_take_indices"] == [1, 2, 3]
+          assert request["information_boundary"]["target_archive_open_allowed"] is False
+          PY
+          python -m py_compile \
+            scripts/remote/audit_pokeflex_probe_action_classes_gpuserver4090.py \
+            scripts/remote/extract_pokeflex_source_active_probe_panel.py \
+            scripts/ci/verify_pokeflex_source_active_probe_panel.py
+          python -m ruff check \
+            scripts/remote/audit_pokeflex_probe_action_classes_gpuserver4090.py \
+            scripts/remote/extract_pokeflex_source_active_probe_panel.py \
+            scripts/ci/verify_pokeflex_source_active_probe_panel.py
+
+  extract:
+    name: Extract source/calibration poke-to-drop panel on gpuserver4090
+    needs: contract
+    runs-on: [self-hosted, Linux, X64, gpuserver4090]
+    timeout-minutes: 240
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Create isolated numerical runtime
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pokeflex-source-panel-venv"
+          "$RUNNER_TEMP/pokeflex-source-panel-venv/bin/python" \
+            -m pip install --disable-pip-version-check \
+              numpy==2.2.6 \
+              scipy==1.15.3
+
+      - name: Extract compact source-only panel
+        run: |
+          rm -rf build/pokeflex-source-active-probe-panel
+          mkdir -p build/pokeflex-source-active-probe-panel
+          "$RUNNER_TEMP/pokeflex-source-panel-venv/bin/python" \
+            scripts/remote/extract_pokeflex_source_active_probe_panel.py \
+            --root /mnt/seagate10tb/florianpfaff/datasets/pokeflex \
+            --request \
+              .github/requests/pokeflex-source-active-probe-panel-gpuserver4090-v1.json \
+            --action-module \
+              scripts/remote/audit_pokeflex_probe_action_classes_gpuserver4090.py \
+            --output-dir build/pokeflex-source-active-probe-panel/result \
+            --cache-path \
+              /home/github-runner/.cache/workflows/pokeflex-active-probe-source-v1/source_panel.json
+
+      - name: Independently verify compact panel
+        run: |
+          "$RUNNER_TEMP/pokeflex-source-panel-venv/bin/python" \
+            scripts/ci/verify_pokeflex_source_active_probe_panel.py \
+            build/pokeflex-source-active-probe-panel/result/panel.json \
+            --output-json \
+              build/pokeflex-source-active-probe-panel/verification.json
+
+      - name: Record runner provenance
+        if: always()
+        run: |
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "workflow_run=${GITHUB_RUN_ID}"
+            echo "workflow_attempt=${GITHUB_RUN_ATTEMPT}"
+            echo "head_sha=${GITHUB_SHA}"
+          } > build/pokeflex-source-active-probe-panel/runner.txt
+
+      - name: Publish panel summary
+        if: always()
+        run: |
+          if test -f build/pokeflex-source-active-probe-panel/result/panel.md; then
+            cat build/pokeflex-source-active-probe-panel/result/panel.md \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload source-only panel evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pokeflex-source-active-probe-panel-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/pokeflex-source-active-probe-panel/
+            .github/requests/pokeflex-source-active-probe-panel-gpuserver4090-v1.json
+          if-no-files-found: error
+          retention-days: 90
