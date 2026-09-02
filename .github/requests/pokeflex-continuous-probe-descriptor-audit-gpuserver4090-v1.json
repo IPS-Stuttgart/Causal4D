@@ -1,0 +1,84 @@
+{
+  "contact_model": {
+    "candidate_tip_offsets_m": [
+      -0.25,
+      -0.225,
+      -0.2,
+      -0.175,
+      -0.15,
+      -0.125,
+      -0.1,
+      -0.075,
+      -0.05,
+      -0.025,
+      0.0,
+      0.025,
+      0.05,
+      0.075,
+      0.1,
+      0.125,
+      0.15,
+      0.175,
+      0.2,
+      0.225,
+      0.25
+    ],
+    "candidate_tool_axes": [0, 1, 2],
+    "descriptor_window_frames": 5,
+    "force_threshold_n": 3.0
+  },
+  "dataset_root": "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+  "gate_thresholds": {
+    "intrinsic_rank_relative_tolerance": 0.05,
+    "maximum_median_contact_index_error": 20.0,
+    "maximum_median_surface_distance_m": 0.15,
+    "maximum_p90_contact_index_error": 60.0,
+    "maximum_p90_nearest_other_object_distance": 6.0,
+    "minimum_force_contact_fraction": 0.9,
+    "minimum_intrinsic_rank": 5,
+    "minimum_object_median_pairwise_distance": 1.0
+  },
+  "information_boundary": {
+    "allowed_payload": "source/calibration poking robot_data.json and first mesh only",
+    "challenge_outcome_allowed": false,
+    "drop_archive_open_allowed": false,
+    "image_member_open_allowed": false,
+    "other_mesh_member_open_allowed": false,
+    "target_archive_open_allowed": false
+  },
+  "next_stage_if_passed": "run-source-only-continuous-sequential-probe-qualification",
+  "prior_action_class_audit": {
+    "artifact_digest": "sha256:1718c46910a3ec1a1fc2ea203aff885fc28506ab731ef373043d72724f8b8e0f",
+    "artifact_id": 9842165711,
+    "content_sha256": "12450e44d7f32330d2d7608f3b13535e6373427e3bc60c0815038ccd10979247",
+    "gate_passed": false,
+    "run_id": 33619100786
+  },
+  "request_id": "pokeflex-continuous-probe-descriptor-audit-gpuserver4090-v1",
+  "runner_label": "gpuserver4090",
+  "schema": "causal4d/pokeflex-continuous-probe-descriptor-audit-request",
+  "schema_version": 1,
+  "source_and_calibration_objects": [
+    "3dPrintedHeart",
+    "3dPrintedPyramid",
+    "FoamDice",
+    "FoamHalfSphere",
+    "PlushDice",
+    "PlushMoon",
+    "PlushTurtle",
+    "PlushVolleyball",
+    "ToiletPaperRoll",
+    "3dPrintedPizza",
+    "FoamCylinder",
+    "PlushOctopus"
+  ],
+  "take_indices": [1, 2, 3, 4, 5, 6],
+  "target_objects_excluded": [
+    "3dPrintedBunny",
+    "3dPrintedCylinder",
+    "Sponge",
+    "MemoryFoam",
+    "Beanbag",
+    "Pillow"
+  ]
+}
