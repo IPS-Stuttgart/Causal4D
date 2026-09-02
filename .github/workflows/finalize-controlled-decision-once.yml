@@ -1,0 +1,208 @@
+# workflow-lifecycle: temporary
+# workflow-owner: IPS-Stuttgart maintainers
+name: Finalize controlled decision PR once
+
+on:
+  push:
+    branches:
+      - feature/controlled-decision-identification-v1
+    paths:
+      - ".github/workflows/finalize-controlled-decision-once.yml"
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  validate-clean-and-merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feature/controlled-decision-identification-v1
+          persist-credentials: true
+          fetch-depth: 0
+          clean: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Revalidate and produce final clean head
+        env:
+          PYTHONPATH: src
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            numpy==2.2.6 \
+            pytest==8.4.2 \
+            ruff==0.16.5
+          files=(
+            src/causal4d/controlled_decision_identification.py
+            tests/test_controlled_decision_identification.py
+            scripts/experiments/controlled_decision_identification.py
+          )
+          python -m ruff format "${files[@]}"
+          python -m ruff check "${files[@]}"
+          pytest -q \
+            tests/test_controlled_decision_identification.py \
+            tests/test_sequential_decision_identification.py \
+            tests/test_probe_quotient_audit.py
+          mkdir -p build/controlled-decision-identification
+          python scripts/experiments/controlled_decision_identification.py \
+            --output build/controlled-decision-identification/result-a.json
+          python scripts/experiments/controlled_decision_identification.py \
+            --output build/controlled-decision-identification/result-b.json
+          cmp \
+            build/controlled-decision-identification/result-a.json \
+            build/controlled-decision-identification/result-b.json
+
+          git rm -f --ignore-unmatch \
+            .github/workflows/format-controlled-decision-once.yml \
+            .github/workflows/finalize-controlled-decision-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Finalize controlled decision-identification implementation"
+            git push origin HEAD:feature/controlled-decision-identification-v1
+          fi
+
+      - name: Wait for exact-head checks and merge only if green
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          BRANCH: feature/controlled-decision-identification-v1
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import time
+          import urllib.parse
+          import urllib.request
+
+          repository = os.environ["REPOSITORY"]
+          owner = repository.split("/", 1)[0]
+          branch = os.environ["BRANCH"]
+          token = os.environ["GH_TOKEN"]
+          api = "https://api.github.com"
+          expected_files = {
+              ".github/workflows/controlled-decision-identification.yml",
+              "docs/controlled_contact_topology_experiment.md",
+              "docs/controlled_decision_identification.md",
+              "scripts/experiments/controlled_decision_identification.py",
+              "src/causal4d/controlled_decision_identification.py",
+              "tests/test_controlled_decision_identification.py",
+          }
+          required_workflows = {
+              "Controlled decision identification",
+              "CI and release",
+              "Extended compatibility",
+              "Security scanning",
+              "Causal4D merge gate",
+          }
+
+          def request(path: str, *, method: str = "GET", payload: object = None):
+              data = None
+              if payload is not None:
+                  data = json.dumps(payload).encode("utf-8")
+              req = urllib.request.Request(
+                  api + path,
+                  data=data,
+                  method=method,
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {token}",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                      "User-Agent": "controlled-decision-finalizer",
+                  },
+              )
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  return json.load(response)
+
+          encoded_branch = urllib.parse.quote(branch, safe="")
+          branch_record = request(f"/repos/{repository}/branches/{encoded_branch}")
+          head_sha = branch_record["commit"]["sha"]
+          pulls = request(
+              f"/repos/{repository}/pulls?state=open&head={owner}%3A{encoded_branch}"
+          )
+          if len(pulls) != 1:
+              raise SystemExit(f"expected exactly one open PR for {branch}, got {len(pulls)}")
+          pull = pulls[0]
+          if pull["base"]["ref"] != "main" or pull["head"]["sha"] != head_sha:
+              raise SystemExit("PR base/head identity changed")
+
+          comparison = request(f"/repos/{repository}/compare/main...{head_sha}")
+          changed = {item["filename"] for item in comparison["files"]}
+          if changed != expected_files:
+              raise SystemExit(
+                  "unexpected final diff: "
+                  + json.dumps(
+                      {
+                          "missing": sorted(expected_files - changed),
+                          "extra": sorted(changed - expected_files),
+                      },
+                      sort_keys=True,
+                  )
+              )
+
+          deadline = time.monotonic() + 35 * 60
+          while time.monotonic() < deadline:
+              runs = request(
+                  f"/repos/{repository}/actions/runs?head_sha={head_sha}&per_page=100"
+              )["workflow_runs"]
+              latest = {}
+              for run in sorted(runs, key=lambda item: item["created_at"], reverse=True):
+                  latest.setdefault(run["name"], run)
+              present = required_workflows & latest.keys()
+              failed = {
+                  name: latest[name]["conclusion"]
+                  for name in present
+                  if latest[name]["status"] == "completed"
+                  and latest[name]["conclusion"] != "success"
+              }
+              if failed:
+                  raise SystemExit("required workflow failed: " + json.dumps(failed))
+              if required_workflows <= latest.keys() and all(
+                  latest[name]["status"] == "completed"
+                  and latest[name]["conclusion"] == "success"
+                  for name in required_workflows
+              ):
+                  break
+              time.sleep(10)
+          else:
+              raise SystemExit("timed out waiting for exact-head required workflows")
+
+          result = request(
+              f"/repos/{repository}/pulls/{pull['number']}/merge",
+              method="PUT",
+              payload={
+                  "commit_title": (
+                      "Add controlled decision identification under "
+                      f"state-changing interventions (#{pull['number']})"
+                  ),
+                  "sha": head_sha,
+                  "merge_method": "squash",
+              },
+          )
+          if not result.get("merged"):
+              raise SystemExit("GitHub did not merge the validated PR: " + json.dumps(result))
+          print(
+              json.dumps(
+                  {
+                      "pull_request": pull["number"],
+                      "validated_head": head_sha,
+                      "merge_sha": result["sha"],
+                  },
+                  sort_keys=True,
+              )
+          )
+          PY
