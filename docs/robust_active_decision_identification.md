@@ -101,6 +101,10 @@ Under exchangeability of complete calibration and future groups, and provided
 the structural procedure was fixed without using calibration outcomes, this is
 a finite-sample group-marginal statement. It is not conditional coverage.
 
+All array-valued calibration outputs returned by public helpers use immutable,
+bytes-backed storage. Merely clearing a NumPy write flag is not treated as an
+artifact-integrity boundary because callers can re-enable that flag.
+
 ## Selection-safe outcome-probability boxes
 
 For `n` independent, identically distributed complete trials of a categorical
