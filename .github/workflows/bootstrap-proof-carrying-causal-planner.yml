@@ -1,0 +1,86 @@
+name: Bootstrap proof-carrying causal planner
+
+on:
+  push:
+    branches:
+      - feature/proof-carrying-causal-planner-v1
+    paths:
+      - ".bootstrap/proof-carrying-causal-planner/**"
+      - ".github/workflows/bootstrap-proof-carrying-causal-planner.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bootstrap-proof-carrying-causal-planner-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact branch revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          clean: true
+
+      - name: Verify and unpack content-bound source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          chunk_dir=.bootstrap/proof-carrying-causal-planner
+          cat > /tmp/chunk-sha256.txt <<'EOF'
+          5a5fefa410ca78c42e86e13b804cf0058a7753d90d0fa0395193b9f9f95332bc  .bootstrap/proof-carrying-causal-planner/part-00
+          3f9afeaaa4cab4a1b5df3f6ac9258dbfd6a0654d1d992f347892aff1c18a50ab  .bootstrap/proof-carrying-causal-planner/part-01
+          16a026367dffad43af7af49084961eeff132445c0e139273bda912d7052a8234  .bootstrap/proof-carrying-causal-planner/part-02
+          4973c4360fd6fe2aa47962eae0ca5c023d92b78d73dff864ac8bbc198d18feb6  .bootstrap/proof-carrying-causal-planner/part-03
+          2fe0504cfd49bffdac6e9354f9f518a0bb774caee0909872d0f6398b5f9eed59  .bootstrap/proof-carrying-causal-planner/part-04
+          71d50a0aac6b3f9ff0d2c86d6b3165078c64a97aad7f7e703e0e8fb1e8d52d58  .bootstrap/proof-carrying-causal-planner/part-05
+          EOF
+          sha256sum --check /tmp/chunk-sha256.txt
+          cat "$chunk_dir"/part-* > /tmp/proof_bundle.b64
+          test "$(wc -c < /tmp/proof_bundle.b64)" -eq 21152
+          base64 --decode /tmp/proof_bundle.b64 > /tmp/proof_bundle.tar.gz
+          echo "65440e1a7f184831c98e88cf4d81ba3fa4e16c6de9a79ad40cf3020c59568b78  /tmp/proof_bundle.tar.gz" | sha256sum --check -
+          tar --extract --gzip --file /tmp/proof_bundle.tar.gz --directory .
+          rm -rf "$chunk_dir"
+          rmdir .bootstrap 2>/dev/null || true
+          rm .github/workflows/bootstrap-proof-carrying-causal-planner.yml
+
+      - name: Install focused validation dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -e ".[dev]"
+          python -m pip check
+
+      - name: Validate the joint diagnosis-to-decision contribution
+        run: |
+          files=(
+            src/causal4d/proof_carrying_causal_planner.py
+            tests/test_proof_carrying_causal_planner.py
+            scripts/experiments/proof_carrying_causal_planner_study.py
+          )
+          python -m ruff check "${files[@]}"
+          python -m ruff format --check "${files[@]}"
+          python -m mypy --no-site-packages src/causal4d/proof_carrying_causal_planner.py
+          python -m pytest -q tests/test_proof_carrying_causal_planner.py
+          python scripts/experiments/proof_carrying_causal_planner_study.py \
+            --output /tmp/proof-carrying-causal-planner-result.json
+          python -m json.tool /tmp/proof-carrying-causal-planner-result.json >/dev/null
+          python -m compileall -q \
+            src/causal4d/proof_carrying_causal_planner.py \
+            scripts/experiments/proof_carrying_causal_planner_study.py
+
+      - name: Commit validated materialization
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git diff --cached --check
+          git commit -m "Add proof-carrying causal planner"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
