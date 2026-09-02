@@ -15,9 +15,10 @@
     "factual": "one complete source interaction A",
     "persistent_latent": "index of the frozen 200-member reduced-rope dynamics bank",
     "abduction": "generalized-Bayes posterior from factual-A future Chamfer scores only",
-    "intervention": "a different source interaction B with B's measured controller trajectory",
-    "event_specific_contact": "B's contact schedule, node, and offset; never copied from A",
+    "intervention": "a different source interaction B: B prefix geometry/contact realization plus B's released future controller trajectory",
+    "event_specific_contact": "contact onset/activity is observed only through B's six-frame prefix; controllers active at the prefix endpoint are held active for prediction; contact node and offset are estimated only from B prefix geometry; no B future tactile/contact annotation is used",
     "prediction": "posterior predictive mixture of the candidate rollouts under B",
+    "challenge_future_geometry": "reserved for scoring and never read by the predictive branch",
     "real_counterfactual_boundary": "A and B are separate physical executions. This is a logged cross-intervention surrogate, not individual-level real counterfactual ground truth."
   },
   "posterior": {
@@ -48,7 +49,12 @@
     "gate_must_pass_before_designing_any_new_unopened_object_target": true
   },
   "information_boundary": {
-    "source_episode_futures_may_be_read": true,
+    "factual_source_episode_futures_may_be_read_for_abduction": true,
+    "challenge_prefix_geometry_and_contact_may_be_read": true,
+    "challenge_future_controller_trajectory_may_be_read_as_intervention": true,
+    "challenge_future_geometry_read_for_prediction": false,
+    "challenge_future_geometry_may_be_read_for_scoring": true,
+    "challenge_future_contact_annotations_read_for_prediction": false,
     "001_rope_historical_target_reused_for_primary_claim": false,
     "protected_six_object_replication_cohort_payloads_read": false,
     "protected_six_object_replication_targets_opened": false,
