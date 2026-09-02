@@ -1,0 +1,96 @@
+name: Register hardened PokeFlex audit
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/repair-pokeflex-registry.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: true
+          clean: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install policy test dependency
+        run: python -m pip install --disable-pip-version-check pytest==8.4.2
+
+      - name: Add exact reviewed-file exception and registry entry
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          policy_path = Path("tests/test_self_hosted_workflow_policy.py")
+          policy = policy_path.read_text(encoding="utf-8")
+          marker = "REVIEWED_FILE_MAIN_TRIGGERS = {\n"
+          entry_text = (
+              '    "pokeflex-probe-challenge-fold-audit-gpuserver4090.yml": (\n'
+              '        ".github/requests/"\n'
+              '        "pokeflex-probe-challenge-fold-audit-gpuserver4090-v1.json"\n'
+              "    ),\n"
+          )
+          if entry_text not in policy:
+              policy = policy.replace(marker, marker + entry_text, 1)
+          policy_path.write_text(policy, encoding="utf-8")
+
+          registry_path = Path(".github/self-hosted-jobs.json")
+          registry = json.loads(registry_path.read_text(encoding="utf-8"))
+          entry = {
+              "authorization_model": "reviewed-file-main",
+              "dataset_access": "verified-public-pokeflex-zip-central-directory-metadata-only",
+              "job": "audit",
+              "purpose": "Metadata-only PokeFlex probe/challenge fold feasibility audit",
+              "runner_labels": [
+                  "self-hosted",
+                  "Linux",
+                  "X64",
+                  "gpuserver4090",
+              ],
+              "secrets_allowed": False,
+              "workflow": "pokeflex-probe-challenge-fold-audit-gpuserver4090.yml",
+          }
+          keys = {(item["workflow"], item["job"]) for item in registry["jobs"]}
+          if (entry["workflow"], entry["job"]) not in keys:
+              registry["jobs"].append(entry)
+          registry["jobs"].sort(key=lambda item: (item["workflow"], item["job"]))
+          registry_path.write_text(
+              json.dumps(registry, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Verify hardened workflow policy
+        run: |
+          python -m pytest -q \
+            tests/test_github_action_pins.py \
+            tests/test_self_hosted_workflow_policy.py
+
+      - name: Commit policy registration
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/self-hosted-jobs.json tests/test_self_hosted_workflow_policy.py
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Register hardened PokeFlex self-hosted audit"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
