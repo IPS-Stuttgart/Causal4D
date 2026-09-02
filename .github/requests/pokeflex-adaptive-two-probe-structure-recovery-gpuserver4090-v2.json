@@ -36,5 +36,5 @@
   "runner_label": "gpuserver4090",
   "schema": "causal4d/pokeflex-adaptive-two-probe-structure-recovery-request",
   "schema_version": 1,
-  "technical_revision": 1
+  "technical_revision": 2
 }
