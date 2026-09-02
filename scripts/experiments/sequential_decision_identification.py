@@ -51,25 +51,18 @@ def _problem() -> tuple[
                     route_rows.append((1.0, 0.0) if route == 0 else (0.0, 1.0))
                     if route == 0:
                         local_zero_rows.append(
-                            (1.0, 0.0, 0.0)
-                            if task == 0
-                            else (0.0, 1.0, 0.0)
+                            (1.0, 0.0, 0.0) if task == 0 else (0.0, 1.0, 0.0)
                         )
                         local_one_rows.append((0.0, 0.0, 1.0))
                     else:
                         local_zero_rows.append((0.0, 0.0, 1.0))
                         local_one_rows.append(
-                            (1.0, 0.0, 0.0)
-                            if task == 0
-                            else (0.0, 1.0, 0.0)
+                            (1.0, 0.0, 0.0) if task == 0 else (0.0, 1.0, 0.0)
                         )
-                    global_rows.append(
-                        (1.0, 0.0) if task == 0 else (0.0, 1.0)
-                    )
+                    global_rows.append((1.0, 0.0) if task == 0 else (0.0, 1.0))
                     nuisance_rows.append(
                         tuple(
-                            1.0 if outcome == nuisance else 0.0
-                            for outcome in range(4)
+                            1.0 if outcome == nuisance else 0.0 for outcome in range(4)
                         )
                     )
     probes = (
@@ -245,12 +238,10 @@ def run() -> dict[str, Any]:
             "complete_hypotheses": quotient.original_hypothesis_count,
             "quotient_classes": quotient.class_count,
             "policy_structure_preserved": (
-                _policy_signature(horizon_two)
-                == _policy_signature(quotient_policy)
+                _policy_signature(horizon_two) == _policy_signature(quotient_policy)
             ),
             "expected_cost_preserved": (
-                horizon_two.expected_probe_cost
-                == quotient_policy.expected_probe_cost
+                horizon_two.expected_probe_cost == quotient_policy.expected_probe_cost
             ),
             "worst_case_cost_preserved": (
                 horizon_two.worst_case_probe_cost
@@ -264,23 +255,19 @@ def run() -> dict[str, Any]:
             "selected_probe"
         ]
         == "nuisance-four-way",
-        "one_step_selects_direct_global_probe": result[
-            "one_step_decision_value"
-        ]["selected_probe"]
-        == "global-task",
-        "routing_probe_has_zero_immediate_value": result[
-            "one_step_decision_value"
-        ]["route_expected_regret_reduction"]
-        == 0.0,
-        "horizon_one_requires_direct_probe": result["horizon_one"][
+        "one_step_selects_direct_global_probe": result["one_step_decision_value"][
             "selected_probe"
         ]
         == "global-task",
+        "routing_probe_has_zero_immediate_value": result["one_step_decision_value"][
+            "route_expected_regret_reduction"
+        ]
+        == 0.0,
+        "horizon_one_requires_direct_probe": result["horizon_one"]["selected_probe"]
+        == "global-task",
         "horizon_two_selects_router": result["horizon_two"]["selected_probe"]
         == "route",
-        "router_enables_branch_specific_probes": result["horizon_two"][
-            "branch_probes"
-        ]
+        "router_enables_branch_specific_probes": result["horizon_two"]["branch_probes"]
         == ("local-r0", "local-r1"),
         "adaptive_cost_strictly_lower_than_one_step": result["horizon_two"][
             "expected_cost"
@@ -290,9 +277,9 @@ def run() -> dict[str, Any]:
             "expected_cost"
         ]
         < result["minimum_nonadaptive"]["total_cost"],
-        "decision_certified_without_state_identification": not result[
-            "horizon_two"
-        ]["complete_state_identified"],
+        "decision_certified_without_state_identification": not result["horizon_two"][
+            "complete_state_identified"
+        ],
         "probe_action_quotient_is_strict": result["probe_action_quotient"][
             "quotient_classes"
         ]

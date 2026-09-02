@@ -120,9 +120,7 @@ class FiniteProbe:
             names = tuple(f"outcome-{index}" for index in range(likelihood.shape[1]))
         if len(names) != likelihood.shape[1]:
             raise ValueError("outcome_names do not match the probe outcome count")
-        names = tuple(
-            _nonempty_name(item, name="probe outcome name") for item in names
-        )
+        names = tuple(_nonempty_name(item, name="probe outcome name") for item in names)
         if len(set(names)) != len(names):
             raise ValueError("probe outcome names must be unique")
         canonical = tuple(
@@ -314,9 +312,7 @@ class FiniteProbeEvaluation:
             "worst_post_probe_regret": self.worst_post_probe_regret,
             "expected_regret_reduction": self.expected_regret_reduction,
             "certification_probability": self.certification_probability,
-            "all_possible_outcomes_certified": (
-                self.all_possible_outcomes_certified
-            ),
+            "all_possible_outcomes_certified": (self.all_possible_outcomes_certified),
             "mutual_information": self.mutual_information,
             "net_value": self.net_value,
         }
@@ -586,9 +582,7 @@ def build_probe_action_quotient(
     members: list[list[int]] = []
     representatives: list[int] = []
     for hypothesis in range(loss_matrix.shape[0]):
-        signature_values = [
-            _canonical(value) for value in normalized[hypothesis]
-        ]
+        signature_values = [_canonical(value) for value in normalized[hypothesis]]
         for probe in roster:
             signature_values.extend(
                 _canonical(value) for value in probe.likelihood[hypothesis]
@@ -611,8 +605,7 @@ def build_probe_action_quotient(
         FiniteProbe(
             name=probe.name,
             likelihood=tuple(
-                probe.likelihood[representative]
-                for representative in representatives
+                probe.likelihood[representative] for representative in representatives
             ),
             cost=probe.cost,
             risk=probe.risk,
@@ -769,9 +762,7 @@ def solve_sequential_decision(
                 current_weights,
                 probe,
             )
-            next_remaining = tuple(
-                index for index in remaining if index != probe_index
-            )
+            next_remaining = tuple(index for index in remaining if index != probe_index)
             branches: list[SequentialOutcomeBranch] = []
             feasible = True
             expected_child_cost = 0.0
@@ -900,9 +891,13 @@ def minimum_nonadaptive_probe_set(
     loss_matrix = _loss_matrix(losses)
     probability = _weights(weights, expected_size=loss_matrix.shape[0])
     roster = _validate_probes(probes, hypothesis_count=loss_matrix.shape[0])
-    limit = len(roster) if max_probes is None else _integer(
-        max_probes,
-        name="max_probes",
+    limit = (
+        len(roster)
+        if max_probes is None
+        else _integer(
+            max_probes,
+            name="max_probes",
+        )
     )
     limit = min(limit, len(roster))
     budget = _finite_nonnegative(risk_budget, name="risk_budget")

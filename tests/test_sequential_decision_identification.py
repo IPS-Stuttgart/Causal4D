@@ -37,25 +37,18 @@ def _routing_problem() -> tuple[
                     route_rows.append((1.0, 0.0) if route == 0 else (0.0, 1.0))
                     if route == 0:
                         local_zero_rows.append(
-                            (1.0, 0.0, 0.0)
-                            if task == 0
-                            else (0.0, 1.0, 0.0)
+                            (1.0, 0.0, 0.0) if task == 0 else (0.0, 1.0, 0.0)
                         )
                         local_one_rows.append((0.0, 0.0, 1.0))
                     else:
                         local_zero_rows.append((0.0, 0.0, 1.0))
                         local_one_rows.append(
-                            (1.0, 0.0, 0.0)
-                            if task == 0
-                            else (0.0, 1.0, 0.0)
+                            (1.0, 0.0, 0.0) if task == 0 else (0.0, 1.0, 0.0)
                         )
-                    global_rows.append(
-                        (1.0, 0.0) if task == 0 else (0.0, 1.0)
-                    )
+                    global_rows.append((1.0, 0.0) if task == 0 else (0.0, 1.0))
                     nuisance_rows.append(
                         tuple(
-                            1.0 if outcome == nuisance else 0.0
-                            for outcome in range(4)
+                            1.0 if outcome == nuisance else 0.0 for outcome in range(4)
                         )
                     )
     probes = (
