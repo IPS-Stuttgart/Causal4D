@@ -1,0 +1,47 @@
+name: Fix score-matrix diagnostic v1
+
+on:
+  push:
+    branches:
+      - science/deform360-logged-counterfactual-v1
+    paths:
+      - .github/workflows/fix-score-matrix-diagnostic-v1.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: science/deform360-logged-counterfactual-v1
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Remove dead local and format
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/experiments/deform360_logged_counterfactual_score_matrix_v1.py')
+          s = p.read_text()
+          dead = '    episode_to_index = {episode: index for index, episode in enumerate(EXPECTED_EPISODES)}\n'
+          if s.count(dead) != 1:
+              raise SystemExit('dead-local marker changed')
+          p.write_text(s.replace(dead, '', 1))
+          PY
+          python -m pip install 'ruff==0.16.5'
+          python -m ruff format scripts/experiments/deform360_logged_counterfactual_score_matrix_v1.py
+          python -m ruff check scripts/experiments/deform360_logged_counterfactual_score_matrix_v1.py
+          rm .github/workflows/fix-score-matrix-diagnostic-v1.yml
+      - name: Commit and self-remove
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/experiments/deform360_logged_counterfactual_score_matrix_v1.py .github/workflows/fix-score-matrix-diagnostic-v1.yml
+          git commit -m 'Clean source score-matrix counterfactual diagnostic'
+          git push origin HEAD:science/deform360-logged-counterfactual-v1
