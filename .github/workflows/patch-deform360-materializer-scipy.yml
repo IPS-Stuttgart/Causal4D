@@ -32,17 +32,17 @@ jobs:
               ".github/workflows/"
               "materialize-deform360-sensor-reveal-source-audit.yml"
           )
-          text = path.read_text(encoding="utf-8")
-          old = """            numpy==2.2.6 \\
-            mypy==1.18.2 \\
-          """
-          new = """            numpy==2.2.6 \\
-            scipy==1.17.1 \\
-            mypy==1.18.2 \\
-          """
-          if old not in text and new not in text:
-              raise SystemExit("materializer dependency block changed")
-          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          lines = path.read_text(encoding="utf-8").splitlines()
+          scipy_line = "            scipy==1.17.1 " + chr(92)
+          if scipy_line not in lines:
+              needle = "            numpy==2.2.6 " + chr(92)
+              matches = [index for index, line in enumerate(lines) if line == needle]
+              if len(matches) != 1:
+                  raise SystemExit(
+                      f"expected one NumPy dependency line, found {len(matches)}"
+                  )
+              lines.insert(matches[0] + 1, scipy_line)
+          path.write_text("\n".join(lines) + "\n", encoding="utf-8")
           Path(
               ".github/workflows/patch-deform360-materializer-scipy.yml"
           ).unlink()
