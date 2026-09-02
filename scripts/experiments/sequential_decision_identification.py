@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from causal4d.probe_quotient_audit import audit_decision_quotient_for_probes
 from causal4d.sequential_decision_identification import (
     FiniteProbe,
     build_probe_action_quotient,
@@ -176,6 +177,7 @@ def run() -> dict[str, Any]:
     if fixed is None:
         raise RuntimeError("controlled fixed probe problem is not solvable")
 
+    decision_audit = audit_decision_quotient_for_probes(losses, weights, probes)
     quotient = build_probe_action_quotient(losses, weights, probes)
     quotient_policy = solve_sequential_decision(
         quotient.normalized_losses,
@@ -234,6 +236,7 @@ def run() -> dict[str, Any]:
             "policy": _compact_policy(horizon_two),
         },
         "minimum_nonadaptive": fixed.as_dict(),
+        "decision_quotient_probe_audit": decision_audit.as_dict(),
         "probe_action_quotient": {
             "complete_hypotheses": quotient.original_hypothesis_count,
             "quotient_classes": quotient.class_count,
@@ -280,6 +283,17 @@ def run() -> dict[str, Any]:
         "decision_certified_without_state_identification": not result["horizon_two"][
             "complete_state_identified"
         ],
+        "decision_quotient_is_not_probe_lumpable": not result[
+            "decision_quotient_probe_audit"
+        ]["sequentially_sufficient"],
+        "decision_quotient_has_two_classes": result[
+            "decision_quotient_probe_audit"
+        ]["decision_class_count"]
+        == 2,
+        "probe_action_quotient_strictly_refines_decision_quotient": result[
+            "probe_action_quotient"
+        ]["quotient_classes"]
+        > result["decision_quotient_probe_audit"]["decision_class_count"],
         "probe_action_quotient_is_strict": result["probe_action_quotient"][
             "quotient_classes"
         ]
