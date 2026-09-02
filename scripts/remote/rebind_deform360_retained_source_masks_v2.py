@@ -91,7 +91,9 @@ def main() -> int:
                 load_episode_calibration,
             )
         except ImportError as error:
-            raise RuntimeError("the pinned Deform360 source checkout is required") from error
+            raise RuntimeError(
+                "the pinned Deform360 source checkout is required"
+            ) from error
 
         episode_dir = resolve_episode_dir(args.processed_root, args.episode_index)
         candidate_cameras = sorted(
@@ -109,7 +111,7 @@ def main() -> int:
         for camera in candidate_cameras:
             path = episode_dir / camera / "mask_refined.h5"
             with H5Array(path) as stored:
-                frame_count = len(stored)
+                frame_count = int(stored.shape[0])
                 _require(frame_count >= 1, f"retained mask is empty: {camera}")
                 first = np.asarray(stored[0], dtype=bool)
                 areas = []

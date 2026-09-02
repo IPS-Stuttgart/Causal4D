@@ -89,8 +89,7 @@ def _prefix_only_challenge_case(
         )
         node = int(np.argmin(np.median(distances, axis=0)))
         offset = np.median(
-            prefix_positions[observed, node]
-            - prefix_controllers[observed, controller],
+            prefix_positions[observed, node] - prefix_controllers[observed, controller],
             axis=0,
         )
         contact_nodes.append(node)
@@ -257,12 +256,8 @@ def evaluate_logged_cross_intervention_abduction_strict(
         "observed_win_fraction_vs_uniform": uniform["win_fraction"],
         "observed_win_fraction_vs_permuted": permuted["win_fraction"],
         "maximum_primary_pair_ratio": config.maximum_primary_pair_ratio,
-        "observed_worst_ratio_vs_uniform": uniform[
-            "worst_abduced_to_control_ratio"
-        ],
-        "observed_worst_ratio_vs_permuted": permuted[
-            "worst_abduced_to_control_ratio"
-        ],
+        "observed_worst_ratio_vs_uniform": uniform["worst_abduced_to_control_ratio"],
+        "observed_worst_ratio_vs_permuted": permuted["worst_abduced_to_control_ratio"],
     }
     gate["passed"] = bool(
         gate["observed_mean_improvement_vs_uniform_fraction"]
