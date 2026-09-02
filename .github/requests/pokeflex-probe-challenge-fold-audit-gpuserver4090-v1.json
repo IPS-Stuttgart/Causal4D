@@ -21,7 +21,7 @@
     "workflow_run_id": 33589834614
   },
   "request_id": "pokeflex-probe-challenge-fold-audit-gpuserver4090-v1",
-  "retry_reason": "qualify duplicate raw T1/T2/T3 stems by action class after a successful metadata-only scan; no archive member payload was opened",
+  "retry_reason": "direct file-change launch after the action-qualified identity repair; GitHub suppresses workflow chaining from GITHUB_TOKEN-authored pushes",
   "roots": [
     "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
     "/home/github-runner/.cache/datasets/pokeflex",
@@ -40,5 +40,5 @@
     ],
     "salt": "PokeFlex-active-probe-folds-v1-2026-09-02"
   },
-  "technical_revision": 3
+  "technical_revision": 4
 }
