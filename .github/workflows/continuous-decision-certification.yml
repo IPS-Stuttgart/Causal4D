@@ -1,0 +1,91 @@
+name: Continuous decision certification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/continuous-decision-certification.yml"
+      - "src/causal4d/continuous_decision_certification.py"
+      - "tests/test_continuous_decision_certification.py"
+      - "scripts/experiments/continuous_decision_certification.py"
+      - "docs/continuous_decision_certification.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/continuous-decision-certification.yml"
+      - "src/causal4d/continuous_decision_certification.py"
+      - "tests/test_continuous_decision_certification.py"
+      - "scripts/experiments/continuous_decision_certification.py"
+      - "docs/continuous_decision_certification.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: continuous-decision-certification-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install focused dependencies
+        run: |
+          python -m pip install --disable-pip-version-check \
+            numpy==2.2.6 \
+            pytest==8.4.2 \
+            ruff==0.16.5
+
+      - name: Lint and verify formatting
+        run: |
+          python -m ruff check \
+            src/causal4d/continuous_decision_certification.py \
+            tests/test_continuous_decision_certification.py \
+            scripts/experiments/continuous_decision_certification.py
+          python -m ruff format --check \
+            src/causal4d/continuous_decision_certification.py \
+            tests/test_continuous_decision_certification.py \
+            scripts/experiments/continuous_decision_certification.py
+
+      - name: Run focused tests and controlled regression
+        env:
+          PYTHONPATH: src
+        run: |
+          pytest -q \
+            tests/test_continuous_decision_certification.py \
+            tests/test_controlled_decision_identification.py
+
+      - name: Execute deterministic study twice
+        env:
+          PYTHONPATH: src
+        run: |
+          mkdir -p build/continuous-decision-certification
+          python scripts/experiments/continuous_decision_certification.py \
+            --output build/continuous-decision-certification/result-a.json
+          python scripts/experiments/continuous_decision_certification.py \
+            --output build/continuous-decision-certification/result-b.json
+          cmp \
+            build/continuous-decision-certification/result-a.json \
+            build/continuous-decision-certification/result-b.json
+          python -m json.tool \
+            build/continuous-decision-certification/result-a.json >/dev/null
+
+      - name: Upload content-addressed result
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: continuous-decision-certification-${{ github.sha }}
+          path: build/continuous-decision-certification/result-a.json
+          if-no-files-found: error
+          retention-days: 30
