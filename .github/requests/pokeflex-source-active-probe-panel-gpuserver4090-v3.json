@@ -1,0 +1,113 @@
+{
+  "calibration_objects": [
+    "3dPrintedPizza",
+    "FoamCylinder",
+    "PlushOctopus"
+  ],
+  "continuous_action_interface": {
+    "artifact_digest": "sha256:936df01497fa46d0e71cd7bcac2907c2dd3c7c2fa1af4eea482a8c3f5f4be59e",
+    "artifact_id": 9842837277,
+    "content_sha256": "d94815f7bb832fc18350a6a42f624cf8bdced5e5914cf58977927bbbfd53e577",
+    "gate_passed": true,
+    "run_id": 33620855493
+  },
+  "dataset_root": "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+  "drop_carrier_inspection": {
+    "artifact_digest": "sha256:d4261385238463c601aaff2186fe08f1e6347735594412b99feeae243d685fc7",
+    "artifact_id": 9843374647,
+    "finding": "exactly PlushDice_T2 and PlushDice_T3 contain zero OBJ vertices across representative endpoints",
+    "run_id": 33622286947
+  },
+  "dropping_take_indices": [1, 2, 3],
+  "geometry": {
+    "chamfer_alignment": "centroid only",
+    "maximum_chamfer_points": 2048,
+    "mesh_frames_per_episode": ["first valid", "last valid"],
+    "vertex_sampling": "deterministic evenly spaced OBJ vertex indices"
+  },
+  "information_boundary": {
+    "allowed_payload": "source/calibration poking robot_data plus first/final valid poke and drop meshes",
+    "image_member_open_allowed": false,
+    "point_cloud_member_open_allowed": false,
+    "target_archive_open_allowed": false,
+    "target_outcome_allowed": false
+  },
+  "object_roles": {
+    "3dPrintedHeart": "source",
+    "3dPrintedPizza": "calibration",
+    "3dPrintedPyramid": "source",
+    "FoamCylinder": "calibration",
+    "FoamDice": "source",
+    "FoamHalfSphere": "source",
+    "PlushDice": "source",
+    "PlushMoon": "source",
+    "PlushOctopus": "calibration",
+    "PlushTurtle": "source",
+    "PlushVolleyball": "source",
+    "ToiletPaperRoll": "source"
+  },
+  "poking_take_indices": [1, 2, 3, 4, 5, 6],
+  "prior_runs": [
+    {
+      "artifact_digest": "sha256:ed6ac6bec0b191c1b3ace22275ed96a9bee973f7c0b04f72cb11af02f17f24f9",
+      "artifact_id": 9843097740,
+      "failure": "empty OBJ endpoint",
+      "run_id": 33621541498,
+      "target_archive_open_count": 0
+    },
+    {
+      "artifact_digest": "sha256:f41b55cb44e58e65cf676f750d14e19964f99b7f987e1826b1c9f911c8a36e54",
+      "artifact_id": 9843195399,
+      "failure": "two source recordings contain no valid OBJ frame",
+      "run_id": 33621803342,
+      "target_archive_open_count": 0
+    }
+  ],
+  "quality_gate": {
+    "expected_invalid_drop_ids": [
+      "dropping:PlushDice_T2",
+      "dropping:PlushDice_T3"
+    ],
+    "minimum_total_valid_drop_records": 34,
+    "minimum_valid_drops_per_object": 1
+  },
+  "request_id": "pokeflex-source-active-probe-panel-gpuserver4090-v3",
+  "runner_label": "gpuserver4090",
+  "schema": "causal4d/pokeflex-source-active-probe-panel-request",
+  "schema_version": 1,
+  "scientific_contract_unchanged": true,
+  "source_and_calibration_objects": [
+    "3dPrintedHeart",
+    "3dPrintedPyramid",
+    "FoamDice",
+    "FoamHalfSphere",
+    "PlushDice",
+    "PlushMoon",
+    "PlushTurtle",
+    "PlushVolleyball",
+    "ToiletPaperRoll",
+    "3dPrintedPizza",
+    "FoamCylinder",
+    "PlushOctopus"
+  ],
+  "source_objects": [
+    "3dPrintedHeart",
+    "3dPrintedPyramid",
+    "FoamDice",
+    "FoamHalfSphere",
+    "PlushDice",
+    "PlushMoon",
+    "PlushTurtle",
+    "PlushVolleyball",
+    "ToiletPaperRoll"
+  ],
+  "target_objects_excluded": [
+    "3dPrintedBunny",
+    "3dPrintedCylinder",
+    "Sponge",
+    "MemoryFoam",
+    "Beanbag",
+    "Pillow"
+  ],
+  "technical_revision": 3
+}
