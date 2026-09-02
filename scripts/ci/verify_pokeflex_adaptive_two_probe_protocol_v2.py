@@ -12,8 +12,7 @@ from typing import Any
 SCHEMA = "causal4d/pokeflex-adaptive-two-probe-drop-protocol"
 PROTOCOL_ID = "pokeflex-adaptive-two-probe-drop-protocol-v2"
 PROTOCOL_PATH = Path(
-    "configs/causal4d_public/"
-    "pokeflex_adaptive_two_probe_drop_protocol_v2.json"
+    "configs/causal4d_public/pokeflex_adaptive_two_probe_drop_protocol_v2.json"
 )
 EXPECTED_OBJECTS = (
     "3dPrintedBunny",
@@ -82,9 +81,7 @@ def digest_order(values: list[str], *, salt: str, role: str) -> list[str]:
     return sorted(
         values,
         key=lambda value: (
-            hashlib.sha256(
-                f"{salt}\0{role}\0{value}".encode("utf-8")
-            ).hexdigest(),
+            hashlib.sha256(f"{salt}\0{role}\0{value}".encode("utf-8")).hexdigest(),
             value,
         ),
     )
@@ -155,9 +152,7 @@ def verify_protocol(payload: dict[str, Any]) -> dict[str, Any]:
     }
     expected_calibration: dict[str, list[str]] = {}
     for name, values in groups.items():
-        remaining = [
-            value for value in values if value not in expected_target[name]
-        ]
+        remaining = [value for value in values if value not in expected_target[name]]
         expected_calibration[name] = digest_order(
             remaining,
             salt=salt,
@@ -218,8 +213,7 @@ def verify_protocol(payload: dict[str, Any]) -> dict[str, Any]:
         "conditional stopping missing",
     )
     require(
-        "separately recorded reset interactions"
-        in acquisition["logged_data_boundary"],
+        "separately recorded reset interactions" in acquisition["logged_data_boundary"],
         "logged-interaction boundary missing",
     )
 
@@ -233,9 +227,7 @@ def verify_protocol(payload: dict[str, Any]) -> dict[str, Any]:
     ):
         require(baseline in baselines, f"missing baseline contract: {baseline}")
 
-    query_ids = [
-        item["query_id"] for item in payload["registered_queries"]
-    ]
+    query_ids = [item["query_id"] for item in payload["registered_queries"]]
     require(
         query_ids == ["drop-impact-geometry", "drop-settled-geometry"],
         "query roster changed",
@@ -358,9 +350,7 @@ def verify_protocol(payload: dict[str, Any]) -> dict[str, Any]:
     )
 
     return {
-        "schema": (
-            "causal4d/pokeflex-adaptive-two-probe-drop-protocol-verification"
-        ),
+        "schema": ("causal4d/pokeflex-adaptive-two-probe-drop-protocol-verification"),
         "schema_version": 1,
         "status": "verified-before-source-modeling-and-target-drop-access",
         "protocol_id": PROTOCOL_ID,
