@@ -1,0 +1,282 @@
+name: PokeFlex adaptive two-probe structure v2
+
+on:
+  push:
+    branches:
+      - main
+      - science/pokeflex-adaptive-two-probe-drop-protocol-v2
+    paths:
+      - ".github/requests/pokeflex-adaptive-two-probe-structure-gpuserver4090-v2.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pokeflex-adaptive-two-probe-v2-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Validate adaptive two-probe protocol
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Validate reviewed request
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path(
+              ".github/requests/"
+              "pokeflex-adaptive-two-probe-structure-gpuserver4090-v2.json"
+          )
+          request = json.loads(path.read_text(encoding="utf-8"))
+          assert request["schema"] == (
+              "causal4d/pokeflex-adaptive-two-probe-structure-request"
+          )
+          assert request["schema_version"] == 1
+          assert request["request_id"] == (
+              "pokeflex-adaptive-two-probe-structure-gpuserver4090-v2"
+          )
+          assert request["runner_label"] == "gpuserver4090"
+          assert request["protocol_id"] == (
+              "pokeflex-adaptive-two-probe-drop-protocol-v2"
+          )
+          assert request["protocol_sha256"] == (
+              "698c2b5d8f41527f14868ca6f35268637990b8c23942fb224f998ba70f76f1ea"
+          )
+          assert request["metadata_audit"] == {
+              "audit_id": (
+                  "73d63e1d1980c723346b55288ef75a3535bde814d5d2603bcc6d4c0a21cb68fc"
+              ),
+              "request_id": (
+                  "pokeflex-probe-challenge-fold-audit-gpuserver4090-v1"
+              ),
+              "selection_salt": (
+                  "PokeFlex-active-probe-folds-v1-2026-09-02"
+              ),
+              "workflow_run_id": 33591607990,
+          }
+          assert request["expected"] == {
+              "archive_count": 170,
+              "candidate_probe_count_per_object": 4,
+              "dropping_count": 54,
+              "object_count": 18,
+              "ordered_distinct_probe_pairs_per_object": 12,
+              "poking_count": 116,
+              "target_object_count": 6,
+          }
+          assert request["information_boundary"] == {
+              "archive_member_decompression_allowed": False,
+              "archive_member_extraction_allowed": False,
+              "archive_member_open_allowed": False,
+              "drop_outcome_allowed": False,
+              "probe_response_payload_allowed": False,
+              "zip_central_directory_metadata_only": True,
+          }
+          PY
+
+      - name: Install focused dependencies
+        run: |
+          python3 -m pip install --disable-pip-version-check \
+            pytest==8.4.2 \
+            ruff==0.16.5
+
+      - name: Verify protocol, lint, format, and test
+        run: |
+          mkdir -p build/pokeflex-adaptive-two-probe-v2
+          python3 \
+            scripts/ci/verify_pokeflex_adaptive_two_probe_protocol_v2.py \
+            --output-json \
+              build/pokeflex-adaptive-two-probe-v2/protocol-verification.json
+          python3 -m ruff check \
+            scripts/ci/verify_pokeflex_adaptive_two_probe_protocol_v2.py \
+            scripts/ci/verify_pokeflex_adaptive_two_probe_roster_v2.py \
+            scripts/remote/build_pokeflex_adaptive_two_probe_roster_v2.py \
+            tests/test_pokeflex_adaptive_two_probe_protocol_v2.py
+          python3 -m ruff format --check \
+            scripts/ci/verify_pokeflex_adaptive_two_probe_protocol_v2.py \
+            scripts/ci/verify_pokeflex_adaptive_two_probe_roster_v2.py \
+            scripts/remote/build_pokeflex_adaptive_two_probe_roster_v2.py \
+            tests/test_pokeflex_adaptive_two_probe_protocol_v2.py
+          pytest -q tests/test_pokeflex_adaptive_two_probe_protocol_v2.py
+
+      - name: Upload hosted verification
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pokeflex-adaptive-two-probe-hosted-${{ github.run_id }}
+          path: |
+            build/pokeflex-adaptive-two-probe-v2/protocol-verification.json
+            configs/causal4d_public/pokeflex_adaptive_two_probe_drop_protocol_v2.json
+            .github/requests/pokeflex-adaptive-two-probe-structure-gpuserver4090-v2.json
+          if-no-files-found: error
+          retention-days: 90
+
+  structural-audit:
+    name: Audit adaptive two-probe roster on gpuserver4090
+    needs: contract
+    runs-on: [self-hosted, Linux, X64, gpuserver4090]
+    timeout-minutes: 150
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Bind request and runner
+        run: |
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          from pathlib import Path
+
+          request = json.loads(
+              Path(
+                  ".github/requests/"
+                  "pokeflex-adaptive-two-probe-structure-gpuserver4090-v2.json"
+              ).read_text(encoding="utf-8")
+          )
+          print(f"REQUEST_ID={request['request_id']}")
+          print(
+              "AUDIT_REQUEST_ID="
+              f"{request['metadata_audit']['request_id']}"
+          )
+          print(
+              "AUDIT_SELECTION_SALT="
+              f"{request['metadata_audit']['selection_salt']}"
+          )
+          print(f"EXPECTED_AUDIT_ID={request['metadata_audit']['audit_id']}")
+          PY
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "workflow_run=${GITHUB_RUN_ID}"
+            echo "workflow_attempt=${GITHUB_RUN_ATTEMPT}"
+            echo "head_sha=${GITHUB_SHA}"
+          } > runner.txt
+
+      - name: Reproduce metadata-only audit
+        id: metadata
+        shell: bash
+        run: |
+          mkdir -p build/pokeflex-adaptive-two-probe-v2/metadata
+          set +e
+          python3 \
+            scripts/remote/audit_pokeflex_probe_challenge_folds_gpuserver4090.py \
+            --output-dir build/pokeflex-adaptive-two-probe-v2/metadata \
+            --request-id "$AUDIT_REQUEST_ID" \
+            --selection-salt "$AUDIT_SELECTION_SALT" \
+            --root /mnt/seagate10tb/florianpfaff/datasets/pokeflex \
+            --root /home/github-runner/.cache/datasets/pokeflex \
+            --root /home/github-runner/.cache/workflows/pokeflex \
+            --expected-archives 170 \
+            --expected-poking 116 \
+            --expected-dropping 54 \
+            --minimum-eligible-objects 18 \
+            --minimum-candidate-pokes 3 \
+            --minimum-drops 2
+          rc=$?
+          set -e
+          echo "return_code=$rc" >> "$GITHUB_OUTPUT"
+          echo "$rc" > build/pokeflex-adaptive-two-probe-v2/metadata-return-code.txt
+
+      - name: Enforce exact metadata identity
+        if: steps.metadata.outputs.return_code == '0'
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          audit = json.loads(
+              Path(
+                  "build/pokeflex-adaptive-two-probe-v2/metadata/audit.json"
+              ).read_text(encoding="utf-8")
+          )
+          if audit["audit_id"] != os.environ["EXPECTED_AUDIT_ID"]:
+              raise SystemExit(
+                  "metadata audit identity changed: "
+                  f"{audit['audit_id']} != {os.environ['EXPECTED_AUDIT_ID']}"
+              )
+          PY
+
+      - name: Build adaptive two-probe structural roster
+        if: steps.metadata.outputs.return_code == '0'
+        id: roster
+        shell: bash
+        run: |
+          set +e
+          python3 \
+            scripts/remote/build_pokeflex_adaptive_two_probe_roster_v2.py \
+            --audit-json \
+              build/pokeflex-adaptive-two-probe-v2/metadata/audit.json \
+            --protocol-json \
+              configs/causal4d_public/pokeflex_adaptive_two_probe_drop_protocol_v2.json \
+            --output-json \
+              build/pokeflex-adaptive-two-probe-v2/structural-roster.json \
+            --output-md \
+              build/pokeflex-adaptive-two-probe-v2/structural-roster.md
+          rc=$?
+          set -e
+          echo "return_code=$rc" >> "$GITHUB_OUTPUT"
+          echo "$rc" > build/pokeflex-adaptive-two-probe-v2/roster-return-code.txt
+
+      - name: Independently verify structural roster
+        if: steps.roster.outputs.return_code == '0'
+        run: |
+          python3 \
+            scripts/ci/verify_pokeflex_adaptive_two_probe_roster_v2.py \
+            build/pokeflex-adaptive-two-probe-v2/structural-roster.json \
+            --protocol-json \
+              configs/causal4d_public/pokeflex_adaptive_two_probe_drop_protocol_v2.json \
+            --output-json \
+              build/pokeflex-adaptive-two-probe-v2/roster-verification.json
+
+      - name: Publish structural summary
+        if: always()
+        run: |
+          if test -f \
+            build/pokeflex-adaptive-two-probe-v2/structural-roster.md; then
+            cat build/pokeflex-adaptive-two-probe-v2/structural-roster.md \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload metadata-only structural evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pokeflex-adaptive-two-probe-structure-${{ github.run_id }}
+          path: |
+            build/pokeflex-adaptive-two-probe-v2/
+            runner.txt
+            configs/causal4d_public/pokeflex_adaptive_two_probe_drop_protocol_v2.json
+            .github/requests/pokeflex-adaptive-two-probe-structure-gpuserver4090-v2.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce structural readiness
+        if: always()
+        run: |
+          metadata_rc="$(
+            cat build/pokeflex-adaptive-two-probe-v2/metadata-return-code.txt
+          )"
+          if test "$metadata_rc" -ne 0; then
+            echo "metadata audit failed with code $metadata_rc" >&2
+            exit "$metadata_rc"
+          fi
+          roster_rc="$(
+            cat build/pokeflex-adaptive-two-probe-v2/roster-return-code.txt
+          )"
+          if test "$roster_rc" -ne 0; then
+            echo "adaptive roster failed with code $roster_rc" >&2
+            exit "$roster_rc"
+          fi
