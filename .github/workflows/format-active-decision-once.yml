@@ -1,0 +1,50 @@
+name: Format active decision layer once
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/format-active-decision-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+          clean: true
+
+      - name: Apply the repository formatter
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'ruff<0.17,>=0.15.22'
+          python -m ruff format \
+            src/causal4d/active_decision_identification.py \
+            tests/test_active_decision_identification.py
+          rm .github/workflows/format-active-decision-once.yml
+          git diff --check
+
+      - name: Commit formatting and remove the one-shot workflow
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            src/causal4d/active_decision_identification.py \
+            tests/test_active_decision_identification.py \
+            .github/workflows/format-active-decision-once.yml
+          git commit -m 'Format active decision identification'
+          git push origin "HEAD:${HEAD_REF}"
