@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/materialize-deform360-sensor-reveal-source-audit.yml"
       - ".github/materialize/deform360-sensor-reveal-source-audit.part*"
+      - ".github/materialize/deform360-sensor-reveal-source-audit.mypy.patch"
       - ".github/requests/deform360-sensor-reveal-source-audit-gpuserver4090-v1.json"
       - ".github/workflows/deform360-sensor-reveal-source-audit-gpuserver4090.yml"
       - ".github/self-hosted-jobs.json"
@@ -157,6 +158,11 @@ jobs:
           for path in parts:
               path.unlink()
           PY
+          git apply --check \
+            .github/materialize/deform360-sensor-reveal-source-audit.mypy.patch
+          git apply \
+            .github/materialize/deform360-sensor-reveal-source-audit.mypy.patch
+          rm .github/materialize/deform360-sensor-reveal-source-audit.mypy.patch
 
       - name: Install exact validation toolchain
         run: |
