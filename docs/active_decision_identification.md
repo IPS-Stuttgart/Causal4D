@@ -37,7 +37,9 @@ where $\overline R_y$ is the posterior certificate's minimax worst-case
 regret. It also reports the probability that the realized outcome yields a
 unique certified terminal action. A probe is eligible only when it is below the
 registered risk cap, exceeds the minimum net value, and meets the registered
-certification-probability threshold.
+certification-probability threshold. The default threshold is one, so every
+positive-probability outcome must identify a terminal action unless the caller
+explicitly registers a weaker requirement.
 
 The deterministic policy is therefore:
 
