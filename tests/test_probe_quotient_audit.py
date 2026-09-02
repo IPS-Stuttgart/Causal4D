@@ -29,8 +29,9 @@ def test_decision_quotient_can_fail_sequential_probe_lumpability() -> None:
     assert len(audit.witnesses) == 2
     for witness in audit.witnesses:
         assert witness.first_likelihood_row != witness.second_likelihood_row
-        assert audit.decision_class_index[witness.first_hypothesis_index] == (
-            audit.decision_class_index[witness.second_hypothesis_index]
+        assert (
+            audit.decision_class_index[witness.first_hypothesis_index]
+            == (audit.decision_class_index[witness.second_hypothesis_index])
         )
 
 
