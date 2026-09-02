@@ -1,0 +1,62 @@
+name: Deform360 published source score-matrix diagnostic v1
+
+on:
+  push:
+    branches:
+      - science/deform360-logged-counterfactual-v1
+    paths:
+      - .github/workflows/deform360-logged-counterfactual-score-matrix-v1.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          clean: true
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Run published source-only cross-intervention score diagnostic
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -e .
+          python -m ruff check scripts/experiments/deform360_logged_counterfactual_score_matrix_v1.py
+          python -m ruff format --check scripts/experiments/deform360_logged_counterfactual_score_matrix_v1.py
+          mkdir -p build/deform360-logged-counterfactual-score-matrix-v1
+          python scripts/experiments/deform360_logged_counterfactual_score_matrix_v1.py \
+            milestones/deform360-001-rope-public-v1/artifacts/deform360_001_rope_shared_forward_fit_v1.json \
+            --output build/deform360-logged-counterfactual-score-matrix-v1/result.json \
+            | tee build/deform360-logged-counterfactual-score-matrix-v1/summary.log
+      - name: Publish bounded diagnostic summary
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          value = json.loads(Path('build/deform360-logged-counterfactual-score-matrix-v1/result.json').read_text())
+          p = value['primary_chamfer']
+          with open(Path(__import__('os').environ['GITHUB_STEP_SUMMARY']), 'a') as stream:
+              stream.write('### Published 001-rope source score-matrix diagnostic\n\n')
+              stream.write(f"- Primary challenge units: `{p['pair_count']}`\n")
+              for control in ('uniform_physics', 'candidate_id_permuted'):
+                  c = p['comparisons'][control]
+                  stream.write(f"- vs `{control}`: {100*c['mean_relative_improvement_fraction']:.2f}% mean expected-Chamfer improvement; {c['wins']}/{p['pair_count']} wins; worst ratio {c['worst_abduced_to_control_ratio']:.3f}\n")
+              stream.write('- Secondary mechanism diagnostic only; no target opened.\n')
+          PY
+      - name: Upload diagnostic
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: deform360-logged-counterfactual-score-matrix-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/deform360-logged-counterfactual-score-matrix-v1
+          if-no-files-found: error
+          retention-days: 90
