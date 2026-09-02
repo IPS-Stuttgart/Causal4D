@@ -147,7 +147,10 @@ def main() -> int:
         object_id = fold.get("object_id")
         require(object_id in eligible_objects, "fold belongs to ineligible object")
         candidates = fold.get("candidate_probe_take_ids")
-        require(isinstance(candidates, list) and candidates, "candidate probe roster empty")
+        require(
+            isinstance(candidates, list) and bool(candidates),
+            "candidate probe roster empty",
+        )
         require(len(candidates) == len(set(candidates)), "duplicate candidate probe")
         calibration = fold.get("calibration_take_id")
         challenge = fold.get("challenge_take_id")

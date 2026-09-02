@@ -6,14 +6,14 @@
     "maintainer-issue-main": {
       "description": "Exact registered-maintainer issue trigger on reviewed refs/heads/main, exact GITHUB_SHA checkout, clean-tree verification, read-only self-hosted token, no issue text execution, and no secrets."
     },
+    "reviewed-file-main": {
+      "description": "Exact frozen public-data workflow triggered only by a reviewed main-branch request-file change or manual main dispatch; exact GITHUB_SHA checkout, clean-tree verification, read-only token, no issue/PR payload execution, and no secrets."
+    },
     "single-operator-v5-issue-main": {
       "description": "Exact registered-owner issue trigger on reviewed refs/heads/main for the nonphysical source-independent v5 owner-identity bootstrap, exact GITHUB_SHA checkout, read-only self-hosted token, no issue text execution, and no secrets."
     },
     "v5-checkout-reprovision-issue-main": {
       "description": "Exact registered-maintainer issue trigger on reviewed refs/heads/main for the pre-freeze atomic v5 checkout replacement, exact GITHUB_SHA checkout, clean-tree verification, byte-verified dataset noninterference, read-only self-hosted token, no issue text execution, and no secrets."
-    },
-    "reviewed-file-main": {
-      "description": "Exact frozen public-data workflow triggered only by a reviewed main-branch request-file change or manual main dispatch; exact GITHUB_SHA checkout, clean-tree verification, read-only token, no issue/PR payload execution, and no secrets."
     }
   },
   "documentation": "docs/self_hosted_runner_security.md",
@@ -297,6 +297,20 @@
       ],
       "secrets_allowed": false,
       "workflow": "optional-integrations.yml"
+    },
+    {
+      "authorization_model": "reviewed-file-main",
+      "dataset_access": "verified-public-pokeflex-zip-central-directory-metadata-only",
+      "job": "audit",
+      "purpose": "Metadata-only PokeFlex probe/challenge fold feasibility audit",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "gpuserver4090"
+      ],
+      "secrets_allowed": false,
+      "workflow": "pokeflex-probe-challenge-fold-audit-gpuserver4090.yml"
     },
     {
       "authorization_model": "main-only",
