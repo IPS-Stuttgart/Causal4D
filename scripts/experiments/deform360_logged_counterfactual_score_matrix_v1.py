@@ -44,26 +44,48 @@ def _require(condition: bool, message: str) -> None:
 
 
 def _load_matrix(payload: dict[str, Any]) -> tuple[np.ndarray, np.ndarray]:
-    _require(payload.get("artifact_kind") == EXPECTED_ARTIFACT_KIND, "artifact kind changed")
-    _require(payload.get("candidate_count") == EXPECTED_CANDIDATE_COUNT, "candidate count changed")
+    _require(
+        payload.get("artifact_kind") == EXPECTED_ARTIFACT_KIND, "artifact kind changed"
+    )
+    _require(
+        payload.get("candidate_count") == EXPECTED_CANDIDATE_COUNT,
+        "candidate count changed",
+    )
     _require(
         tuple(payload.get("accepted_source_episode_ids", ())) == EXPECTED_EPISODES,
         "accepted source episode order changed",
     )
     rows = payload.get("candidate_scores")
-    _require(isinstance(rows, list) and len(rows) == EXPECTED_CANDIDATE_COUNT, "candidate score matrix missing")
-    chamfer = np.empty((EXPECTED_CANDIDATE_COUNT, len(EXPECTED_EPISODES)), dtype=np.float64)
+    _require(
+        isinstance(rows, list) and len(rows) == EXPECTED_CANDIDATE_COUNT,
+        "candidate score matrix missing",
+    )
+    chamfer = np.empty(
+        (EXPECTED_CANDIDATE_COUNT, len(EXPECTED_EPISODES)), dtype=np.float64
+    )
     track = np.empty_like(chamfer)
     for expected_index, row in enumerate(rows):
-        _require(int(row["candidate_index"]) == expected_index, "candidate indices changed")
+        _require(
+            int(row["candidate_index"]) == expected_index, "candidate indices changed"
+        )
         episodes = row.get("per_episode")
-        _require(isinstance(episodes, list) and len(episodes) == len(EXPECTED_EPISODES), "per-episode score row changed")
+        _require(
+            isinstance(episodes, list) and len(episodes) == len(EXPECTED_EPISODES),
+            "per-episode score row changed",
+        )
         ids = tuple(item["episode_id"] for item in episodes)
         _require(ids == EXPECTED_EPISODES, "per-episode score order changed")
-        chamfer[expected_index] = [float(item["chamfer_distance_m"]) for item in episodes]
+        chamfer[expected_index] = [
+            float(item["chamfer_distance_m"]) for item in episodes
+        ]
         track[expected_index] = [float(item["track_error_m"]) for item in episodes]
-    _require(np.all(np.isfinite(chamfer)) and np.all(chamfer >= 0.0), "invalid Chamfer matrix")
-    _require(np.all(np.isfinite(track)) and np.all(track >= 0.0), "invalid track matrix")
+    _require(
+        np.all(np.isfinite(chamfer)) and np.all(chamfer >= 0.0),
+        "invalid Chamfer matrix",
+    )
+    _require(
+        np.all(np.isfinite(track)) and np.all(track >= 0.0), "invalid track matrix"
+    )
     return chamfer, track
 
 
@@ -131,7 +153,6 @@ def main() -> None:
     payload = json.loads(raw)
     chamfer, track = _load_matrix(payload)
     config = LoggedCounterfactualConfig()
-    episode_to_index = {episode: index for index, episode in enumerate(EXPECTED_EPISODES)}
 
     all_rows = []
     for factual_index in range(len(EXPECTED_EPISODES)):
@@ -142,7 +163,15 @@ def main() -> None:
             track_pair = _pair(factual_index, challenge_index, track, config=config)
             all_rows.append(
                 {
-                    **{key: chamfer_pair[key] for key in ("factual_episode_id", "challenge_episode_id", "permutation_shift", "posterior")},
+                    **{
+                        key: chamfer_pair[key]
+                        for key in (
+                            "factual_episode_id",
+                            "challenge_episode_id",
+                            "permutation_shift",
+                            "posterior",
+                        )
+                    },
                     "expected_chamfer_loss_m": chamfer_pair["expected_loss_m"],
                     "expected_track_loss_m": track_pair["expected_loss_m"],
                 }
@@ -150,7 +179,10 @@ def main() -> None:
 
     partner_map = _factual_partner_map(PROTOCOL_ID, EXPECTED_EPISODES)
     primary_rows = []
-    by_pair = {(row["factual_episode_id"], row["challenge_episode_id"]): row for row in all_rows}
+    by_pair = {
+        (row["factual_episode_id"], row["challenge_episode_id"]): row
+        for row in all_rows
+    }
     for challenge_id in EXPECTED_EPISODES:
         factual_id = partner_map[challenge_id]
         primary_rows.append(by_pair[(factual_id, challenge_id)])
@@ -191,12 +223,20 @@ def main() -> None:
         "paper_claim_authorized": False,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(json.dumps({
-        "primary_chamfer": result["primary_chamfer"],
-        "all_pairs_chamfer": result["all_pairs_chamfer"],
-        "target_opened": False,
-    }, indent=2, sort_keys=True))
+    args.output.write_text(
+        json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    print(
+        json.dumps(
+            {
+                "primary_chamfer": result["primary_chamfer"],
+                "all_pairs_chamfer": result["all_pairs_chamfer"],
+                "target_opened": False,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 if __name__ == "__main__":
