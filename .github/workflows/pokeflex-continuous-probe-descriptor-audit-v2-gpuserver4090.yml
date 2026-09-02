@@ -1,0 +1,169 @@
+name: PokeFlex continuous probe-descriptor audit v2
+
+on:
+  push:
+    branches:
+      - science/pokeflex-sequential-probe-source-v1
+    paths:
+      - ".github/requests/pokeflex-continuous-probe-descriptor-audit-gpuserver4090-v2.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pokeflex-continuous-probe-descriptor-audit-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Validate revised continuous action audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Install focused dependencies
+        run: |
+          python -m pip install --disable-pip-version-check \
+            numpy==2.2.6 \
+            scipy==1.15.3 \
+            ruff==0.16.5
+
+      - name: Validate revision, compile, and lint
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          request = json.loads(
+              Path(
+                  ".github/requests/"
+                  "pokeflex-continuous-probe-descriptor-audit-gpuserver4090-v2.json"
+              ).read_text(encoding="utf-8")
+          )
+          assert request["schema"] == (
+              "causal4d/pokeflex-continuous-probe-descriptor-audit-request"
+          )
+          assert request["schema_version"] == 1
+          assert request["localization_revision"] == {
+              "distance_tolerance_grid_m": [
+                  0.0,
+                  0.001,
+                  0.0025,
+                  0.005,
+                  0.01,
+                  0.02,
+              ],
+              "force_reference": "dominant contiguous excess-force run",
+              "geometry_reference": "earliest point within tolerance of minimum surface distance",
+              "revision": 2,
+          }
+          assert request["gate_thresholds"]["maximum_p90_contact_index_error"] == 60.0
+          assert request["prior_continuous_audit"]["gate_passed"] is False
+          assert request["information_boundary"]["target_archive_open_allowed"] is False
+          assert request["information_boundary"]["drop_archive_open_allowed"] is False
+          PY
+          python -m py_compile \
+            scripts/remote/audit_pokeflex_continuous_probe_descriptors_gpuserver4090.py \
+            scripts/remote/audit_pokeflex_continuous_probe_descriptors_v2_gpuserver4090.py \
+            scripts/ci/verify_pokeflex_continuous_probe_descriptor_audit.py
+          python -m ruff check \
+            scripts/remote/audit_pokeflex_continuous_probe_descriptors_gpuserver4090.py \
+            scripts/remote/audit_pokeflex_continuous_probe_descriptors_v2_gpuserver4090.py \
+            scripts/ci/verify_pokeflex_continuous_probe_descriptor_audit.py
+
+  audit:
+    name: Run revised continuous action audit on gpuserver4090
+    needs: contract
+    runs-on: [self-hosted, Linux, X64, gpuserver4090]
+    timeout-minutes: 180
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Create isolated numerical runtime
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pokeflex-continuous-action-v2-venv"
+          "$RUNNER_TEMP/pokeflex-continuous-action-v2-venv/bin/python" \
+            -m pip install --disable-pip-version-check \
+              numpy==2.2.6 \
+              scipy==1.15.3
+
+      - name: Run revised source-only descriptor audit
+        id: scientific
+        shell: bash
+        run: |
+          mkdir -p build/pokeflex-continuous-probe-descriptor-audit-v2
+          set +e
+          "$RUNNER_TEMP/pokeflex-continuous-action-v2-venv/bin/python" \
+            scripts/remote/audit_pokeflex_continuous_probe_descriptors_v2_gpuserver4090.py \
+            --root /mnt/seagate10tb/florianpfaff/datasets/pokeflex \
+            --request \
+              .github/requests/pokeflex-continuous-probe-descriptor-audit-gpuserver4090-v2.json \
+            --output-dir build/pokeflex-continuous-probe-descriptor-audit-v2/result
+          rc=$?
+          set -e
+          echo "return_code=$rc" >> "$GITHUB_OUTPUT"
+          echo "$rc" > build/pokeflex-continuous-probe-descriptor-audit-v2/return_code.txt
+
+      - name: Verify result and information boundary
+        if: always() && steps.scientific.outputs.return_code != ''
+        run: |
+          "$RUNNER_TEMP/pokeflex-continuous-action-v2-venv/bin/python" \
+            scripts/ci/verify_pokeflex_continuous_probe_descriptor_audit.py \
+            build/pokeflex-continuous-probe-descriptor-audit-v2/result/result.json \
+            --output-json \
+              build/pokeflex-continuous-probe-descriptor-audit-v2/verification.json
+
+      - name: Record provenance
+        if: always()
+        run: |
+          {
+            echo "runner_name=${RUNNER_NAME}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "workflow_run=${GITHUB_RUN_ID}"
+            echo "workflow_attempt=${GITHUB_RUN_ATTEMPT}"
+            echo "head_sha=${GITHUB_SHA}"
+          } > build/pokeflex-continuous-probe-descriptor-audit-v2/runner.txt
+
+      - name: Publish summary
+        if: always()
+        run: |
+          if test -f build/pokeflex-continuous-probe-descriptor-audit-v2/result/result.md; then
+            cat build/pokeflex-continuous-probe-descriptor-audit-v2/result/result.md \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload source-only evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pokeflex-continuous-probe-descriptor-audit-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/pokeflex-continuous-probe-descriptor-audit-v2/
+            .github/requests/pokeflex-continuous-probe-descriptor-audit-gpuserver4090-v2.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce technical execution only
+        if: always()
+        run: |
+          rc="$(cat build/pokeflex-continuous-probe-descriptor-audit-v2/return_code.txt)"
+          if test "$rc" -ne 0 && test "$rc" -ne 3; then
+            echo "Technical execution failed with code $rc" >&2
+            exit "$rc"
+          fi
