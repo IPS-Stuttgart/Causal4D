@@ -1,0 +1,65 @@
+name: Fix logged-counterfactual H5Array access v1
+
+on:
+  push:
+    branches:
+      - science/deform360-logged-counterfactual-v1
+    paths:
+      - .github/workflows/deform360-logged-counterfactual-fix-h5array-v1.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: science/deform360-logged-counterfactual-v1
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Apply API correction and exact repository formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/remote/rebind_deform360_retained_source_masks_v2.py')
+          text = path.read_text(encoding='utf-8')
+          old = '                frame_count = len(stored)\n'
+          new = '                frame_count = int(stored.shape[0])\n'
+          if text.count(old) != 1:
+              raise SystemExit('H5Array frame-count marker is not unique')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          python -m pip install 'ruff==0.16.5'
+          files=(
+            src/causal4d_public/deform360_logged_counterfactual.py
+            src/causal4d_public/deform360_logged_counterfactual_strict.py
+            scripts/experiments/deform360_logged_counterfactual_source_v1.py
+            scripts/remote/rebind_deform360_retained_source_masks_v2.py
+            tests/test_deform360_logged_counterfactual.py
+          )
+          python -m ruff format "${files[@]}"
+          python -m ruff check "${files[@]}"
+          grep -F 'frame_count = int(stored.shape[0])' scripts/remote/rebind_deform360_retained_source_masks_v2.py
+          rm .github/workflows/deform360-logged-counterfactual-fix-h5array-v1.yml
+      - name: Commit corrected implementation and self-remove
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            src/causal4d_public/deform360_logged_counterfactual.py \
+            src/causal4d_public/deform360_logged_counterfactual_strict.py \
+            scripts/experiments/deform360_logged_counterfactual_source_v1.py \
+            scripts/remote/rebind_deform360_retained_source_masks_v2.py \
+            tests/test_deform360_logged_counterfactual.py \
+            .github/workflows/deform360-logged-counterfactual-fix-h5array-v1.yml
+          git commit -m 'Use H5Array shape for retained source masks'
+          git push origin HEAD:science/deform360-logged-counterfactual-v1
