@@ -33,9 +33,7 @@ def _load_discovery_module() -> ModuleType:
 
 
 _DISCOVERY = _load_discovery_module()
-discover_pokeflex_development_replica = (
-    _DISCOVERY.discover_pokeflex_development_replica
-)
+discover_pokeflex_development_replica = _DISCOVERY.discover_pokeflex_development_replica
 validate_pokeflex_replica_discovery = _DISCOVERY.validate_pokeflex_replica_discovery
 
 
