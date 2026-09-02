@@ -27,8 +27,7 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     args = _parse_args()
     payloads = [
-        json.loads(path.read_text(encoding="utf-8"))
-        for path in args.observation_json
+        json.loads(path.read_text(encoding="utf-8")) for path in args.observation_json
     ]
     result = build_logged_counterfactual_source_artifact(
         payloads,

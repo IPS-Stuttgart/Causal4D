@@ -16,7 +16,9 @@ from causal4d_public.deform360_rope_dynamics import (
 )
 
 
-def _synthetic_observation(episode: int, direction: np.ndarray) -> RopeDynamicsObservation:
+def _synthetic_observation(
+    episode: int, direction: np.ndarray
+) -> RopeDynamicsObservation:
     frame_count = 14
     node_count = 5
     dt = 1.0 / 30.0

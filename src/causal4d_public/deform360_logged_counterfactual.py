@@ -63,9 +63,12 @@ class LoggedCounterfactualConfig:
     maximum_primary_pair_ratio: float = 1.25
 
     def __post_init__(self) -> None:
-        _require(self.prefix_frame_count >= 2, "prefix_frame_count must be at least two")
         _require(
-            np.isfinite(self.minimum_temperature_m) and self.minimum_temperature_m > 0.0,
+            self.prefix_frame_count >= 2, "prefix_frame_count must be at least two"
+        )
+        _require(
+            np.isfinite(self.minimum_temperature_m)
+            and self.minimum_temperature_m > 0.0,
             "minimum_temperature_m must be finite and positive",
         )
         _require(
@@ -89,7 +92,9 @@ class LoggedCounterfactualConfig:
         )
 
 
-def _prediction_metrics(reference: np.ndarray, prediction: np.ndarray) -> dict[str, float]:
+def _prediction_metrics(
+    reference: np.ndarray, prediction: np.ndarray
+) -> dict[str, float]:
     _require(reference.shape == prediction.shape, "reference/prediction shape mismatch")
     return {
         "chamfer_distance_m": _mean_chamfer_m(reference, prediction),
@@ -144,12 +149,20 @@ def _factual_posterior(
     config: LoggedCounterfactualConfig,
 ) -> tuple[np.ndarray, dict[str, float]]:
     scores = np.asarray(candidate_chamfer_m, dtype=np.float64)
-    _require(scores.ndim == 1 and len(scores) >= 2, "candidate scores must be one-dimensional")
-    _require(np.all(np.isfinite(scores)) and np.all(scores >= 0.0), "invalid candidate scores")
+    _require(
+        scores.ndim == 1 and len(scores) >= 2,
+        "candidate scores must be one-dimensional",
+    )
+    _require(
+        np.all(np.isfinite(scores)) and np.all(scores >= 0.0),
+        "invalid candidate scores",
+    )
     median = float(np.median(scores))
     mad = float(np.median(np.abs(scores - median)))
     temperature = max(config.minimum_temperature_m, mad)
-    log_weight = -config.posterior_power * (scores - float(np.min(scores))) / temperature
+    log_weight = (
+        -config.posterior_power * (scores - float(np.min(scores))) / temperature
+    )
     log_weight -= float(np.max(log_weight))
     weights = np.exp(log_weight)
     weights /= np.sum(weights)
@@ -173,7 +186,9 @@ def _permutation_shift(protocol_id: str, factual_episode_id: str, count: int) ->
     return 1 + int.from_bytes(digest[:8], "big") % (count - 1)
 
 
-def _factual_partner_map(protocol_id: str, episode_ids: Sequence[str]) -> dict[str, str]:
+def _factual_partner_map(
+    protocol_id: str, episode_ids: Sequence[str]
+) -> dict[str, str]:
     ids = tuple(sorted(map(str, episode_ids)))
     _require(len(ids) >= 3, "primary pairing needs at least three source episodes")
     partners: dict[str, str] = {}
@@ -355,12 +370,8 @@ def evaluate_logged_cross_intervention_abduction(
         "observed_win_fraction_vs_uniform": uniform["win_fraction"],
         "observed_win_fraction_vs_permuted": permuted["win_fraction"],
         "maximum_primary_pair_ratio": config.maximum_primary_pair_ratio,
-        "observed_worst_ratio_vs_uniform": uniform[
-            "worst_abduced_to_control_ratio"
-        ],
-        "observed_worst_ratio_vs_permuted": permuted[
-            "worst_abduced_to_control_ratio"
-        ],
+        "observed_worst_ratio_vs_uniform": uniform["worst_abduced_to_control_ratio"],
+        "observed_worst_ratio_vs_permuted": permuted["worst_abduced_to_control_ratio"],
     }
     gate["passed"] = bool(
         gate["observed_mean_improvement_vs_uniform_fraction"]
