@@ -1,0 +1,273 @@
+--- a/src/causal4d_public/deform360_sensor_reveal_source.py
++++ b/src/causal4d_public/deform360_sensor_reveal_source.py
+@@ -11,9 +11,13 @@
+ from collections import defaultdict
+ from collections.abc import Mapping, Sequence
+ from pathlib import Path
+-from typing import Any
++from typing import Any, cast
+ 
+ import numpy as np
++import numpy.typing as npt
++
++Array = npt.NDArray[Any]
++FloatArray = npt.NDArray[np.float64]
+ 
+ AUDIT_SCHEMA_VERSION = 1
+ AUDIT_KIND = "Deform360SensorRevealSourceAudit"
+@@ -74,7 +78,9 @@
+ 
+ def _load_config(path: str | Path) -> dict[str, Any]:
+     config_path = Path(path).resolve()
+-    payload = json.loads(config_path.read_text(encoding="utf-8"))
++    loaded: object = json.loads(config_path.read_text(encoding="utf-8"))
++    _require(isinstance(loaded, dict), "config must be a JSON object")
++    payload = cast(dict[str, Any], loaded)
+     _require(payload.get("schema_version") == AUDIT_SCHEMA_VERSION, "config schema changed")
+     _require(payload.get("artifact_kind") == CONFIG_KIND, "config kind changed")
+     _require(
+@@ -268,11 +274,11 @@
+     }
+ 
+ 
+-def _leading_frame_count(value: np.ndarray) -> int | None:
++def _leading_frame_count(value: Array) -> int | None:
+     return int(value.shape[0]) if value.ndim >= 1 and value.shape[0] >= 1 else None
+ 
+ 
+-def _robot_inventory(episode: Path, root: Path) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
++def _robot_inventory(episode: Path, root: Path) -> tuple[dict[str, Any], dict[str, Array]]:
+     candidates = (episode / "robot" / "robot.npz", episode / "robot.npz")
+     paths = [path for path in candidates if path.is_file()]
+     if not paths:
+@@ -283,7 +289,7 @@
+             "reason": f"expected one robot.npz, found {len(paths)}",
+         }, {}
+     path = paths[0]
+-    arrays: dict[str, np.ndarray] = {}
++    arrays: dict[str, Array] = {}
+     with np.load(path, allow_pickle=False) as payload:
+         keys = sorted(payload.files)
+         for key in keys:
+@@ -323,20 +329,20 @@
+     return summary, arrays
+ 
+ 
+-def _per_frame_mean_absolute(value: np.ndarray, chunk_size: int = 64) -> np.ndarray:
++def _per_frame_mean_absolute(value: Array, chunk_size: int = 64) -> FloatArray:
+     _require(value.ndim >= 1 and value.shape[0] >= 1, "sensor array lacks a frame axis")
+-    result = np.empty(value.shape[0], dtype=np.float64)
++    result: FloatArray = np.empty(value.shape[0], dtype=np.float64)
+     for start in range(0, value.shape[0], chunk_size):
+         stop = min(start + chunk_size, value.shape[0])
+         chunk = np.asarray(value[start:stop], dtype=np.float64)
+-        _require(np.all(np.isfinite(chunk)), "sensor array contains nonfinite values")
++        _require(bool(np.all(np.isfinite(chunk))), "sensor array contains nonfinite values")
+         result[start:stop] = np.mean(np.abs(chunk).reshape(stop - start, -1), axis=1)
+     return result
+ 
+ 
+ def _tactile_inventory(
+     episode_roots: Sequence[tuple[Path, Path]],
+-) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
++) -> tuple[dict[str, Any], dict[str, FloatArray]]:
+     paths: list[tuple[Path, Path]] = []
+     seen_paths: set[Path] = set()
+     for episode, root in episode_roots:
+@@ -345,8 +351,8 @@
+             if resolved not in seen_paths:
+                 paths.append((path, root))
+                 seen_paths.add(resolved)
+-    summaries = []
+-    energies: dict[str, np.ndarray] = {}
++    summaries: list[dict[str, Any]] = []
++    energies: dict[str, FloatArray] = {}
+     for path, root in paths:
+         episode = next(
+             candidate_episode
+@@ -388,18 +394,18 @@
+     }, energies
+ 
+ 
+-def _robot_feature_series(arrays: Mapping[str, np.ndarray]) -> dict[str, np.ndarray]:
+-    features: dict[str, np.ndarray] = {}
++def _robot_feature_series(arrays: Mapping[str, Array]) -> dict[str, FloatArray]:
++    features: dict[str, FloatArray] = {}
+     openings = arrays.get("openings")
+     if openings is not None and openings.ndim >= 1:
+         reshaped = np.asarray(openings, dtype=np.float64).reshape(openings.shape[0], -1)
+-        _require(np.all(np.isfinite(reshaped)), "robot openings contain nonfinite values")
++        _require(bool(np.all(np.isfinite(reshaped))), "robot openings contain nonfinite values")
+         features["robot-opening"] = np.mean(reshaped, axis=1)
+     worlds = arrays.get("T_worlds")
+     if worlds is not None and worlds.ndim >= 3 and worlds.shape[-2:] == (4, 4):
+         translations = np.asarray(worlds[..., :3, 3], dtype=np.float64)
+         translations = translations.reshape(translations.shape[0], -1, 3)
+-        _require(np.all(np.isfinite(translations)), "robot transforms contain nonfinite values")
++        _require(bool(np.all(np.isfinite(translations))), "robot transforms contain nonfinite values")
+         step = np.zeros(translations.shape[0], dtype=np.float64)
+         if translations.shape[0] > 1:
+             step[1:] = np.mean(np.linalg.norm(np.diff(translations, axis=0), axis=-1), axis=1)
+@@ -425,12 +431,12 @@
+     return rounded
+ 
+ 
+-def _window_sum(series: np.ndarray, end: int, width: int) -> float:
++def _window_sum(series: FloatArray, end: int, width: int) -> float:
+     start = max(end - width + 1, 0)
+     return float(np.sum(series[start : end + 1]))
+ 
+ 
+-def _window_range(series: np.ndarray, end: int, width: int) -> float:
++def _window_range(series: FloatArray, end: int, width: int) -> float:
+     start = max(end - width + 1, 0)
+     window = series[start : end + 1]
+     return float(np.max(window) - np.min(window))
+@@ -439,12 +445,14 @@
+ def _quantile_codebook(values: Sequence[float]) -> tuple[float, float]:
+     array = np.asarray(values, dtype=np.float64)
+     _require(array.ndim == 1 and array.size >= 3, "codebook needs at least three values")
+-    lower, upper = np.quantile(array, (1.0 / 3.0, 2.0 / 3.0))
++    quantiles = np.quantile(array, (1.0 / 3.0, 2.0 / 3.0))
++    lower = float(quantiles[0])
++    upper = float(quantiles[1])
+     if upper <= lower:
+         spread = max(float(np.ptp(array)), 1.0) * 1e-12
+         lower -= spread
+         upper += spread
+-    return float(lower), float(upper)
++    return lower, upper
+ 
+ 
+ def _bin(value: float, thresholds: tuple[float, float]) -> int:
+@@ -516,7 +524,7 @@
+     predictions: list[int] = []
+     targets: list[int] = []
+     baseline_predictions: list[int] = []
+-    episode_records = []
++    episode_records: list[dict[str, Any]] = []
+     for held_episode in episode_ids:
+         training = [row for row in rows if int(row["episode_id"]) != held_episode]
+         held = [row for row in rows if int(row["episode_id"]) == held_episode]
+@@ -601,7 +609,7 @@
+         ]
+         for sensor in sensor_names
+     }
+-    single = []
++    single: list[dict[str, Any]] = []
+     for sensor in sensor_names:
+         accuracy = _lookup_accuracy([(value,) for value in outcomes[sensor]], labels)
+         grouped = _leave_one_episode_out_accuracy(rows, (sensor,))
+@@ -617,7 +625,7 @@
+                 ).tolist(),
+             }
+         )
+-    pairs = []
++    pairs: list[dict[str, Any]] = []
+     for left_index, left in enumerate(sensor_names):
+         for right in sensor_names[left_index + 1 :]:
+             keys = list(zip(outcomes[left], outcomes[right], strict=True))
+@@ -688,8 +696,8 @@
+     source_ids = tuple(config["source_episode_ids"])
+     forbidden_ids = tuple(config["forbidden_episode_ids"])
+     object_id = str(config["object_id"])
+-    episode_records = []
+-    feature_state: dict[int, dict[str, np.ndarray]] = {}
++    episode_records: list[dict[str, Any]] = []
++    feature_state: dict[int, dict[str, FloatArray]] = {}
+     common_tactile: set[str] | None = None
+ 
+     roots_for_tactile = tuple(
+@@ -753,7 +761,7 @@
+         for name in sensor_names
+     }
+     rows: list[dict[str, Any]] = []
+-    episode_readiness = []
++    episode_readiness: list[dict[str, Any]] = []
+     for record in episode_records:
+         episode_id = int(record["episode_id"])
+         series = feature_state[episode_id]
+@@ -895,8 +903,10 @@
+         == _payload_sha256(payload, digest_field="result_sha256"),
+         "result checksum mismatch",
+     )
+-    boundary = payload.get("information_boundary")
+-    _require(isinstance(boundary, Mapping), "information boundary is missing")
++    boundary_value = payload.get("information_boundary")
++    if not isinstance(boundary_value, Mapping):
++        raise ValueError("information boundary is missing")
++    boundary = cast(Mapping[str, Any], boundary_value)
+     _require(
+         boundary.get("source_only") is True
+         and boundary.get("forbidden_episode_payloads_read") is False
+@@ -906,20 +916,26 @@
+         and boundary.get("paper_claim_authorized") is False,
+         "result crossed a source or claim boundary",
+     )
+-    dataset = payload.get("dataset")
+-    _require(isinstance(dataset, Mapping), "dataset record is missing")
++    dataset_value = payload.get("dataset")
++    if not isinstance(dataset_value, Mapping):
++        raise ValueError("dataset record is missing")
++    dataset = cast(Mapping[str, Any], dataset_value)
+     source_ids = dataset.get("source_episode_ids")
+     forbidden_ids = dataset.get("forbidden_episode_ids")
++    if not isinstance(source_ids, list) or not isinstance(forbidden_ids, list):
++        raise ValueError("result episode rosters are missing")
+     _require(
+-        isinstance(source_ids, list)
+-        and isinstance(forbidden_ids, list)
+-        and not set(source_ids) & set(forbidden_ids),
++        not set(source_ids) & set(forbidden_ids),
+         "result source and forbidden episode rosters overlap",
+     )
+-    records = payload.get("episode_records")
++    records_value = payload.get("episode_records")
++    if not isinstance(records_value, list) or not all(
++        isinstance(record, Mapping) for record in records_value
++    ):
++        raise ValueError("result episode records are missing")
++    records = cast(list[Mapping[str, Any]], records_value)
+     _require(
+-        isinstance(records, list)
+-        and [record.get("episode_id") for record in records] == source_ids,
++        [record.get("episode_id") for record in records] == source_ids,
+         "result episode roster changed",
+     )
+ 
+@@ -936,18 +952,24 @@
+     if args.verify is not None:
+         validate_source_audit(json.loads(args.verify.read_text(encoding="utf-8")))
+         return 0
+-    _require(
+-        args.point_cloud_root is not None
+-        and args.aligned_root is not None
+-        and args.config is not None
+-        and args.output is not None,
+-        "--point-cloud-root, --aligned-root, --config, and --output are required",
+-    )
++    point_cloud_root = args.point_cloud_root
++    aligned_root = args.aligned_root
++    config = args.config
++    output = args.output
++    if (
++        point_cloud_root is None
++        or aligned_root is None
++        or config is None
++        or output is None
++    ):
++        raise ValueError(
++            "--point-cloud-root, --aligned-root, --config, and --output are required"
++        )
+     run_source_audit(
+-        args.point_cloud_root,
+-        args.aligned_root,
+-        args.config,
+-        args.output,
++        point_cloud_root,
++        aligned_root,
++        config,
++        output,
+         tactile_roots=args.tactile_root,
+     )
+     return 0
