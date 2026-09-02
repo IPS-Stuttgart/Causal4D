@@ -1,3 +1,4 @@
+# execution-revision: cleaned-diagnostic-v1
 name: Deform360 published source score-matrix diagnostic v1
 
 on:
@@ -6,6 +7,7 @@ on:
       - science/deform360-logged-counterfactual-v1
     paths:
       - .github/workflows/deform360-logged-counterfactual-score-matrix-v1.yml
+      - scripts/experiments/deform360_logged_counterfactual_score_matrix_v1.py
 
 permissions:
   contents: read
