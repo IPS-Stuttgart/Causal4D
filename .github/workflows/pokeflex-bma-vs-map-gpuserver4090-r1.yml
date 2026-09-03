@@ -1,0 +1,297 @@
+# workflow-lifecycle: permanent
+# workflow-owner: IPS-Stuttgart maintainers
+name: PokeFlex BMA versus MAP technical relaunch r1
+
+on:
+  push:
+    branches:
+      - science/pokeflex-bma-vs-map-r1
+    paths:
+      - .github/requests/pokeflex-bma-vs-map-r1.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pokeflex-bma-vs-map-gpuserver4090-r1
+  cancel-in-progress: false
+
+env:
+  BASE_SCIENTIFIC_REVISION: 6d1c4e1b32ce7996d301f2596cb15b9bd52ec1d2
+  DATASET_ROOT: /mnt/seagate10tb/florianpfaff/datasets/pokeflex
+  POLICY_PATH: control/configs/causal4d_public/pokeflex_realized_load_source_v1.json
+  SOURCE_QA_PATH: control/milestones/pokeflex-001-source-warp-gate-v1/artifacts/3dPrintedBunny_source_qa_v1.json
+  ORIGINAL_REQUEST_PATH: control/ops/pokeflex-bma-vs-map-gpuserver4090-request.json
+  SUMMARY_SCRIPT: control/scripts/science/summarize_pokeflex_bma_vs_map_v1.py
+  ORIGINAL_WORKFLOW_BLOB: d410f503426677c51a18330296e024bae438aa6a
+  ORIGINAL_REQUEST_BLOB: 46821cfcd0df5400cf431b01d2bf783ac132fd19
+  PYTHONUNBUFFERED: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONHASHSEED: "0"
+  OPENBLAS_NUM_THREADS: "1"
+  OMP_NUM_THREADS: "1"
+  MKL_NUM_THREADS: "1"
+  NUMEXPR_NUM_THREADS: "1"
+
+jobs:
+  evaluate:
+    name: Evaluate unchanged five-take source contrast
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]
+    timeout-minutes: 120
+    steps:
+      - name: Check out technical relaunch branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: control
+          persist-credentials: false
+          clean: true
+          fetch-depth: 2
+
+      - name: Authorize one add-only technical relaunch request
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          PUSH_FORCED: ${{ github.event.forced }}
+          REQUEST: .github/requests/pokeflex-bma-vs-map-r1.json
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = refs/heads/science/pokeflex-bma-vs-map-r1
+          test "${PUSH_FORCED}" = false
+          test "${BEFORE_SHA}" != 0000000000000000000000000000000000000000
+          mapfile -t changed < <(
+            git -C control diff --name-status "${BEFORE_SHA}" "${GITHUB_SHA}"
+          )
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = $'A\t.github/requests/pokeflex-bma-vs-map-r1.json'
+          REQUEST_PATH="control/${REQUEST}" python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          value = json.loads(Path(os.environ["REQUEST_PATH"]).read_text(encoding="utf-8"))
+          expected = {
+              "schema": "causal4d/pokeflex-bma-vs-map-technical-relaunch-v1",
+              "request_id": "pokeflex-bma-vs-map-20260903-r1",
+              "purpose": "Relaunch the unchanged reviewed five-development-take posterior-averaging-versus-MAP experiment in an isolated pinned Python environment after the first run failed before data access.",
+              "base_scientific_revision": "6d1c4e1b32ce7996d301f2596cb15b9bd52ec1d2",
+              "superseded_run_id": 33749709370,
+              "superseded_failure": "no-compatible-preinstalled-numpy-before-data-access",
+              "runner_labels": ["self-hosted", "Linux", "X64", "nvidia-smi", "gpuserver4090"],
+              "dataset_root": "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+              "development_take_ids": [
+                  "3dPrintedBunny_T1",
+                  "3dPrintedBunny_T3",
+                  "3dPrintedBunny_T4",
+                  "3dPrintedBunny_T6",
+                  "3dPrintedBunny_T7",
+              ],
+              "scientific_evaluator_changed": False,
+              "policy_changed": False,
+              "component_bank_changed": False,
+              "comparison_definition_changed": False,
+              "calibration_take_data_allowed": False,
+              "target_take_data_allowed": False,
+              "new_physical_data_collected": False,
+              "scientific_outcome_may_fail_workflow": False,
+              "paper_claim_authorized": False,
+          }
+          for key, expected_value in expected.items():
+              if value.get(key) != expected_value:
+                  raise SystemExit(f"invalid {key}: {value.get(key)!r}")
+          allowed = set(expected) | {"expected_source_revision"}
+          if set(value) != allowed:
+              raise SystemExit("request fields differ from the frozen relaunch schema")
+          parent = subprocess.check_output(
+              ["git", "-C", "control", "rev-parse", f"{os.environ['GITHUB_SHA']}^"],
+              text=True,
+          ).strip()
+          if value["expected_source_revision"] != parent:
+              raise SystemExit("expected_source_revision is not the trigger parent")
+          PY
+
+      - name: Verify unchanged scientific implementation and reviewed request
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C control merge-base --is-ancestor "${BASE_SCIENTIFIC_REVISION}" HEAD
+          git -C control diff --exit-code "${BASE_SCIENTIFIC_REVISION}" HEAD -- \
+            src/causal4d_public \
+            configs/causal4d_public \
+            milestones/pokeflex-001-source-warp-gate-v1 \
+            ops/pokeflex-bma-vs-map-gpuserver4090-request.json
+          test "$(git -C control hash-object .github/workflows/pokeflex-bma-vs-map-gpuserver4090.yml)" = \
+            "${ORIGINAL_WORKFLOW_BLOB}"
+          test "$(git -C control hash-object ops/pokeflex-bma-vs-map-gpuserver4090-request.json)" = \
+            "${ORIGINAL_REQUEST_BLOB}"
+          python3 -m py_compile "${SUMMARY_SCRIPT}"
+
+      - name: Prepare isolated pinned runtime and evidence directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="${RUNNER_TEMP}/pokeflex-bma-vs-map-r1-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          venv="${RUNNER_TEMP}/pokeflex-bma-vs-map-r1-venv-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          rm -rf -- "${output}" "${venv}"
+          mkdir -p -- "${output}"
+          {
+            echo "OUTPUT_DIR=${output}"
+            echo "VENV_ROOT=${venv}"
+          } >> "${GITHUB_ENV}"
+          python3 -m venv "${venv}"
+          "${venv}/bin/python" -m pip install --disable-pip-version-check \
+            numpy==1.26.4 scipy==1.11.4 packaging==24.2
+          echo "PYTHON_BIN=${venv}/bin/python" >> "${GITHUB_ENV}"
+          "${venv}/bin/python" - <<'PY'
+          import numpy
+          import packaging
+          import scipy
+          print("numpy", numpy.__version__)
+          print("scipy", scipy.__version__)
+          print("packaging", packaging.__version__)
+          PY
+
+      - name: Validate reviewed source request and readable world copy
+        shell: bash
+        run: |
+          set -euo pipefail
+          request_env="${RUNNER_TEMP}/pokeflex-bma-vs-map-r1-request.env"
+          ORIGINAL_REQUEST_PATH="${ORIGINAL_REQUEST_PATH}" "${PYTHON_BIN}" - <<'PY' > "${request_env}"
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["ORIGINAL_REQUEST_PATH"])
+          request = json.loads(path.read_text(encoding="utf-8"))
+          request_id = request.pop("request_id")
+          observed = hashlib.sha256(
+              json.dumps(
+                  request,
+                  sort_keys=True,
+                  separators=(",", ":"),
+                  allow_nan=False,
+              ).encode("utf-8")
+          ).hexdigest()
+          if request_id != observed:
+              raise SystemExit("reviewed request identity mismatch")
+          expected = {
+              "artifact_kind": "PublicPokeFlexRealizedLoadSourceRequest",
+              "dataset_root": "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+              "enabled": True,
+              "information_boundary": {
+                  "automatic_follow_on_allowed": False,
+                  "calibration_take_data_allowed": False,
+                  "development_take_ids": [
+                      "3dPrintedBunny_T1",
+                      "3dPrintedBunny_T3",
+                      "3dPrintedBunny_T4",
+                      "3dPrintedBunny_T6",
+                      "3dPrintedBunny_T7",
+                  ],
+                  "public_data_only": True,
+                  "target_take_data_allowed": False,
+              },
+              "policy_path": "configs/causal4d_public/pokeflex_realized_load_source_v1.json",
+              "runner_labels": [
+                  "self-hosted",
+                  "Linux",
+                  "X64",
+                  "nvidia-smi",
+                  "gpuserver4090",
+              ],
+              "schema_version": 1,
+              "source_qa_artifact_path": "milestones/pokeflex-001-source-warp-gate-v1/artifacts/3dPrintedBunny_source_qa_v1.json",
+              "stage": "development-source-gate",
+          }
+          if request != expected:
+              raise SystemExit("reviewed request content changed")
+          print(f"REQUEST_ID={request_id}")
+          PY
+          cat "${request_env}" >> "${GITHUB_ENV}"
+          test "${DATASET_ROOT}" = "/mnt/seagate10tb/florianpfaff/datasets/pokeflex"
+          test -d "${DATASET_ROOT}"
+          test -r "${DATASET_ROOT}"
+          test -x "${DATASET_ROOT}"
+          cp control/.github/requests/pokeflex-bma-vs-map-r1.json \
+            "${OUTPUT_DIR}/technical_relaunch_request.json"
+          cp "${ORIGINAL_REQUEST_PATH}" "${OUTPUT_DIR}/reviewed_source_request.json"
+
+      - name: Run frozen evaluator and unchanged BMA-versus-MAP summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=control/src "${PYTHON_BIN}" -m \
+            causal4d_public.cli.pokeflex_realized_load_source \
+            "${DATASET_ROOT}" \
+            "${SOURCE_QA_PATH}" \
+            "${OUTPUT_DIR}" \
+            --policy "${POLICY_PATH}" | tee "${OUTPUT_DIR}/console.json"
+          test -f "${OUTPUT_DIR}/result.json"
+          "${PYTHON_BIN}" "${SUMMARY_SCRIPT}" "${OUTPUT_DIR}" \
+            | tee "${OUTPUT_DIR}/bayesian_value_console.json"
+
+      - name: Validate evidence boundary and record exact identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          SUMMARY_PATH="${OUTPUT_DIR}/bayesian_value_summary.json" "${PYTHON_BIN}" - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          value = json.loads(Path(os.environ["SUMMARY_PATH"]).read_text(encoding="utf-8"))
+          if value.get("artifact_kind") != "PublicPokeFlexBayesianValueSummary":
+              raise SystemExit("unexpected summary artifact")
+          if value.get("unit_count") != 5:
+              raise SystemExit("expected five complete-take units")
+          contrast = value.get("contrast", {})
+          if contrast.get("only_posterior_averaging_vs_map_selection_changes") is not True:
+              raise SystemExit("BMA/MAP contrast changed")
+          boundary = value.get("information_boundary", {})
+          if boundary != {
+              "public_data_only": True,
+              "new_physical_data_collected": False,
+              "target_force_suffix_passed_to_inference": False,
+              "calibration_take_data_read": False,
+              "target_take_data_read": False,
+          }:
+              raise SystemExit("information boundary changed")
+          PY
+          {
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "technical_relaunch_revision=${GITHUB_SHA}"
+            echo "base_scientific_revision=${BASE_SCIENTIFIC_REVISION}"
+            echo "superseded_run_id=33749709370"
+            echo "runner_name=${RUNNER_NAME}"
+            echo "dataset_root=${DATASET_ROOT}"
+            "${PYTHON_BIN}" --version
+            "${PYTHON_BIN}" -c 'import numpy, scipy, packaging; print("numpy=" + numpy.__version__); print("scipy=" + scipy.__version__); print("packaging=" + packaging.__version__)'
+            sha256sum \
+              "${SUMMARY_SCRIPT}" \
+              "${POLICY_PATH}" \
+              "${SOURCE_QA_PATH}" \
+              "${ORIGINAL_REQUEST_PATH}" \
+              "${OUTPUT_DIR}/result.json" \
+              "${OUTPUT_DIR}/bayesian_value_summary.json"
+            uname -a
+          } | tee "${OUTPUT_DIR}/environment.txt"
+          find "${OUTPUT_DIR}" -maxdepth 1 -type f -print0 \
+            | sort -z \
+            | xargs -0 sha256sum > "${OUTPUT_DIR}/sha256sums.txt"
+          git -C control diff --exit-code
+          test -z "$(git -C control status --porcelain --untracked-files=all)"
+
+      - name: Upload complete compact evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pokeflex-bma-vs-map-r1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.OUTPUT_DIR }}
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Remove isolated runtime
+        if: always()
+        shell: bash
+        run: rm -rf -- "${VENV_ROOT:-}"
