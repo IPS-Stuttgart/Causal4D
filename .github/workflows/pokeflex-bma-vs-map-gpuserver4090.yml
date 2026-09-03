@@ -19,6 +19,8 @@ env:
   PYTHONUNBUFFERED: "1"
   REQUEST_PATH: ops/pokeflex-bma-vs-map-gpuserver4090-request.json
   NUMPY_VERSION: "2.2.6"
+  SCIPY_VERSION: "1.15.3"
+  PACKAGING_VERSION: "25.0"
 
 jobs:
   evaluate:
@@ -49,7 +51,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
           test -z "$(git status --porcelain=v1)"
 
-      - name: Bootstrap isolated pinned NumPy runtime
+      - name: Bootstrap isolated pinned numerical runtime
         shell: bash
         run: |
           set -euo pipefail
@@ -84,22 +86,37 @@ jobs:
             --no-input \
             --only-binary=:all: \
             --target "$runtime" \
-            "numpy==${NUMPY_VERSION}" 2>&1 | tee "$output/pip-install.log"
+            "numpy==${NUMPY_VERSION}" \
+            "scipy==${SCIPY_VERSION}" \
+            "packaging==${PACKAGING_VERSION}" \
+            2>&1 | tee "$output/pip-install.log"
 
           PYTHONPATH="$runtime" "$selected" - <<'PY' > "$output/runtime.txt"
           import numpy
           import os
+          import packaging
           import platform
+          import scipy
           import sys
 
-          expected = os.environ["NUMPY_VERSION"]
-          if numpy.__version__ != expected:
+          expected = {
+              "numpy": os.environ["NUMPY_VERSION"],
+              "scipy": os.environ["SCIPY_VERSION"],
+              "packaging": os.environ["PACKAGING_VERSION"],
+          }
+          observed = {
+              "numpy": numpy.__version__,
+              "scipy": scipy.__version__,
+              "packaging": packaging.__version__,
+          }
+          if observed != expected:
               raise SystemExit(
-                  f"unexpected isolated NumPy version: {numpy.__version__} != {expected}"
+                  f"unexpected isolated numerical runtime: {observed} != {expected}"
               )
           print("python_executable", sys.executable)
           print("python", platform.python_version())
-          print("numpy", numpy.__version__)
+          for name in sorted(observed):
+              print(name, observed[name])
           PY
           printf 'PYTHON_BIN=%s\n' "$selected" >> "$GITHUB_ENV"
           printf 'EVAL_PYTHONPATH=%s\n' "$runtime" >> "$GITHUB_ENV"
