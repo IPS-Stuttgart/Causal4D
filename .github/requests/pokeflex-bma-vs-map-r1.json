@@ -1,0 +1,33 @@
+{
+  "schema": "causal4d/pokeflex-bma-vs-map-technical-relaunch-v1",
+  "request_id": "pokeflex-bma-vs-map-20260903-r1",
+  "purpose": "Relaunch the unchanged reviewed five-development-take posterior-averaging-versus-MAP experiment in an isolated pinned Python environment after the first run failed before data access.",
+  "base_scientific_revision": "6d1c4e1b32ce7996d301f2596cb15b9bd52ec1d2",
+  "superseded_run_id": 33749709370,
+  "superseded_failure": "no-compatible-preinstalled-numpy-before-data-access",
+  "runner_labels": [
+    "self-hosted",
+    "Linux",
+    "X64",
+    "nvidia-smi",
+    "gpuserver4090"
+  ],
+  "dataset_root": "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+  "development_take_ids": [
+    "3dPrintedBunny_T1",
+    "3dPrintedBunny_T3",
+    "3dPrintedBunny_T4",
+    "3dPrintedBunny_T6",
+    "3dPrintedBunny_T7"
+  ],
+  "scientific_evaluator_changed": false,
+  "policy_changed": false,
+  "component_bank_changed": false,
+  "comparison_definition_changed": false,
+  "calibration_take_data_allowed": false,
+  "target_take_data_allowed": false,
+  "new_physical_data_collected": false,
+  "scientific_outcome_may_fail_workflow": false,
+  "paper_claim_authorized": false,
+  "expected_source_revision": "8167bdb55c75005883fdadbf0f5e48471d084b92"
+}
