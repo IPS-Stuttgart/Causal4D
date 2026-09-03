@@ -48,24 +48,46 @@ jobs:
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
           test -z "$(git status --porcelain=v1)"
 
-      - name: Select an isolated compatible Python
+      - name: Prepare isolated numerical runtime
         shell: bash
         run: |
           set -euo pipefail
-          for candidate in /opt/pyvenv/bin/python python3 python; do
-            if command -v "$candidate" >/dev/null 2>&1 && \
-               "$candidate" - <<'PY' >/dev/null 2>&1
-          import numpy
-          assert tuple(map(int, numpy.__version__.split(".")[:2])) >= (1, 24)
+          output="${RUNNER_TEMP}/pokeflex-bma-vs-map-v1"
+          venv="${RUNNER_TEMP}/pokeflex-bma-vs-map-venv-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          rm -rf -- "${output}" "${venv}"
+          mkdir -p -- "${output}"
+          {
+            python3 - <<'PY'
+          import sys
+
+          if not ((3, 10) <= sys.version_info[:2] < (3, 13)):
+              raise SystemExit(
+                  f"expected Python 3.10-3.12, observed {sys.version.split()[0]}"
+              )
           PY
-            then
-              resolved="$(command -v "$candidate")"
-              printf 'PYTHON_BIN=%s\n' "$resolved" >> "$GITHUB_ENV"
-              exit 0
-            fi
-          done
-          echo "No Python with NumPy >=1.24 is available" >&2
-          exit 1
+            python3 -m venv "${venv}"
+            "${venv}/bin/python" -m pip install \
+              --disable-pip-version-check \
+              numpy==1.26.4 \
+              scipy==1.15.3 \
+              packaging==25.0
+            "${venv}/bin/python" - <<'PY'
+          import numpy
+          import packaging
+          import scipy
+
+          assert numpy.__version__ == "1.26.4"
+          assert scipy.__version__ == "1.15.3"
+          print("numpy", numpy.__version__)
+          print("scipy", scipy.__version__)
+          print("packaging", packaging.__version__)
+          PY
+          } 2>&1 | tee "${output}/runtime-bootstrap.log"
+          {
+            echo "PYTHON_BIN=${venv}/bin/python"
+            echo "VENV_ROOT=${venv}"
+            echo "OUTPUT_ROOT=${output}"
+          } >> "${GITHUB_ENV}"
 
       - name: Validate reviewed request and readable dataset root
         shell: bash
@@ -146,9 +168,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          output="$RUNNER_TEMP/pokeflex-bma-vs-map-v1"
-          rm -rf "$output"
-          mkdir -p "$output"
+          output="${OUTPUT_ROOT}"
+          mkdir -p -- "$output"
           PYTHONPATH=src "$PYTHON_BIN" -m \
             causal4d_public.cli.pokeflex_realized_load_source \
             "$DATASET_ROOT" \
@@ -367,6 +388,14 @@ jobs:
           )
           print(json.dumps(summary, indent=2, sort_keys=True))
           PY
+
+      - name: Remove isolated runtime
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${VENV_ROOT:-}" ]]; then
+            rm -rf -- "${VENV_ROOT}"
+          fi
 
       - name: Upload complete compact evidence
         if: always()
