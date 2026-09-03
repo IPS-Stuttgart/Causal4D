@@ -18,6 +18,7 @@ concurrency:
 env:
   PYTHONUNBUFFERED: "1"
   REQUEST_PATH: ops/pokeflex-bma-vs-map-gpuserver4090-request.json
+  NUMPY_VERSION: "2.2.6"
 
 jobs:
   evaluate:
@@ -48,31 +49,67 @@ jobs:
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
           test -z "$(git status --porcelain=v1)"
 
-      - name: Select an isolated compatible Python
+      - name: Bootstrap isolated pinned NumPy runtime
         shell: bash
         run: |
           set -euo pipefail
-          for candidate in /opt/pyvenv/bin/python python3 python; do
-            if command -v "$candidate" >/dev/null 2>&1 && \
-               "$candidate" - <<'PY' >/dev/null 2>&1
-          import numpy
-          assert tuple(map(int, numpy.__version__.split(".")[:2])) >= (1, 24)
+          output="$RUNNER_TEMP/pokeflex-bma-vs-map-v1"
+          mkdir -p "$output"
+
+          selected=""
+          for candidate in \
+            python3.13 python3.12 python3.11 python3.10 /usr/bin/python3 python3; do
+            command -v "$candidate" >/dev/null 2>&1 || continue
+            if "$candidate" - <<'PY' >/dev/null 2>&1
+          import sys
+          raise SystemExit(0 if sys.version_info >= (3, 10) else 1)
           PY
             then
-              resolved="$(command -v "$candidate")"
-              printf 'PYTHON_BIN=%s\n' "$resolved" >> "$GITHUB_ENV"
-              exit 0
+              if "$candidate" -m pip --version >/dev/null 2>&1; then
+                selected="$(command -v "$candidate")"
+                break
+              fi
             fi
           done
-          echo "No Python with NumPy >=1.24 is available" >&2
-          exit 1
+          if [[ -z "$selected" ]]; then
+            echo "No Python >=3.10 with pip is available" | tee "$output/runtime-error.txt"
+            exit 1
+          fi
+
+          runtime="$RUNNER_TEMP/pokeflex-bma-numpy-runtime"
+          rm -rf "$runtime"
+          mkdir -p "$runtime"
+          "$selected" -m pip install \
+            --disable-pip-version-check \
+            --no-input \
+            --only-binary=:all: \
+            --target "$runtime" \
+            "numpy==${NUMPY_VERSION}" 2>&1 | tee "$output/pip-install.log"
+
+          PYTHONPATH="$runtime" "$selected" - <<'PY' > "$output/runtime.txt"
+          import numpy
+          import os
+          import platform
+          import sys
+
+          expected = os.environ["NUMPY_VERSION"]
+          if numpy.__version__ != expected:
+              raise SystemExit(
+                  f"unexpected isolated NumPy version: {numpy.__version__} != {expected}"
+              )
+          print("python_executable", sys.executable)
+          print("python", platform.python_version())
+          print("numpy", numpy.__version__)
+          PY
+          printf 'PYTHON_BIN=%s\n' "$selected" >> "$GITHUB_ENV"
+          printf 'EVAL_PYTHONPATH=%s\n' "$runtime" >> "$GITHUB_ENV"
 
       - name: Validate reviewed request and readable dataset root
         shell: bash
         run: |
           set -euo pipefail
           request_env="$RUNNER_TEMP/pokeflex-bma-vs-map-request.env"
-          "$PYTHON_BIN" - <<'PY' > "$request_env"
+          PYTHONPATH="$EVAL_PYTHONPATH" "$PYTHON_BIN" - <<'PY' > "$request_env"
           import hashlib
           import json
           from pathlib import Path
@@ -88,45 +125,42 @@ jobs:
                   allow_nan=False,
               ).encode("utf-8")
           ).hexdigest()
-          if request_id != observed:
+          expected_id = (
+              "e6ffb9cdc31a5f59f04ad7b0c7b327fa4ee5320f2e46b9cc6e66d5b50930189f"
+          )
+          if request_id != observed or request_id != expected_id:
               raise SystemExit("request identity mismatch")
-          expected = {
-              "artifact_kind": "PublicPokeFlexRealizedLoadSourceRequest",
-              "dataset_root": "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
-              "enabled": True,
-              "information_boundary": {
-                  "automatic_follow_on_allowed": False,
-                  "calibration_take_data_allowed": False,
-                  "development_take_ids": [
-                      "3dPrintedBunny_T1",
-                      "3dPrintedBunny_T3",
-                      "3dPrintedBunny_T4",
-                      "3dPrintedBunny_T6",
-                      "3dPrintedBunny_T7",
-                  ],
-                  "public_data_only": True,
-                  "target_take_data_allowed": False,
-              },
-              "policy_path": (
-                  "configs/causal4d_public/"
-                  "pokeflex_realized_load_source_v1.json"
-              ),
-              "runner_labels": [
-                  "self-hosted",
-                  "Linux",
-                  "X64",
-                  "nvidia-smi",
-                  "gpuserver4090",
+          if request.get("enabled") is not True:
+              raise SystemExit("request is disabled")
+          if request.get("dataset_root") != (
+              "/mnt/seagate10tb/florianpfaff/datasets/pokeflex"
+          ):
+              raise SystemExit("dataset root changed")
+          if request.get("stage") != "development-source-gate":
+              raise SystemExit("unexpected request stage")
+          if request.get("runner_labels") != [
+              "self-hosted",
+              "Linux",
+              "X64",
+              "nvidia-smi",
+              "gpuserver4090",
+          ]:
+              raise SystemExit("runner identity changed")
+          boundary = request.get("information_boundary", {})
+          if boundary != {
+              "automatic_follow_on_allowed": False,
+              "calibration_take_data_allowed": False,
+              "development_take_ids": [
+                  "3dPrintedBunny_T1",
+                  "3dPrintedBunny_T3",
+                  "3dPrintedBunny_T4",
+                  "3dPrintedBunny_T6",
+                  "3dPrintedBunny_T7",
               ],
-              "schema_version": 1,
-              "source_qa_artifact_path": (
-                  "milestones/pokeflex-001-source-warp-gate-v1/"
-                  "artifacts/3dPrintedBunny_source_qa_v1.json"
-              ),
-              "stage": "development-source-gate",
-          }
-          if request != expected:
-              raise SystemExit("reviewed request content changed")
+              "public_data_only": True,
+              "target_take_data_allowed": False,
+          }:
+              raise SystemExit("information boundary changed")
           print(f"REQUEST_ID={request_id}")
           print(f"DATASET_ROOT={request['dataset_root']}")
           print(f"POLICY_PATH={request['policy_path']}")
@@ -141,15 +175,16 @@ jobs:
           test -d "$DATASET_ROOT"
           test -r "$DATASET_ROOT"
           test -x "$DATASET_ROOT"
+          test -d "$DATASET_ROOT/poking"
 
       - name: Run frozen source evaluator and summarize Bayesian value
         shell: bash
         run: |
           set -euo pipefail
           output="$RUNNER_TEMP/pokeflex-bma-vs-map-v1"
-          rm -rf "$output"
-          mkdir -p "$output"
-          PYTHONPATH=src "$PYTHON_BIN" -m \
+          rm -f "$output/result.json"
+          PYTHONPATH="$EVAL_PYTHONPATH:$GITHUB_WORKSPACE/src" \
+            "$PYTHON_BIN" -m \
             causal4d_public.cli.pokeflex_realized_load_source \
             "$DATASET_ROOT" \
             "$SOURCE_QA_PATH" \
@@ -157,7 +192,8 @@ jobs:
             --policy "$POLICY_PATH" | tee "$output/console.json"
 
           test -f "$output/result.json"
-          OUTPUT_DIR="$output" "$PYTHON_BIN" - <<'PY'
+          PYTHONPATH="$EVAL_PYTHONPATH:$GITHUB_WORKSPACE/src" \
+            OUTPUT_DIR="$output" "$PYTHON_BIN" - <<'PY'
           import hashlib
           import json
           import math
@@ -177,12 +213,9 @@ jobs:
           map_method = "posterior_map"
           metric_names = (
               "force_rmse_n",
-              "force_mae_n",
               "force_gaussian_nll",
               "contact_brier",
               "contact_log_score",
-              "peak_force_error_n",
-              "mean_force_error_n",
           )
           comparisons = {}
           for metric in metric_names:
@@ -198,15 +231,17 @@ jobs:
               wins = int(np.sum(differences > tolerance))
               losses = int(np.sum(differences < -tolerance))
               non_ties = wins + losses
-              if non_ties:
-                  sign_p = sum(
+              sign_p = (
+                  sum(
                       math.comb(non_ties, value)
                       for value in range(wins, non_ties + 1)
-                  ) / (2**non_ties)
-              else:
-                  sign_p = 1.0
-              seed_bytes = hashlib.sha256(metric.encode("utf-8")).digest()[:8]
-              seed = (20260903 + int.from_bytes(seed_bytes, "big")) % (2**63 - 1)
+                  )
+                  / (2**non_ties)
+                  if non_ties
+                  else 1.0
+              )
+              seed_material = hashlib.sha256(metric.encode("utf-8")).digest()[:8]
+              seed = (20260903 + int.from_bytes(seed_material, "big")) % (2**63 - 1)
               generator = np.random.default_rng(seed)
               indices = generator.integers(
                   0,
@@ -230,11 +265,13 @@ jobs:
                   "one_sided_sign_pvalue": float(sign_p),
               }
 
-          seals = []
+          ambiguity = []
           for path in sorted(output.glob("prediction_seal_*.json")):
               seal = json.loads(path.read_text(encoding="utf-8"))
               posterior = seal["metadata"]["posterior"]
-              seals.append(
+              if seal["target_force_suffix_used"] is not False:
+                  raise SystemExit("target suffix leaked into inference")
+              ambiguity.append(
                   {
                       "target_take_id": seal["target_take_id"],
                       "candidate_count": int(posterior["candidate_count"]),
@@ -243,30 +280,19 @@ jobs:
                       ),
                       "posterior_entropy": float(posterior["posterior_entropy"]),
                       "map_candidate": posterior["map_candidate"],
-                      "target_force_suffix_used": bool(
-                          seal["target_force_suffix_used"]
-                      ),
                       "prediction_seal_sha256": seal["seal_sha256"],
                   }
               )
-          if len(seals) != 5:
+          if len(ambiguity) != 5:
               raise SystemExit("expected five prediction seals")
-          if any(item["target_force_suffix_used"] for item in seals):
-              raise SystemExit("target suffix leaked into inference")
 
-          selected_aggregate = {
+          aggregate = {
               method: {
                   metric: result["aggregate_equal_take_results"][method][metric]
                   for metric in metric_names
               }
               for method in (bma, map_method)
           }
-          primary_metrics = (
-              "force_rmse_n",
-              "force_gaussian_nll",
-              "contact_brier",
-              "contact_log_score",
-          )
           summary = {
               "artifact_kind": "PublicPokeFlexBayesianValueSummary",
               "schema_version": 1,
@@ -296,13 +322,14 @@ jobs:
                   "same_future_tool_kinematics": True,
                   "only_posterior_averaging_vs_map_selection_changes": True,
               },
-              "aggregate_equal_take_results": selected_aggregate,
+              "aggregate_equal_take_results": aggregate,
               "paired_map_minus_bma_comparisons": comparisons,
-              "posterior_ambiguity_by_take": seals,
+              "posterior_ambiguity_by_take": ambiguity,
               "primary_mean_differences_all_favor_bma": all(
-                  comparisons[metric]["mean_difference"] > 0.0
-                  for metric in primary_metrics
+                  item["mean_difference"] > 0.0 for item in comparisons.values()
               ),
+              "source_backend_admitted": result["source_backend_admitted"],
+              "source_decision": result["decision"],
               "information_boundary": {
                   "public_data_only": True,
                   "new_physical_data_collected": False,
@@ -317,52 +344,16 @@ jobs:
                   ),
                   (
                       "The force Gaussian NLL scores the moment-matched "
-                      "predictive mean and variance, not an exact mixture log "
-                      "density."
+                      "predictive mean and variance, not an exact mixture log density."
                   ),
                   (
-                      "A favorable result supports posterior averaging over "
-                      "the fixed template-gain-delay bank relative to MAP "
-                      "selection on this protocol."
+                      "A favorable result supports posterior averaging over the "
+                      "fixed template-gain-delay bank relative to MAP selection."
                   ),
               ],
           }
           (output / "bayesian_value_summary.json").write_text(
               json.dumps(summary, indent=2, sort_keys=True, allow_nan=False) + "\n",
-              encoding="utf-8",
-          )
-
-          lines = [
-              "# PokeFlex Bayesian-value source result",
-              "",
-              (
-                  "Positive paired differences below mean that posterior "
-                  "averaging outperformed MAP selection."
-              ),
-              "",
-              "| Metric | MAP - BMA mean | 95% take-bootstrap CI | Wins / 5 |",
-              "|---|---:|---:|---:|",
-          ]
-          for metric in primary_metrics:
-              item = comparisons[metric]
-              lines.append(
-                  f"| `{metric}` | {item['mean_difference']:.8g} | "
-                  f"[{item['bootstrap_lower95']:.8g}, "
-                  f"{item['bootstrap_upper95']:.8g}] | "
-                  f"{item['wins']} |"
-              )
-          lines.extend(
-              [
-                  "",
-                  (
-                      "This result uses five development takes. Calibration "
-                      "T5 and target T2 remained unopened."
-                  ),
-                  "",
-              ]
-          )
-          (output / "bayesian_value_summary.md").write_text(
-              "\n".join(lines),
               encoding="utf-8",
           )
           print(json.dumps(summary, indent=2, sort_keys=True))
