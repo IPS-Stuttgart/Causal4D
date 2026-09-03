@@ -1,0 +1,176 @@
+name: Dispatch reviewed PokeFlex BMA versus MAP run
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/self-hosted-jobs.json"
+      - ".github/workflows/dispatch-pokeflex-bma-vs-map-gpuserver4090.yml"
+      - ".github/workflows/pokeflex-bma-vs-map-gpuserver4090.yml"
+      - "ops/pokeflex-bma-vs-map-gpuserver4090-request.json"
+  push:
+    branches: [main]
+    paths:
+      - "ops/pokeflex-bma-vs-map-gpuserver4090-request.json"
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: dispatch-pokeflex-bma-vs-map-gpuserver4090
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate reviewed request and exact-SHA target
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact reviewed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Verify clean immutable checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Verify request identity, information boundary, and target guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          request_path = Path(
+              "ops/pokeflex-bma-vs-map-gpuserver4090-request.json"
+          )
+          request = json.loads(request_path.read_text(encoding="utf-8"))
+          supplied = request.pop("request_id")
+          observed = hashlib.sha256(
+              json.dumps(
+                  request,
+                  sort_keys=True,
+                  separators=(",", ":"),
+                  allow_nan=False,
+              ).encode("utf-8")
+          ).hexdigest()
+          if supplied != observed:
+              raise SystemExit("reviewed request identity mismatch")
+          expected = {
+              "artifact_kind": "PublicPokeFlexRealizedLoadSourceRequest",
+              "dataset_root": "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+              "enabled": True,
+              "information_boundary": {
+                  "automatic_follow_on_allowed": False,
+                  "calibration_take_data_allowed": False,
+                  "development_take_ids": [
+                      "3dPrintedBunny_T1",
+                      "3dPrintedBunny_T3",
+                      "3dPrintedBunny_T4",
+                      "3dPrintedBunny_T6",
+                      "3dPrintedBunny_T7",
+                  ],
+                  "public_data_only": True,
+                  "target_take_data_allowed": False,
+              },
+              "policy_path": (
+                  "configs/causal4d_public/"
+                  "pokeflex_realized_load_source_v1.json"
+              ),
+              "runner_labels": [
+                  "self-hosted",
+                  "Linux",
+                  "X64",
+                  "nvidia-smi",
+                  "gpuserver4090",
+              ],
+              "schema_version": 1,
+              "source_qa_artifact_path": (
+                  "milestones/pokeflex-001-source-warp-gate-v1/"
+                  "artifacts/3dPrintedBunny_source_qa_v1.json"
+              ),
+              "stage": "development-source-gate",
+          }
+          if request != expected:
+              raise SystemExit("reviewed request content changed")
+
+          workflow = Path(
+              ".github/workflows/pokeflex-bma-vs-map-gpuserver4090.yml"
+          ).read_text(encoding="utf-8")
+          required = (
+              "workflow_dispatch:",
+              "expected_sha:",
+              "github.event_name == 'workflow_dispatch'",
+              "github.ref == 'refs/heads/main'",
+              "inputs.expected_sha == github.sha",
+              'test "${EXPECTED_SHA}" = "${GITHUB_SHA}"',
+              (
+                  "runs-on: [self-hosted, Linux, X64, nvidia-smi, "
+                  "gpuserver4090]"
+              ),
+              "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+              "test -f \"$output/result.json\"",
+              "posterior_mean",
+              "posterior_map",
+          )
+          missing = [fragment for fragment in required if fragment not in workflow]
+          if missing:
+              raise SystemExit(f"target workflow lost required guards: {missing}")
+          PY
+
+  dispatch:
+    name: Dispatch exact reviewed main revision
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      EXPECTED_SHA: ${{ github.sha }}
+      GH_TOKEN: ${{ github.token }}
+      TARGET_WORKFLOW: pokeflex-bma-vs-map-gpuserver4090.yml
+    steps:
+      - name: Dispatch fixed workflow with exact expected SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          payload=$(printf \
+            '{"ref":"main","inputs":{"expected_sha":"%s"}}' \
+            "$EXPECTED_SHA")
+          response="$RUNNER_TEMP/dispatch-response.txt"
+          status=$(curl \
+            --fail-with-body \
+            --location \
+            --silent \
+            --show-error \
+            --output "$response" \
+            --write-out '%{http_code}' \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/$TARGET_WORKFLOW/dispatches" \
+            --data "$payload")
+          if [[ "$status" != "204" ]]; then
+            cat "$response" >&2
+            echo "workflow dispatch returned HTTP $status" >&2
+            exit 1
+          fi
+          {
+            echo "### PokeFlex Bayesian-value run dispatched"
+            echo
+            echo "- Workflow: \`$TARGET_WORKFLOW\`"
+            echo "- Exact reviewed SHA: \`$EXPECTED_SHA\`"
+            echo "- Dataset runner: \`gpuserver4090\`"
+            echo "- Calibration T5 and target T2 remain disabled."
+          } >> "$GITHUB_STEP_SUMMARY"

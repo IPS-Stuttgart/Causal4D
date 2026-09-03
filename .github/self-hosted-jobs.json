@@ -299,6 +299,21 @@
       "workflow": "optional-integrations.yml"
     },
     {
+      "authorization_model": "main-only",
+      "dataset_access": "verified-public-pokeflex-development-robot-records-only",
+      "job": "evaluate",
+      "purpose": "Development-only PokeFlex BMA-versus-MAP source evaluation on gpuserver4090",
+      "runner_labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nvidia-smi",
+        "gpuserver4090"
+      ],
+      "secrets_allowed": false,
+      "workflow": "pokeflex-bma-vs-map-gpuserver4090.yml"
+    },
+    {
       "authorization_model": "reviewed-file-main",
       "dataset_access": "verified-public-pokeflex-zip-central-directory-metadata-only",
       "job": "audit",
