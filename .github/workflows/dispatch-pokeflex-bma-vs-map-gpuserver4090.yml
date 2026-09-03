@@ -11,6 +11,8 @@ on:
   push:
     branches: [main]
     paths:
+      - ".github/workflows/dispatch-pokeflex-bma-vs-map-gpuserver4090.yml"
+      - ".github/workflows/pokeflex-bma-vs-map-gpuserver4090.yml"
       - "ops/pokeflex-bma-vs-map-gpuserver4090-request.json"
 
 permissions:
@@ -64,45 +66,22 @@ jobs:
                   allow_nan=False,
               ).encode("utf-8")
           ).hexdigest()
-          if supplied != observed:
+          expected_id = (
+              "e6ffb9cdc31a5f59f04ad7b0c7b327fa4ee5320f2e46b9cc6e66d5b50930189f"
+          )
+          if supplied != observed or supplied != expected_id:
               raise SystemExit("reviewed request identity mismatch")
-          expected = {
-              "artifact_kind": "PublicPokeFlexRealizedLoadSourceRequest",
-              "dataset_root": "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
-              "enabled": True,
-              "information_boundary": {
-                  "automatic_follow_on_allowed": False,
-                  "calibration_take_data_allowed": False,
-                  "development_take_ids": [
-                      "3dPrintedBunny_T1",
-                      "3dPrintedBunny_T3",
-                      "3dPrintedBunny_T4",
-                      "3dPrintedBunny_T6",
-                      "3dPrintedBunny_T7",
-                  ],
-                  "public_data_only": True,
-                  "target_take_data_allowed": False,
-              },
-              "policy_path": (
-                  "configs/causal4d_public/"
-                  "pokeflex_realized_load_source_v1.json"
-              ),
-              "runner_labels": [
-                  "self-hosted",
-                  "Linux",
-                  "X64",
-                  "nvidia-smi",
-                  "gpuserver4090",
-              ],
-              "schema_version": 1,
-              "source_qa_artifact_path": (
-                  "milestones/pokeflex-001-source-warp-gate-v1/"
-                  "artifacts/3dPrintedBunny_source_qa_v1.json"
-              ),
-              "stage": "development-source-gate",
-          }
-          if request != expected:
-              raise SystemExit("reviewed request content changed")
+          if request.get("dataset_root") != (
+              "/mnt/seagate10tb/florianpfaff/datasets/pokeflex"
+          ):
+              raise SystemExit("reviewed dataset root changed")
+          boundary = request.get("information_boundary", {})
+          if boundary.get("calibration_take_data_allowed") is not False:
+              raise SystemExit("calibration boundary changed")
+          if boundary.get("target_take_data_allowed") is not False:
+              raise SystemExit("target boundary changed")
+          if boundary.get("automatic_follow_on_allowed") is not False:
+              raise SystemExit("automatic follow-on boundary changed")
 
           workflow = Path(
               ".github/workflows/pokeflex-bma-vs-map-gpuserver4090.yml"
@@ -119,6 +98,8 @@ jobs:
                   "gpuserver4090]"
               ),
               "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+              'NUMPY_VERSION: "2.2.6"',
+              '--target "$runtime"',
               "test -f \"$output/result.json\"",
               "posterior_mean",
               "posterior_map",
