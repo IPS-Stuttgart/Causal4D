@@ -1,0 +1,378 @@
+name: PokeFlex BMA versus MAP on gpuserver4090
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact reviewed main commit authorized for execution
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pokeflex-bma-vs-map-gpuserver4090-v1
+  cancel-in-progress: false
+
+env:
+  PYTHONUNBUFFERED: "1"
+  REQUEST_PATH: ops/pokeflex-bma-vs-map-gpuserver4090-request.json
+
+jobs:
+  evaluate:
+    name: Evaluate sealed prefixes against untouched suffixes
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.expected_sha == github.sha
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver4090]
+    timeout-minutes: 90
+    env:
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+    steps:
+      - name: Check out exact reviewed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Verify exact clean main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "${EXPECTED_SHA}" = "${GITHUB_SHA}"
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Select an isolated compatible Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          for candidate in /opt/pyvenv/bin/python python3 python; do
+            if command -v "$candidate" >/dev/null 2>&1 && \
+               "$candidate" - <<'PY' >/dev/null 2>&1
+          import numpy
+          assert tuple(map(int, numpy.__version__.split(".")[:2])) >= (1, 24)
+          PY
+            then
+              resolved="$(command -v "$candidate")"
+              printf 'PYTHON_BIN=%s\n' "$resolved" >> "$GITHUB_ENV"
+              exit 0
+            fi
+          done
+          echo "No Python with NumPy >=1.24 is available" >&2
+          exit 1
+
+      - name: Validate reviewed request and readable dataset root
+        shell: bash
+        run: |
+          set -euo pipefail
+          request_env="$RUNNER_TEMP/pokeflex-bma-vs-map-request.env"
+          "$PYTHON_BIN" - <<'PY' > "$request_env"
+          import hashlib
+          import json
+          from pathlib import Path
+
+          path = Path("ops/pokeflex-bma-vs-map-gpuserver4090-request.json")
+          request = json.loads(path.read_text(encoding="utf-8"))
+          request_id = request.pop("request_id")
+          observed = hashlib.sha256(
+              json.dumps(
+                  request,
+                  sort_keys=True,
+                  separators=(",", ":"),
+                  allow_nan=False,
+              ).encode("utf-8")
+          ).hexdigest()
+          if request_id != observed:
+              raise SystemExit("request identity mismatch")
+          expected = {
+              "artifact_kind": "PublicPokeFlexRealizedLoadSourceRequest",
+              "dataset_root": "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+              "enabled": True,
+              "information_boundary": {
+                  "automatic_follow_on_allowed": False,
+                  "calibration_take_data_allowed": False,
+                  "development_take_ids": [
+                      "3dPrintedBunny_T1",
+                      "3dPrintedBunny_T3",
+                      "3dPrintedBunny_T4",
+                      "3dPrintedBunny_T6",
+                      "3dPrintedBunny_T7",
+                  ],
+                  "public_data_only": True,
+                  "target_take_data_allowed": False,
+              },
+              "policy_path": (
+                  "configs/causal4d_public/"
+                  "pokeflex_realized_load_source_v1.json"
+              ),
+              "runner_labels": [
+                  "self-hosted",
+                  "Linux",
+                  "X64",
+                  "nvidia-smi",
+                  "gpuserver4090",
+              ],
+              "schema_version": 1,
+              "source_qa_artifact_path": (
+                  "milestones/pokeflex-001-source-warp-gate-v1/"
+                  "artifacts/3dPrintedBunny_source_qa_v1.json"
+              ),
+              "stage": "development-source-gate",
+          }
+          if request != expected:
+              raise SystemExit("reviewed request content changed")
+          print(f"REQUEST_ID={request_id}")
+          print(f"DATASET_ROOT={request['dataset_root']}")
+          print(f"POLICY_PATH={request['policy_path']}")
+          print(f"SOURCE_QA_PATH={request['source_qa_artifact_path']}")
+          PY
+          cat "$request_env" >> "$GITHUB_ENV"
+          set -a
+          source "$request_env"
+          set +a
+          test "$DATASET_ROOT" = \
+            "/mnt/seagate10tb/florianpfaff/datasets/pokeflex"
+          test -d "$DATASET_ROOT"
+          test -r "$DATASET_ROOT"
+          test -x "$DATASET_ROOT"
+
+      - name: Run frozen source evaluator and summarize Bayesian value
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/pokeflex-bma-vs-map-v1"
+          rm -rf "$output"
+          mkdir -p "$output"
+          PYTHONPATH=src "$PYTHON_BIN" -m \
+            causal4d_public.cli.pokeflex_realized_load_source \
+            "$DATASET_ROOT" \
+            "$SOURCE_QA_PATH" \
+            "$output" \
+            --policy "$POLICY_PATH" | tee "$output/console.json"
+
+          test -f "$output/result.json"
+          OUTPUT_DIR="$output" "$PYTHON_BIN" - <<'PY'
+          import hashlib
+          import json
+          import math
+          import os
+          import platform
+          from pathlib import Path
+
+          import numpy as np
+
+          output = Path(os.environ["OUTPUT_DIR"])
+          result = json.loads((output / "result.json").read_text(encoding="utf-8"))
+          rows = result["per_take_results"]
+          if len(rows) != 5:
+              raise SystemExit("expected exactly five complete-take units")
+
+          bma = "posterior_mean"
+          map_method = "posterior_map"
+          metric_names = (
+              "force_rmse_n",
+              "force_mae_n",
+              "force_gaussian_nll",
+              "contact_brier",
+              "contact_log_score",
+              "peak_force_error_n",
+              "mean_force_error_n",
+          )
+          comparisons = {}
+          for metric in metric_names:
+              differences = np.asarray(
+                  [
+                      row["metrics"][map_method][metric]
+                      - row["metrics"][bma][metric]
+                      for row in rows
+                  ],
+                  dtype=np.float64,
+              )
+              tolerance = 1e-12
+              wins = int(np.sum(differences > tolerance))
+              losses = int(np.sum(differences < -tolerance))
+              non_ties = wins + losses
+              if non_ties:
+                  sign_p = sum(
+                      math.comb(non_ties, value)
+                      for value in range(wins, non_ties + 1)
+                  ) / (2**non_ties)
+              else:
+                  sign_p = 1.0
+              seed_bytes = hashlib.sha256(metric.encode("utf-8")).digest()[:8]
+              seed = (20260903 + int.from_bytes(seed_bytes, "big")) % (2**63 - 1)
+              generator = np.random.default_rng(seed)
+              indices = generator.integers(
+                  0,
+                  len(differences),
+                  size=(20000, len(differences)),
+              )
+              bootstrap = np.mean(differences[indices], axis=1)
+              comparisons[metric] = {
+                  "positive_difference_means_bma_is_better": True,
+                  "take_differences_map_minus_bma": {
+                      row["take_id"]: float(value)
+                      for row, value in zip(rows, differences, strict=True)
+                  },
+                  "mean_difference": float(np.mean(differences)),
+                  "median_difference": float(np.median(differences)),
+                  "bootstrap_lower95": float(np.quantile(bootstrap, 0.025)),
+                  "bootstrap_upper95": float(np.quantile(bootstrap, 0.975)),
+                  "wins": wins,
+                  "ties": len(differences) - wins - losses,
+                  "losses": losses,
+                  "one_sided_sign_pvalue": float(sign_p),
+              }
+
+          seals = []
+          for path in sorted(output.glob("prediction_seal_*.json")):
+              seal = json.loads(path.read_text(encoding="utf-8"))
+              posterior = seal["metadata"]["posterior"]
+              seals.append(
+                  {
+                      "target_take_id": seal["target_take_id"],
+                      "candidate_count": int(posterior["candidate_count"]),
+                      "effective_candidate_count": float(
+                          posterior["effective_candidate_count"]
+                      ),
+                      "posterior_entropy": float(posterior["posterior_entropy"]),
+                      "map_candidate": posterior["map_candidate"],
+                      "target_force_suffix_used": bool(
+                          seal["target_force_suffix_used"]
+                      ),
+                      "prediction_seal_sha256": seal["seal_sha256"],
+                  }
+              )
+          if len(seals) != 5:
+              raise SystemExit("expected five prediction seals")
+          if any(item["target_force_suffix_used"] for item in seals):
+              raise SystemExit("target suffix leaked into inference")
+
+          selected_aggregate = {
+              method: {
+                  metric: result["aggregate_equal_take_results"][method][metric]
+                  for metric in metric_names
+              }
+              for method in (bma, map_method)
+          }
+          primary_metrics = (
+              "force_rmse_n",
+              "force_gaussian_nll",
+              "contact_brier",
+              "contact_log_score",
+          )
+          summary = {
+              "artifact_kind": "PublicPokeFlexBayesianValueSummary",
+              "schema_version": 1,
+              "source_result_sha256": result["result_sha256"],
+              "github_repository": os.environ["GITHUB_REPOSITORY"],
+              "github_sha": os.environ["GITHUB_SHA"],
+              "github_run_id": os.environ["GITHUB_RUN_ID"],
+              "github_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "request_id": os.environ["REQUEST_ID"],
+              "runner_name": os.environ.get("RUNNER_NAME"),
+              "python": platform.python_version(),
+              "numpy": np.__version__,
+              "dataset_root": os.environ["DATASET_ROOT"],
+              "independent_unit": "complete development take",
+              "unit_count": len(rows),
+              "factual_prefix_frames": result["policy_config"][
+                  "prefix_frame_count"
+              ],
+              "untouched_suffix_frames": result["policy_config"][
+                  "forecast_horizon_frames"
+              ],
+              "contrast": {
+                  "bma_method": bma,
+                  "map_method": map_method,
+                  "same_component_bank": True,
+                  "same_prefix_evidence": True,
+                  "same_future_tool_kinematics": True,
+                  "only_posterior_averaging_vs_map_selection_changes": True,
+              },
+              "aggregate_equal_take_results": selected_aggregate,
+              "paired_map_minus_bma_comparisons": comparisons,
+              "posterior_ambiguity_by_take": seals,
+              "primary_mean_differences_all_favor_bma": all(
+                  comparisons[metric]["mean_difference"] > 0.0
+                  for metric in primary_metrics
+              ),
+              "information_boundary": {
+                  "public_data_only": True,
+                  "new_physical_data_collected": False,
+                  "target_force_suffix_passed_to_inference": False,
+                  "calibration_take_data_read": False,
+                  "target_take_data_read": False,
+              },
+              "claim_boundary": [
+                  (
+                      "This is a five-development-take mechanism test, not an "
+                      "independent held-out target result."
+                  ),
+                  (
+                      "The force Gaussian NLL scores the moment-matched "
+                      "predictive mean and variance, not an exact mixture log "
+                      "density."
+                  ),
+                  (
+                      "A favorable result supports posterior averaging over "
+                      "the fixed template-gain-delay bank relative to MAP "
+                      "selection on this protocol."
+                  ),
+              ],
+          }
+          (output / "bayesian_value_summary.json").write_text(
+              json.dumps(summary, indent=2, sort_keys=True, allow_nan=False) + "\n",
+              encoding="utf-8",
+          )
+
+          lines = [
+              "# PokeFlex Bayesian-value source result",
+              "",
+              (
+                  "Positive paired differences below mean that posterior "
+                  "averaging outperformed MAP selection."
+              ),
+              "",
+              "| Metric | MAP - BMA mean | 95% take-bootstrap CI | Wins / 5 |",
+              "|---|---:|---:|---:|",
+          ]
+          for metric in primary_metrics:
+              item = comparisons[metric]
+              lines.append(
+                  f"| `{metric}` | {item['mean_difference']:.8g} | "
+                  f"[{item['bootstrap_lower95']:.8g}, "
+                  f"{item['bootstrap_upper95']:.8g}] | "
+                  f"{item['wins']} |"
+              )
+          lines.extend(
+              [
+                  "",
+                  (
+                      "This result uses five development takes. Calibration "
+                      "T5 and target T2 remained unopened."
+                  ),
+                  "",
+              ]
+          )
+          (output / "bayesian_value_summary.md").write_text(
+              "\n".join(lines),
+              encoding="utf-8",
+          )
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload complete compact evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pokeflex-bma-vs-map-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pokeflex-bma-vs-map-v1
+          if-no-files-found: error
+          retention-days: 90

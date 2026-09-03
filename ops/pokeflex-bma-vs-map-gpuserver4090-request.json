@@ -1,0 +1,30 @@
+{
+  "artifact_kind": "PublicPokeFlexRealizedLoadSourceRequest",
+  "dataset_root": "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+  "enabled": true,
+  "information_boundary": {
+    "automatic_follow_on_allowed": false,
+    "calibration_take_data_allowed": false,
+    "development_take_ids": [
+      "3dPrintedBunny_T1",
+      "3dPrintedBunny_T3",
+      "3dPrintedBunny_T4",
+      "3dPrintedBunny_T6",
+      "3dPrintedBunny_T7"
+    ],
+    "public_data_only": true,
+    "target_take_data_allowed": false
+  },
+  "policy_path": "configs/causal4d_public/pokeflex_realized_load_source_v1.json",
+  "request_id": "e6ffb9cdc31a5f59f04ad7b0c7b327fa4ee5320f2e46b9cc6e66d5b50930189f",
+  "runner_labels": [
+    "self-hosted",
+    "Linux",
+    "X64",
+    "nvidia-smi",
+    "gpuserver4090"
+  ],
+  "schema_version": 1,
+  "source_qa_artifact_path": "milestones/pokeflex-001-source-warp-gate-v1/artifacts/3dPrintedBunny_source_qa_v1.json",
+  "stage": "development-source-gate"
+}
