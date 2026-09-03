@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "protocol_id": "causal4d-deform360-logged-counterfactual-source-v1",
+  "status": "frozen-source-only-before-running-new-pair-matrix",
+  "dataset": {
+    "name": "Deform360",
+    "object_id": "001-rope",
+    "dataset_revision": "7fea8e20231a47641d1d2bc8791920ec4e62ec5e",
+    "source_episode_indices": [0, 3, 4, 5, 8],
+    "source_episode_selection": "the five quality-passing source observations from the already published 001-rope protocol",
+    "target_episode_opened_by_this_protocol": false
+  },
+  "scientific_question": "Does a persistent reduced-physics posterior abducted from one real interaction improve prediction under a distinct recorded intervention on the same physical object?",
+  "semantics": {
+    "factual": "one complete source interaction A",
+    "persistent_latent": "index of the frozen 200-member reduced-rope dynamics bank",
+    "abduction": "generalized-Bayes posterior from factual-A future Chamfer scores only",
+    "intervention": "a different source interaction B: B prefix geometry/contact realization plus B's released future controller trajectory",
+    "event_specific_contact": "contact onset/activity is observed only through B's six-frame prefix; controllers active at the prefix endpoint are held active for prediction; contact node and offset are estimated only from B prefix geometry; no B future tactile/contact annotation is used",
+    "prediction": "posterior predictive mixture of the candidate rollouts under B",
+    "challenge_future_geometry": "reserved for scoring and never read by the predictive branch",
+    "real_counterfactual_boundary": "A and B are separate physical executions. This is a logged cross-intervention surrogate, not individual-level real counterfactual ground truth."
+  },
+  "posterior": {
+    "minimum_temperature_m": 0.0005,
+    "posterior_power": 1.0,
+    "temperature_rule": "max(0.5 mm, factual-only median absolute deviation of candidate Chamfer scores)",
+    "target_or_challenge_outcome_used_for_temperature": false
+  },
+  "primary_pairing": {
+    "unit": "challenge source episode",
+    "partner_rule": "for each challenge, choose one distinct factual episode by minimum SHA-256 of protocol_id:primary-pair:challenge:factual",
+    "outcome_dependent_pair_selection": false,
+    "primary_unit_count": 5,
+    "all_20_ordered_pairs_reported_as_secondary_diagnostic": true
+  },
+  "controls": {
+    "uniform_physics": "same 200 candidate rollouts under B with uniform weights",
+    "candidate_id_permuted": "same factual posterior weight multiset cyclically shifted by a nonzero deterministic SHA-derived candidate-ID offset before B prediction",
+    "persistence": "B prefix endpoint repeated over the B future",
+    "permutation_preserves_factual_score_marginal": true,
+    "permutation_preserves_challenge_rollout_bank": true
+  },
+  "source_gate": {
+    "minimum_mean_improvement_vs_uniform_fraction": 0.02,
+    "minimum_mean_improvement_vs_permuted_fraction": 0.02,
+    "minimum_primary_win_fraction_vs_each_control": 0.60,
+    "maximum_primary_pair_ratio_vs_each_control": 1.25,
+    "gate_must_pass_before_designing_any_new_unopened_object_target": true
+  },
+  "information_boundary": {
+    "factual_source_episode_futures_may_be_read_for_abduction": true,
+    "challenge_prefix_geometry_and_contact_may_be_read": true,
+    "challenge_future_controller_trajectory_may_be_read_as_intervention": true,
+    "challenge_future_geometry_read_for_prediction": false,
+    "challenge_future_geometry_may_be_read_for_scoring": true,
+    "challenge_future_contact_annotations_read_for_prediction": false,
+    "001_rope_historical_target_reused_for_primary_claim": false,
+    "protected_six_object_replication_cohort_payloads_read": false,
+    "protected_six_object_replication_targets_opened": false,
+    "new_public_object_target_opened": false,
+    "paper_claim_authorized": false
+  },
+  "promotion_rule": "If the source gate passes, register a separate target-closed multi-object protocol before opening any new candidate object's held-out episode. If the gate fails, retain the negative source result and do not open a new target."
+}
