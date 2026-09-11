@@ -1,0 +1,118 @@
+name: Shared-gauge portable receipt v1
+
+on:
+  push:
+    branches:
+      - research/shared-gauge-intervention-receipt-v1
+      - main
+    paths:
+      - ".github/workflows/shared-gauge-intervention-portable-receipt-v1.yml"
+      - "src/causal4d/shared_gauge_intervention.py"
+      - "src/causal4d/shared_gauge_intervention_io.py"
+      - "scripts/science/run_shared_gauge_intervention_receipt_study_v1.py"
+      - "tests/test_shared_gauge_intervention.py"
+      - "tests/test_shared_gauge_intervention_io.py"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/shared-gauge-intervention-portable-receipt-v1.yml"
+      - "src/causal4d/shared_gauge_intervention.py"
+      - "src/causal4d/shared_gauge_intervention_io.py"
+      - "scripts/science/run_shared_gauge_intervention_receipt_study_v1.py"
+      - "tests/test_shared_gauge_intervention.py"
+      - "tests/test_shared_gauge_intervention_io.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shared-gauge-portable-receipt-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  verify:
+    name: Portable receipt / Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12"]
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          clean: true
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install development environment
+        run: |
+          python -m pip install -e ".[dev]"
+          python -m pip check
+      - name: Verify receipt, serializer, and deterministic evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m ruff check \
+            src/causal4d/shared_gauge_intervention.py \
+            src/causal4d/shared_gauge_intervention_io.py \
+            scripts/science/run_shared_gauge_intervention_receipt_study_v1.py \
+            tests/test_shared_gauge_intervention.py \
+            tests/test_shared_gauge_intervention_io.py
+          python -m pytest -q \
+            tests/test_shared_gauge_intervention.py \
+            tests/test_shared_gauge_intervention_io.py
+          root="$RUNNER_TEMP/shared-gauge-portable-receipt-v1"
+          mkdir -p "$root"
+          python scripts/science/run_shared_gauge_intervention_receipt_study_v1.py \
+            --output "$root/result-a.json"
+          python scripts/science/run_shared_gauge_intervention_receipt_study_v1.py \
+            --output "$root/result-b.json"
+          cmp "$root/result-a.json" "$root/result-b.json"
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["RUNNER_TEMP"]) / "shared-gauge-portable-receipt-v1"
+          result = json.loads((root / "result-a.json").read_text(encoding="utf-8"))
+          assert result["decision"] == "controlled-shared-gauge-receipt-passed"
+          assert all(result["checks"].values())
+          receipt = result["portable_receipt"]
+          expected = receipt.pop("receipt_id")
+          actual = hashlib.sha256(
+              json.dumps(
+                  receipt,
+                  sort_keys=True,
+                  separators=(",", ":"),
+                  allow_nan=False,
+              ).encode("utf-8")
+          ).hexdigest()
+          assert actual == expected
+          assert receipt["pairwise_realization_margin"] == [
+              [0.0, 0.1, 0.1],
+              [0.1, 0.0, 0.0],
+              [0.1, 0.0, 0.0],
+          ]
+          print(json.dumps(result, indent=2, sort_keys=True))
+          PY
+      - name: Upload portable receipt evidence
+        if: matrix.python == '3.12'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
+        with:
+          name: shared-gauge-portable-receipt-${{ github.sha }}
+          path: ${{ runner.temp }}/shared-gauge-portable-receipt-v1/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

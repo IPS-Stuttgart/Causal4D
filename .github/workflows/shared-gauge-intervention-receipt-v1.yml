@@ -1,0 +1,137 @@
+name: Shared-gauge intervention receipt v1
+
+on:
+  push:
+    branches:
+      - research/shared-gauge-intervention-receipt-v1
+      - main
+    paths:
+      - ".github/workflows/shared-gauge-intervention-receipt-v1.yml"
+      - "docs/shared-gauge-intervention-receipt.md"
+      - "protocols/shared-gauge-intervention-receipt-study-v1.json"
+      - "scripts/science/run_shared_gauge_intervention_receipt_study_v1.py"
+      - "src/causal4d/shared_gauge_intervention.py"
+      - "tests/test_shared_gauge_intervention.py"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/shared-gauge-intervention-receipt-v1.yml"
+      - "docs/shared-gauge-intervention-receipt.md"
+      - "protocols/shared-gauge-intervention-receipt-study-v1.json"
+      - "scripts/science/run_shared_gauge_intervention_receipt_study_v1.py"
+      - "src/causal4d/shared_gauge_intervention.py"
+      - "tests/test_shared_gauge_intervention.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shared-gauge-receipt-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  unit:
+    name: Contract tests / Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12"]
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          clean: true
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install development environment
+        run: |
+          python -m pip install -e ".[dev]"
+          python -m pip check
+      - name: Verify receipt implementation
+        run: |
+          python -m ruff check \
+            src/causal4d/shared_gauge_intervention.py \
+            scripts/science/run_shared_gauge_intervention_receipt_study_v1.py \
+            tests/test_shared_gauge_intervention.py
+          python -m pytest -q tests/test_shared_gauge_intervention.py
+
+  controlled-study:
+    name: Byte-identical shared-gauge receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          clean: true
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install package
+        run: |
+          python -m pip install -e .
+          python -m pip check
+      - name: Execute twice and verify registered result
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/shared-gauge-intervention-receipt-v1"
+          mkdir -p "$root"
+          python scripts/science/run_shared_gauge_intervention_receipt_study_v1.py \
+            --output "$root/result-a.json"
+          python scripts/science/run_shared_gauge_intervention_receipt_study_v1.py \
+            --output "$root/result-b.json"
+          cmp "$root/result-a.json" "$root/result-b.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["RUNNER_TEMP"]) / "shared-gauge-intervention-receipt-v1"
+          result = json.loads((root / "result-a.json").read_text(encoding="utf-8"))
+          protocol = json.loads(
+              Path("protocols/shared-gauge-intervention-receipt-study-v1.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          assert result["decision"] == "controlled-shared-gauge-receipt-passed"
+          assert all(result["checks"].values())
+          assert result["contract"]["element_ids"] == protocol["group"]["element_ids"]
+          assert result["receipt"]["observed_realization_radius_by_action"] == [
+              0.05,
+              0.0,
+              0.0,
+          ]
+          assert result["receipt"]["pairwise_realization_margin"] == protocol[
+              "registered_requirements"
+          ]["pairwise_margin"]
+          assert all(result["negative_controls"].values())
+          print(json.dumps(result, indent=2, sort_keys=True))
+          PY
+          sha256sum \
+            protocols/shared-gauge-intervention-receipt-study-v1.json \
+            "$root/result-a.json"
+      - name: Upload controlled evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
+        with:
+          name: shared-gauge-intervention-receipt-${{ github.sha }}
+          path: ${{ runner.temp }}/shared-gauge-intervention-receipt-v1/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
