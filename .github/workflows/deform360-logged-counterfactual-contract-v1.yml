@@ -1,0 +1,62 @@
+# validation-revision: h5array-shape-v1
+name: Deform360 logged-counterfactual contract v1
+
+on:
+  push:
+    branches:
+      - science/deform360-logged-counterfactual-v1
+    paths:
+      - .github/workflows/deform360-logged-counterfactual-contract-v1.yml
+      - src/causal4d_public/deform360_logged_counterfactual.py
+      - src/causal4d_public/deform360_logged_counterfactual_strict.py
+      - scripts/experiments/deform360_logged_counterfactual_source_v1.py
+      - scripts/remote/rebind_deform360_retained_source_masks_v2.py
+      - tests/test_deform360_logged_counterfactual.py
+      - protocols/deform360_logged_counterfactual_source_v1.json
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          clean: true
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Validate implementation and frozen information boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -e ".[dev]"
+          files=(
+            src/causal4d_public/deform360_logged_counterfactual.py
+            src/causal4d_public/deform360_logged_counterfactual_strict.py
+            scripts/experiments/deform360_logged_counterfactual_source_v1.py
+            scripts/remote/rebind_deform360_retained_source_masks_v2.py
+            tests/test_deform360_logged_counterfactual.py
+          )
+          python -m ruff check "${files[@]}"
+          python -m ruff format --check "${files[@]}"
+          python -m pytest -q tests/test_deform360_logged_counterfactual.py
+          python -m py_compile scripts/remote/rebind_deform360_retained_source_masks_v2.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          protocol = json.loads(Path('protocols/deform360_logged_counterfactual_source_v1.json').read_text())
+          assert protocol['status'] == 'frozen-source-only-before-running-new-pair-matrix'
+          boundary = protocol['information_boundary']
+          assert boundary['challenge_future_geometry_read_for_prediction'] is False
+          assert boundary['challenge_future_contact_annotations_read_for_prediction'] is False
+          assert boundary['protected_six_object_replication_cohort_payloads_read'] is False
+          assert boundary['new_public_object_target_opened'] is False
+          assert boundary['paper_claim_authorized'] is False
+          PY

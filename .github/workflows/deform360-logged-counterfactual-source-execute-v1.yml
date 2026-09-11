@@ -1,0 +1,228 @@
+# execution-revision: h5array-shape-v1
+name: Deform360 logged-counterfactual source execution v1
+
+on:
+  push:
+    branches:
+      - science/deform360-logged-counterfactual-v1
+    paths:
+      - .github/workflows/deform360-logged-counterfactual-source-execute-v1.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deform360-logged-counterfactual-source-execution-v1
+  cancel-in-progress: false
+
+jobs:
+  execute:
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver6000]
+    timeout-minutes: 600
+    env:
+      RAW_OBJECT: /mnt/lexar4tb/datasets/deform360/data-7fea8e2/raw/001-rope
+      PROCESSED_ROOT: /mnt/lexar4tb/datasets/deform360/processed-0fe36f0-7fea8e2/001-rope
+      PROTOCOL_CONFIG: configs/causal4d_public/deform360_001_rope_v1.json
+      COUNTERFACTUAL_PROTOCOL: protocols/deform360_logged_counterfactual_source_v1.json
+      PINNED_DEFORM360_SHA: 0fe36f0b7a7a917ba62b5f8cee707299a9a4a317
+      OUT_ROOT: /home/github-runner/.cache/workflows/causal4d-logged-counterfactual-source-v1
+      OPENCV_SITE: /home/github-runner/.cache/causal4d/runtime/opencv-contrib-python-headless-4.10.0.84-py312
+    steps:
+      - name: Check out exact research revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Check out pinned official Deform360 code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: lhy0807/deform360
+          ref: ${{ env.PINNED_DEFORM360_SHA }}
+          path: _deform360
+          persist-credentials: false
+          clean: true
+
+      - name: Bind source-only data and isolated output
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = workstation2
+          test -d "$RAW_OBJECT"
+          test -d "$PROCESSED_ROOT"
+          test -f "$PROTOCOL_CONFIG"
+          test -f "$COUNTERFACTUAL_PROTOCOL"
+          test "$(git -C _deform360 rev-parse HEAD)" = "$PINNED_DEFORM360_SHA"
+          out="$OUT_ROOT/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          test ! -e "$out"
+          mkdir -p "$out/logs" "$out/episodes"
+          echo "RUN_OUT=$out" >> "$GITHUB_ENV"
+
+      - name: Select runtime and provision isolated OpenCV cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          selected=""
+          for candidate in python3.12 python3.11 python3.10 /usr/bin/python3 python3; do
+            command -v "$candidate" >/dev/null 2>&1 || continue
+            if "$candidate" - <<'PY'
+          import sys
+          if sys.version_info < (3, 10):
+              raise SystemExit(1)
+          import numpy, scipy, h5py
+          PY
+            then
+              selected="$(command -v "$candidate")"
+              break
+            fi
+          done
+          test -n "$selected"
+          mkdir -p "$OPENCV_SITE"
+          if ! PYTHONPATH="$OPENCV_SITE" "$selected" -c 'import cv2' >/dev/null 2>&1; then
+            rm -rf "$OPENCV_SITE"/*
+            "$selected" -m pip install --disable-pip-version-check --no-input \
+              --no-deps --target "$OPENCV_SITE" 'opencv-contrib-python-headless==4.10.0.84'
+          fi
+          export PYTHONPATH="$OPENCV_SITE:$PWD/src:$PWD/_deform360"
+          "$selected" - <<'PY'
+          import cv2, h5py, numpy, scipy
+          import deform360
+          import causal4d_public
+          print('runtime-ready', cv2.__version__, numpy.__version__, scipy.__version__)
+          PY
+          echo "RUN_PYTHON=$selected" >> "$GITHUB_ENV"
+          echo "PYTHONPATH=$PYTHONPATH" >> "$GITHUB_ENV"
+
+      - name: Create target-closed preflight and contact model
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUN_PYTHON" -m causal4d_public.cli.deform360_preflight \
+            "$RAW_OBJECT" "$RUN_OUT/preflight.json" \
+            --config "$PROTOCOL_CONFIG" \
+            --processed-root "$PROCESSED_ROOT" \
+            | tee "$RUN_OUT/logs/preflight.log"
+          "$RUN_PYTHON" -m causal4d_public.cli.deform360_contact fit \
+            "$RAW_OBJECT" "$PROCESSED_ROOT" "$RUN_OUT/contact_model.json" \
+            --config "$PROTOCOL_CONFIG" \
+            | tee "$RUN_OUT/logs/contact-fit.log"
+
+      - name: Rebind retained source masks and reconstruct five source observations
+        shell: bash
+        run: |
+          set -euo pipefail
+          for episode in 0 3 4 5 8; do
+            ep="$RUN_OUT/episodes/source${episode}"
+            mkdir -p "$ep"
+            "$RUN_PYTHON" scripts/remote/rebind_deform360_retained_source_masks_v2.py \
+              "$PROCESSED_ROOT" "$episode" "$RUN_OUT/preflight.json" \
+              "$ep/views.json" "$ep/masks.json" \
+              --config "$PROTOCOL_CONFIG" \
+              | tee "$RUN_OUT/logs/source${episode}-mask-rebind.log"
+
+            "$RUN_PYTHON" -m causal4d_public.cli.deform360_rope_sequence \
+              "$PROCESSED_ROOT" "$episode" "$ep/views.json" \
+              "$RUN_OUT/preflight.json" "$ep/centerlines.npz" "$ep/centerlines.json" \
+              --config "$PROTOCOL_CONFIG" \
+              --mask-audit-json "$ep/masks.json" \
+              --frame-stride 2 --minimum-sync-reliability 0.85 \
+              | tee "$RUN_OUT/logs/source${episode}-centerline.log"
+
+            "$RUN_PYTHON" -m causal4d_public.cli.deform360_rope_observation \
+              "$PROCESSED_ROOT" "$RUN_OUT/contact_model.json" "$ep/centerlines.json" \
+              "$ep/observation.npz" "$ep/observation.json" \
+              --config "$PROTOCOL_CONFIG" \
+              | tee "$RUN_OUT/logs/source${episode}-observation.log"
+          done
+
+      - name: Verify exact source cohort before cross-intervention scoring
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_OUT="$RUN_OUT" "$RUN_PYTHON" - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          expected = {0, 3, 4, 5, 8}
+          observed = set()
+          for path in sorted((Path(os.environ['RUN_OUT']) / 'episodes').glob('source*/observation.json')):
+              value = json.loads(path.read_text())
+              assert value['split'] == 'source'
+              assert value['quality']['passed'] is True
+              boundary = value['information_boundary']
+              assert boundary['target_files_read'] is False
+              observed.add(int(value['episode_index']))
+          assert observed == expected, (observed, expected)
+          contact = json.loads((Path(os.environ['RUN_OUT']) / 'contact_model.json').read_text())
+          assert contact['artifact_kind'] == 'Deform360ContactModel'
+          assert contact['information_boundary']['target_tactile_read'] is False
+          PY
+
+      - name: Run frozen logged abduction-intervention-prediction matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUN_PYTHON" scripts/experiments/deform360_logged_counterfactual_source_v1.py \
+            "$RUN_OUT/episodes/source0/observation.json" \
+            "$RUN_OUT/episodes/source3/observation.json" \
+            "$RUN_OUT/episodes/source4/observation.json" \
+            "$RUN_OUT/episodes/source5/observation.json" \
+            "$RUN_OUT/episodes/source8/observation.json" \
+            --output "$RUN_OUT/logged_counterfactual_source_result.json" \
+            --protocol-id causal4d-deform360-logged-counterfactual-source-v1 \
+            | tee "$RUN_OUT/logs/counterfactual-source.log"
+
+      - name: Enforce frozen information boundary and report source decision
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_OUT="$RUN_OUT" "$RUN_PYTHON" - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ['RUN_OUT'])
+          protocol = json.loads(Path('protocols/deform360_logged_counterfactual_source_v1.json').read_text())
+          result = json.loads((root / 'logged_counterfactual_source_result.json').read_text())
+          assert result['protocol_id'] == protocol['protocol_id']
+          boundary = result['information_boundary']
+          assert boundary['challenge_future_geometry_read_for_prediction'] is False
+          assert boundary['challenge_future_contact_annotations_read_for_prediction'] is False
+          assert boundary['target_prefix_read'] is False
+          assert boundary['target_future_read'] is False
+          assert boundary['target_tactile_read'] is False
+          assert result['target_promotion_authorized'] is False
+          primary = result['primary_summary']
+          gate = result['source_gate']
+          summary = {
+              'source_gate_passed': gate['passed'],
+              'primary_pair_count': primary['pair_count'],
+              'mean_chamfer_distance_m': primary['mean_chamfer_distance_m'],
+              'comparisons': primary['comparisons'],
+              'result_sha256': result['result_sha256'],
+              'target_opened': False,
+          }
+          (root / 'summary.json').write_text(json.dumps(summary, indent=2, sort_keys=True) + '\n')
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
+              stream.write('### Deform360 logged cross-intervention source result\n\n')
+              stream.write(f"- Source gate: `{gate['passed']}`\n")
+              stream.write(f"- Primary challenge units: `{primary['pair_count']}`\n")
+              for control in ('uniform_physics', 'candidate_id_permuted', 'persistence'):
+                  c = primary['comparisons'][control]
+                  stream.write(
+                      f"- vs `{control}`: {100*c['mean_relative_improvement_fraction']:.2f}% mean improvement, "
+                      f"{c['wins']}/{primary['pair_count']} wins, worst ratio {c['worst_abduced_to_control_ratio']:.3f}\n"
+                  )
+              stream.write('- No target episode was opened by this study.\n')
+          PY
+
+      - name: Upload complete source-only evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: deform360-logged-counterfactual-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.RUN_OUT }}
+          if-no-files-found: error
+          retention-days: 90

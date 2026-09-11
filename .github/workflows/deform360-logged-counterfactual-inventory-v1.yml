@@ -1,0 +1,188 @@
+name: Deform360 logged-counterfactual source study v1
+
+on:
+  push:
+    branches:
+      - science/deform360-logged-counterfactual-v1
+    paths:
+      - .github/workflows/deform360-logged-counterfactual-inventory-v1.yml
+      - src/causal4d_public/deform360_logged_counterfactual.py
+      - scripts/experiments/deform360_logged_counterfactual_source_v1.py
+      - tests/test_deform360_logged_counterfactual.py
+      - protocols/deform360_logged_counterfactual_source_v1.json
+      - docs/deform360_logged_counterfactual_source_v1.md
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact research branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          clean: true
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Validate source-only counterfactual implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -e ".[dev]"
+          python -m ruff check \
+            src/causal4d_public/deform360_logged_counterfactual.py \
+            scripts/experiments/deform360_logged_counterfactual_source_v1.py \
+            tests/test_deform360_logged_counterfactual.py
+          python -m ruff format --check \
+            src/causal4d_public/deform360_logged_counterfactual.py \
+            scripts/experiments/deform360_logged_counterfactual_source_v1.py \
+            tests/test_deform360_logged_counterfactual.py
+          python -m pytest -q tests/test_deform360_logged_counterfactual.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          protocol = json.loads(Path('protocols/deform360_logged_counterfactual_source_v1.json').read_text())
+          assert protocol['status'] == 'frozen-source-only-before-running-new-pair-matrix'
+          assert protocol['information_boundary']['protected_six_object_replication_cohort_payloads_read'] is False
+          assert protocol['information_boundary']['new_public_object_target_opened'] is False
+          assert protocol['information_boundary']['paper_claim_authorized'] is False
+          PY
+
+  inventory:
+    needs: contract
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver6000]
+    timeout-minutes: 25
+    env:
+      OUT: deform360-logged-counterfactual-inventory
+    steps:
+      - name: Check out exact research branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Locate retained 001-rope source prerequisites without opening payloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT"
+          OUT="$OUT" python3 - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          roots = [
+              Path('/mnt/lexar4tb/datasets/deform360'),
+              Path('/home/github-runner/.cache/workflows'),
+              Path('/home/github-runner/.cache/causal4d'),
+              Path('/home/github-runner/.cache'),
+          ]
+          exact_names = {
+              *(f'source{i}_observation.json' for i in (0, 3, 4, 5, 8)),
+              *(f'source{i}_observation.npz' for i in (0, 3, 4, 5, 8)),
+              *(f'source{i}_centerlines.json' for i in (0, 3, 4, 5, 8)),
+              *(f'source{i}_centerlines.npz' for i in (0, 3, 4, 5, 8)),
+              'source_episode_0_views.json',
+              'source_episode_0_masks.json',
+              'contact_model.json',
+              'shared_forward_fit.json',
+              'sam2.1_hiera_small.pt',
+          }
+          records = []
+          directories = []
+          for root in roots:
+              if not root.is_dir():
+                  continue
+              for path in root.rglob('*'):
+                  try:
+                      if path.is_symlink():
+                          continue
+                      if path.is_dir():
+                          if path.name == '001-rope' or path.name == 'sam2':
+                              directories.append(str(path))
+                          continue
+                      if not path.is_file():
+                          continue
+                  except OSError:
+                      continue
+                  relevant_001 = '001-rope' in path.parts and (
+                      'centerline' in path.name.lower()
+                      or 'observation' in path.name.lower()
+                      or path.name in {'contact_model.json', 'source_episode_0_views.json', 'source_episode_0_masks.json'}
+                      or (path.name == 'robot.npz' and 'episode_0000' in path.parts)
+                  )
+                  if path.name not in exact_names and not relevant_001:
+                      continue
+                  stat = path.stat()
+                  records.append({
+                      'path': str(path),
+                      'name': path.name,
+                      'bytes': int(stat.st_size),
+                      'mtime_ns': int(stat.st_mtime_ns),
+                  })
+          records.sort(key=lambda row: (row['name'], row['path']))
+          directories = sorted(set(directories))
+          by_name = {}
+          for record in records:
+              by_name.setdefault(record['name'], []).append(record['path'])
+          aligned_root = Path('/mnt/lexar4tb/datasets/deform360/causal4d-public-expansion-v1/aligned/001-rope')
+          raw_root = Path('/mnt/lexar4tb/datasets/deform360/data-7fea8e2/raw/001-rope')
+          result = {
+              'schema': 'causal4d.deform360-logged-counterfactual-prerequisite-inventory',
+              'schema_version': 2,
+              'runner_name': os.environ.get('RUNNER_NAME'),
+              'roots_checked': [str(root) for root in roots],
+              'records': records,
+              'directories': directories,
+              'by_name': by_name,
+              'fixed_roots': {
+                  'raw_001_rope_exists': raw_root.is_dir(),
+                  'aligned_001_rope_exists': aligned_root.is_dir(),
+              },
+              'decision': {
+                  'complete_source_observation_set_found': all(
+                      f'source{i}_observation.json' in by_name and f'source{i}_observation.npz' in by_name
+                      for i in (0, 3, 4, 5, 8)
+                  ),
+                  'all_source_centerline_pairs_found': all(
+                      f'source{i}_centerlines.json' in by_name and f'source{i}_centerlines.npz' in by_name
+                      for i in (0, 3, 4, 5, 8)
+                  ),
+                  'contact_model_found_for_001': any('001-rope' in path for path in by_name.get('contact_model.json', [])),
+                  'sam2_checkpoint_found': 'sam2.1_hiera_small.pt' in by_name,
+                  'raw_001_rope_exists': raw_root.is_dir(),
+                  'aligned_001_rope_exists': aligned_root.is_dir(),
+              },
+              'information_boundary': {
+                  'file_contents_read': False,
+                  'raw_media_opened': False,
+                  'tactile_payload_opened': False,
+                  'target_future_payload_opened': False,
+                  'target_scores_read': False,
+                  'protected_replication_payloads_opened': False,
+                  'file_names_and_metadata_only': True,
+              },
+          }
+          encoded = json.dumps(result, sort_keys=True, separators=(',', ':')).encode()
+          result['inventory_id'] = hashlib.sha256(encoded).hexdigest()
+          output = Path(os.environ['OUT']) / 'inventory.json'
+          output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps(result['decision'], indent=2, sort_keys=True))
+          PY
+
+      - name: Upload bounded prerequisite inventory
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: deform360-logged-counterfactual-inventory-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.OUT }}/inventory.json
+          if-no-files-found: error
+          retention-days: 30

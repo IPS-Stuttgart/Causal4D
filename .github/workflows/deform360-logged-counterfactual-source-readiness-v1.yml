@@ -1,0 +1,119 @@
+name: Deform360 logged-counterfactual source readiness v1
+
+on:
+  push:
+    branches:
+      - science/deform360-logged-counterfactual-v1
+    paths:
+      - .github/workflows/deform360-logged-counterfactual-source-readiness-v1.yml
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver6000]
+    timeout-minutes: 20
+    env:
+      PROCESSED_ROOT: /mnt/lexar4tb/datasets/deform360/processed-0fe36f0-7fea8e2/001-rope
+      RAW_ROOT: /mnt/lexar4tb/datasets/deform360/data-7fea8e2/raw/001-rope
+      SAM2_REPOSITORY: /mnt/lexar4tb/datasets/deform360/sam2-2b90b9f5
+      SAM2_CHECKPOINT: /mnt/lexar4tb/datasets/deform360/sam2-2b90b9f5/checkpoints/sam2.1_hiera_small.pt
+      EXPECTED_SAM2_SHA256: 6d1aa6f30de5c92224f8172114de081d104bbd23dd9dc5c58996f0cad5dc4d38
+      OUT: deform360-logged-counterfactual-source-readiness
+    steps:
+      - name: Check out exact Causal4D branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          clean: true
+      - name: Check out pinned official Deform360 code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: lhy0807/deform360
+          ref: 0fe36f0b7a7a917ba62b5f8cee707299a9a4a317
+          path: _deform360
+          persist-credentials: false
+          clean: true
+      - name: Audit exact source regeneration prerequisites without opening media
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d "$PROCESSED_ROOT"
+          test -d "$RAW_ROOT"
+          test -d "$SAM2_REPOSITORY/sam2"
+          test -f "$SAM2_CHECKPOINT"
+          printf '%s  %s\n' "$EXPECTED_SAM2_SHA256" "$SAM2_CHECKPOINT" | sha256sum --check --strict
+          mkdir -p "$OUT"
+          OUT="$OUT" PROCESSED_ROOT="$PROCESSED_ROOT" RAW_ROOT="$RAW_ROOT" \
+          SAM2_REPOSITORY="$SAM2_REPOSITORY" SAM2_CHECKPOINT="$SAM2_CHECKPOINT" \
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import importlib.util
+          import json
+          import os
+          from pathlib import Path
+
+          processed = Path(os.environ['PROCESSED_ROOT'])
+          raw = Path(os.environ['RAW_ROOT'])
+          episodes = (0, 3, 4, 5, 8)
+          episode_records = []
+          for index in episodes:
+              episode = processed / f'episode_{index:04d}'
+              files = sorted(path.relative_to(episode).as_posix() for path in episode.rglob('*') if path.is_file()) if episode.is_dir() else []
+              masks = [name for name in files if name.endswith('mask_refined.h5')]
+              robots = [name for name in files if name.endswith('/robot.npz') or name == 'robot/robot.npz']
+              tactile = [name for name in files if name.endswith('synced_tactile.npy')]
+              images = [name for name in files if name.endswith(('.jpg', '.png'))]
+              episode_records.append({
+                  'episode_index': index,
+                  'processed_exists': episode.is_dir(),
+                  'file_count': len(files),
+                  'mask_refined_h5': masks,
+                  'robot_npz': robots,
+                  'synced_tactile_count': len(tactile),
+                  'decoded_image_count': len(images),
+              })
+          modules = {
+              name: importlib.util.find_spec(name) is not None
+              for name in ('numpy', 'scipy', 'cv2', 'torch', 'h5py', 'PIL', 'hydra')
+          }
+          result = {
+              'schema': 'causal4d.deform360-logged-counterfactual-source-readiness',
+              'schema_version': 1,
+              'runner_name': os.environ.get('RUNNER_NAME'),
+              'roots': {
+                  'processed_root': str(processed),
+                  'raw_root': str(raw),
+                  'sam2_repository': os.environ['SAM2_REPOSITORY'],
+                  'sam2_checkpoint': os.environ['SAM2_CHECKPOINT'],
+              },
+              'episodes': episode_records,
+              'python_modules_on_system_runtime': modules,
+              'decision': {
+                  'all_source_processed_episodes_exist': all(row['processed_exists'] for row in episode_records),
+                  'all_source_robot_trajectories_exist': all(bool(row['robot_npz']) for row in episode_records),
+                  'all_source_have_existing_masks': all(bool(row['mask_refined_h5']) for row in episode_records),
+                  'all_source_have_tactile': all(row['synced_tactile_count'] >= 2 for row in episode_records),
+                  'sam2_runtime_imports_present': all(modules.get(name, False) for name in ('torch', 'h5py', 'PIL', 'hydra')),
+              },
+              'information_boundary': {
+                  'media_payload_opened': False,
+                  'tactile_payload_opened': False,
+                  'mask_payload_opened': False,
+                  'target_episode_inspected': False,
+                  'source_file_names_only': True,
+              },
+          }
+          output = Path(os.environ['OUT']) / 'readiness.json'
+          output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps(result['decision'], indent=2, sort_keys=True))
+          PY
+      - name: Upload bounded readiness artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: deform360-logged-counterfactual-source-readiness-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.OUT }}/readiness.json
+          retention-days: 30
+          if-no-files-found: error

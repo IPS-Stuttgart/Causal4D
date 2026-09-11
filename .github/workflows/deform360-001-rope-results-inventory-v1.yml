@@ -1,0 +1,111 @@
+name: Inventory retained original Deform360 001-rope results v1
+
+on:
+  push:
+    branches:
+      - science/deform360-logged-counterfactual-v1
+    paths:
+      - .github/workflows/deform360-001-rope-results-inventory-v1.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: [self-hosted, Linux, X64, nvidia-smi, gpuserver6000]
+    timeout-minutes: 20
+    env:
+      RESULTS_ROOT: /mnt/lexar4tb/datasets/deform360/results
+      OUT: deform360-001-rope-retained-results-inventory
+    steps:
+      - name: Inventory names and metadata only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = workstation2
+          test -d "$RESULTS_ROOT"
+          mkdir -p "$OUT"
+          RESULTS_ROOT="$RESULTS_ROOT" OUT="$OUT" python3 - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ['RESULTS_ROOT'])
+          records = []
+          directories = []
+          interesting_tokens = (
+              '001-rope', 'source0', 'source3', 'source4', 'source5', 'source8',
+              'centerline', 'observation', 'forward_fit', 'contact_model', 'sam2',
+          )
+          for path in root.rglob('*'):
+              try:
+                  if path.is_symlink():
+                      continue
+                  rel = path.relative_to(root).as_posix()
+                  if path.is_dir():
+                      if any(token in rel.lower() for token in ('001-rope', 'causal4d')):
+                          directories.append(rel)
+                      continue
+                  if not path.is_file():
+                      continue
+                  low = rel.lower()
+                  if not any(token.lower() in low for token in interesting_tokens):
+                      continue
+                  stat = path.stat()
+                  records.append({
+                      'path': rel,
+                      'bytes': int(stat.st_size),
+                      'mtime_ns': int(stat.st_mtime_ns),
+                      'suffix': path.suffix.lower(),
+                  })
+              except OSError:
+                  continue
+          records.sort(key=lambda row: row['path'])
+          directories = sorted(set(directories))
+          likely = [
+              row for row in records
+              if any(token in row['path'].lower() for token in (
+                  'source0', 'source3', 'source4', 'source5', 'source8',
+                  'episode_0000', 'episode_0003', 'episode_0004', 'episode_0005', 'episode_0008'
+              ))
+              and any(token in row['path'].lower() for token in ('centerline', 'observation', '.npz', '.json'))
+          ]
+          result = {
+              'schema': 'causal4d.deform360-001-rope-retained-results-inventory',
+              'schema_version': 1,
+              'results_root': str(root),
+              'records': records,
+              'directories': directories,
+              'likely_historical_source_artifacts': likely,
+              'decision': {
+                  'likely_source_artifact_count': len(likely),
+                  'has_source4_candidate': any(
+                      ('source4' in row['path'].lower() or 'episode_0004' in row['path'].lower())
+                      and ('observation' in row['path'].lower() or 'centerline' in row['path'].lower())
+                      for row in likely
+                  ),
+              },
+              'information_boundary': {
+                  'file_payloads_read': False,
+                  'target_payload_opened': False,
+                  'names_and_stat_metadata_only': True,
+              },
+          }
+          encoded = json.dumps(result, sort_keys=True, separators=(',', ':')).encode()
+          result['inventory_id'] = hashlib.sha256(encoded).hexdigest()
+          output = Path(os.environ['OUT']) / 'inventory.json'
+          output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n')
+          print(json.dumps(result['decision'], indent=2, sort_keys=True))
+          if likely:
+              print(json.dumps({'first_likely_paths': [row['path'] for row in likely[:40]]}, indent=2))
+          PY
+      - name: Upload bounded inventory
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: deform360-001-rope-retained-results-inventory-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.OUT }}/inventory.json
+          if-no-files-found: error
+          retention-days: 30
