@@ -1,0 +1,291 @@
+{
+  "adaptive_acquisition": {
+    "cost_objective": "expected source-standardized query loss plus lambda times cumulative normalized path-length, duration, and predicted-force cost",
+    "cumulative_risk": "sum of registered source-predicted probe risk charges",
+    "first_reveal": "reveal only the first selected probe response and reduce it to the registered geometry/force summary",
+    "first_stage": "select one safe candidate using only source/calibration models, target initial geometry, registered query, and action descriptor; then seal its identity",
+    "horizon": 2,
+    "logged_data_boundary": "the two revealed responses come from separately recorded reset interactions; this is adaptive logged acquisition, not execution of a physical two-step sequence",
+    "second_reveal": "reveal only the conditionally selected second probe response",
+    "second_stage": "conditioned on the first response, either stop and predict or select one different safe probe from the remaining three; seal before reveal",
+    "stopping_rule": "stop after zero or one probe whenever every safe remaining probe has nonpositive source-estimated net query value or violates the cumulative risk cap"
+  },
+  "baseline_contracts": {
+    "dependence-destroyed-adaptive-two-probe": "preserves first- and second-probe response marginals but permutes object-matched probe-to-drop dependence under a frozen source-only derangement",
+    "generic-information-adaptive-two-probe": "same horizon, candidate library, costs and risk cap; maximizes source-estimated full latent information rather than registered-query value",
+    "source-fixed-two-probe-set": "one unordered safe pair selected using source/calibration objects only and reused for every target object and both queries; both responses are always revealed",
+    "task-conditioned-best-single-probe": "same source model, risk cap, query and candidate library as the adaptive policy; may reveal at most one response"
+  },
+  "claim_boundary": [
+    "A positive result supports offline adaptive selection of at most two separately logged physical pokes for sealed cross-intervention drop queries.",
+    "The primary novelty claim requires superiority to both the best registered single-probe policy and a source-fixed two-probe set under matched risk and cost.",
+    "It does not establish online sequential probe execution, identical reset states, same-state counterfactual outcomes, unique material identification, calibrated full-state uncertainty, deployment safety, or closed-loop manipulation success.",
+    "If exact drop-outcome freshness cannot be established, the complete study is retrospective real-data mechanism evidence."
+  ],
+  "dataset": {
+    "dataset_root_candidates": [
+      "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+      "/home/github-runner/.cache/datasets/pokeflex",
+      "/home/github-runner/.cache/workflows/pokeflex"
+    ],
+    "expected_archive_count": 170,
+    "expected_dropping_count": 54,
+    "expected_object_count": 18,
+    "expected_poking_count": 116,
+    "metadata_audit_id": "a3e0f70e7d0d222cc6f78b8db8be381c60133f28c87bbf722b6ce5f795dff8e3",
+    "metadata_audit_request_id": "pokeflex-probe-challenge-fold-audit-gpuserver4090-v1",
+    "metadata_audit_workflow_run": 33591607990,
+    "name": "PokeFlex",
+    "metadata_identity_sha256": "940bfeb33a12403c9e2e3f5c604c03e7ff967023b8e2a808d19324f358582e2f"
+  },
+  "evidence_class": {
+    "adaptive_acquisition": "offline-selected reveal of at most two separately logged pokes",
+    "online_execution": false,
+    "primary_drop_challenge": "prospective-only-if-exact-historical-exposure-scan-passes",
+    "probe_panel": "retrospective-logged-physical-pokes",
+    "same_microscopic_state_counterfactual": false,
+    "same_microscopic_state_sequence": false
+  },
+  "object_split": {
+    "calibration_objects_per_family": 1,
+    "expected_if_all_18_objects_are_eligible": {
+      "calibration": {
+        "foam": [
+          "FoamCylinder"
+        ],
+        "printed": [
+          "3dPrintedPizza"
+        ],
+        "soft": [
+          "PlushOctopus"
+        ]
+      },
+      "source": [
+        "3dPrintedHeart",
+        "3dPrintedPyramid",
+        "FoamDice",
+        "FoamHalfSphere",
+        "PlushDice",
+        "PlushMoon",
+        "PlushTurtle",
+        "PlushVolleyball",
+        "ToiletPaperRoll"
+      ],
+      "target": {
+        "foam": [
+          "Sponge",
+          "MemoryFoam"
+        ],
+        "printed": [
+          "3dPrintedBunny",
+          "3dPrintedCylinder"
+        ],
+        "soft": [
+          "Beanbag",
+          "Pillow"
+        ]
+      }
+    },
+    "family_rules": [
+      {
+        "family": "printed",
+        "rule": "object_id starts with 3dPrinted"
+      },
+      {
+        "family": "foam",
+        "rule": "object_id contains Foam or equals Sponge or ToiletPaperRoll"
+      },
+      {
+        "family": "soft",
+        "rule": "all remaining registered object_ids"
+      }
+    ],
+    "minimum_primary_target_objects": 6,
+    "replacement_after_outcome_access": false,
+    "selection_salt": "PokeFlex-active-drop-target-v1-2026-09-02",
+    "source_objects": "all remaining eligible objects",
+    "target_objects_per_family": 2
+  },
+  "policies": [
+    "no-probe",
+    "deterministic-random-safe-up-to-two",
+    "source-fixed-single-probe",
+    "task-conditioned-best-single-probe",
+    "source-fixed-two-probe-set",
+    "generic-information-adaptive-two-probe",
+    "task-conditioned-adaptive-two-probe",
+    "dependence-destroyed-adaptive-two-probe",
+    "target-outcome-oracle-adaptive-diagnostic"
+  ],
+  "primary_analysis": {
+    "dependence_attribution_endpoint": "fraction of adaptive gain over best-single-probe removed by the frozen object-matched dependence derangement",
+    "efficiency_endpoints": [
+      "mean revealed probe count",
+      "mean cumulative normalized probe cost",
+      "raw query loss",
+      "cost-adjusted query loss",
+      "fraction of decisions stopping after zero, one, and two probes"
+    ],
+    "exact_sign_randomization": {
+      "assignments": 64,
+      "one_sided_all_wins_probability": 0.015625,
+      "unit_count": 6
+    },
+    "nested_units": [
+      "drop repetitions",
+      "queries",
+      "frames",
+      "mesh vertices",
+      "query coordinates"
+    ],
+    "paired_object_bootstrap": {
+      "confidence_level": 0.95,
+      "resamples": 100000,
+      "seed": 20260902
+    },
+    "pool_frames_as_independent": false,
+    "pool_vertices_as_independent": false,
+    "primary_comparisons": [
+      "task-conditioned-adaptive-two-probe versus task-conditioned-best-single-probe",
+      "task-conditioned-adaptive-two-probe versus source-fixed-two-probe-set",
+      "task-conditioned-adaptive-two-probe versus generic-information-adaptive-two-probe",
+      "task-conditioned-adaptive-two-probe versus no-probe"
+    ],
+    "statistical_unit": "physical object",
+    "task_dependence_endpoint": "fraction of target objects whose impact and settled queries induce different first probes or response-conditioned second-probe branches"
+  },
+  "protocol_id": "pokeflex-adaptive-two-probe-drop-protocol-v2",
+  "registered_queries": [
+    {
+      "components": [
+        "maximum template-diagonal-normalized bounding-box compression",
+        "time to maximum compression",
+        "rebound ratio"
+      ],
+      "primary_loss": "source-standardized squared error",
+      "query_id": "drop-impact-geometry"
+    },
+    {
+      "components": [
+        "final template-diagonal-normalized symmetric Chamfer distance to initial mesh",
+        "final bounding-box compression",
+        "final centroid drift"
+      ],
+      "primary_loss": "source-standardized squared error",
+      "query_id": "drop-settled-geometry"
+    }
+  ],
+  "risk_and_cost": {
+    "cost_weight": "chosen once on calibration objects before target response access",
+    "cumulative_risk_cap": "frozen on source and calibration objects before target response access",
+    "no_safe_positive_value_behavior": "exact no-probe fallback",
+    "probe_cost_features": [
+      "tool path length",
+      "duration",
+      "source-predicted force impulse"
+    ],
+    "risk_features": [
+      "source-predicted peak force",
+      "source-predicted force impulse",
+      "source-predicted normalized mesh compression"
+    ]
+  },
+  "schema": "causal4d/pokeflex-adaptive-two-probe-drop-protocol",
+  "schema_version": 2,
+  "semantic_carriers": {
+    "action_descriptor": {
+      "allowed_fields": [
+        "frame",
+        "T_WT"
+      ],
+      "boundary": "isolated semantic slicer; byte-level carrier co-location is acknowledged and forbidden response fields are deleted before policy access",
+      "carrier": "robot_data.json",
+      "descriptor": [
+        "tool-path displacement and length",
+        "approach direction",
+        "pose-derived speed profile",
+        "tool location relative to the initial mesh"
+      ],
+      "forbidden_fields": [
+        "forces",
+        "torques",
+        "contact_response",
+        "future_mesh"
+      ]
+    },
+    "drop_outcome": {
+      "allowed_only_after_joint_prediction_seal": true,
+      "material_vertex_identity_required": false
+    },
+    "selected_probe_response": {
+      "allowed_after_corresponding_probe_identity_is_sealed": [
+        "force trajectory",
+        "pose trajectory",
+        "geometry-invariant mesh-response summaries"
+      ],
+      "material_vertex_identity_required": false
+    }
+  },
+  "source_gate": {
+    "failed_gate_behavior": "stop before target first-probe selection or target drop access",
+    "required": [
+      "for both registered queries, adaptive two-probe mean calibration loss is lower than no-probe",
+      "for both registered queries, adaptive two-probe mean calibration loss is lower than task-conditioned best-single-probe",
+      "adaptive two-probe cost-adjusted calibration loss is lower than source-fixed two-probe-set",
+      "adaptive two-probe cost-adjusted calibration loss is lower than generic-information adaptive two-probe",
+      "mean revealed probe count is strictly below two",
+      "at least two distinct branch-dependent second-probe identities occur across calibration folds",
+      "the impact and settled queries induce different acquisition trees for at least one calibration object",
+      "dependence destruction removes at least half of the adaptive advantage over best-single-probe",
+      "all unsafe probes are rejected and all nonpositive-value branches stop or return exact no-probe fallback"
+    ],
+    "target_drop_outcomes_opened": false
+  },
+  "stages": [
+    "metadata-only fold audit",
+    "adaptive two-probe structural roster audit",
+    "exact historical exposure scan for every target drop take",
+    "source-object response and query model fitting",
+    "calibration-only policy and risk-cost selection",
+    "target action-descriptor slicing and first-probe selection",
+    "first selected-probe response reveal",
+    "conditional stop or second-probe selection",
+    "second selected-probe response reveal when selected",
+    "joint sealing of all target drop-query predictions",
+    "single target drop-outcome opening and scoring"
+  ],
+  "status": "registered-before-source-response-modeling-and-target-drop-access",
+  "take_roles": {
+    "candidate_probe_selection_salt": "PokeFlex-adaptive-two-probe-library-v2-2026-09-02",
+    "distinct_probe_reuse_within_one_acquisition_path": false,
+    "maximum_revealed_probe_count_per_object_query": 2,
+    "minimum_source_candidate_probe_count": 4,
+    "minimum_target_drops_per_object": 2,
+    "target_candidate_probe_count": 4,
+    "target_drop_outcome_available_before_prediction_seal": false,
+    "target_drop_rule": "all complete dropping takes of each primary target object are held challenges",
+    "target_probe_response_available_before_first_selection": false,
+    "target_second_probe_response_available_before_second_selection": false,
+    "target_unselected_probe_response_available": false
+  },
+  "target_confirmatory_gate": {
+    "negative_result_retained": true,
+    "no_retry_or_target_reselection": true,
+    "required": [
+      "positive physical-object-mean raw query-loss gain versus no-probe",
+      "positive physical-object-mean raw query-loss gain versus task-conditioned best-single-probe",
+      "positive physical-object-mean cost-adjusted gain versus source-fixed two-probe-set",
+      "positive physical-object-mean cost-adjusted gain versus generic-information adaptive two-probe",
+      "all six target objects improve versus task-conditioned best-single-probe under the registered paired object loss",
+      "all six target objects improve versus source-fixed two-probe-set under the registered cost-adjusted paired object loss",
+      "the paired object-bootstrap 95 percent lower bound is positive versus best-single-probe and fixed-two-probe-set",
+      "the exact one-sided six-object sign probability is at most 0.015625 versus best-single-probe and fixed-two-probe-set",
+      "mean revealed probe count is strictly below two",
+      "stage two is used on at least 25 percent and at most 75 percent of target object-query decisions",
+      "at least three target objects exhibit branch-dependent second-probe selection",
+      "at least two target objects receive different acquisition trees for impact and settled queries",
+      "dependence destruction removes at least half of the adaptive advantage over best-single-probe"
+    ]
+  },
+  "protocol_sha256": "f33b190d0391f8782b990f50a521f69085ee3df947a92e6b4d7e3be80de8d9e3"
+}

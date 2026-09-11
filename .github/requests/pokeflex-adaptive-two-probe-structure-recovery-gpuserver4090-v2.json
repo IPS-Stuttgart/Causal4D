@@ -1,0 +1,40 @@
+{
+  "expected": {
+    "archive_count": 170,
+    "candidate_probe_count_per_object": 4,
+    "dropping_count": 54,
+    "object_count": 18,
+    "ordered_distinct_probe_pairs_per_object": 12,
+    "poking_count": 116,
+    "target_object_count": 6
+  },
+  "information_boundary": {
+    "archive_member_decompression_allowed": false,
+    "archive_member_extraction_allowed": false,
+    "archive_member_open_allowed": false,
+    "drop_outcome_allowed": false,
+    "probe_response_payload_allowed": false,
+    "zip_central_directory_metadata_only": true
+  },
+  "metadata_audit": {
+    "audit_id": "a3e0f70e7d0d222cc6f78b8db8be381c60133f28c87bbf722b6ce5f795dff8e3",
+    "metadata_identity_sha256": "940bfeb33a12403c9e2e3f5c604c03e7ff967023b8e2a808d19324f358582e2f",
+    "minimum_eligible_objects": 12,
+    "request_id": "pokeflex-probe-challenge-fold-audit-gpuserver4090-v1",
+    "selection_salt": "PokeFlex-active-probe-folds-v1-2026-09-02",
+    "workflow_run_id": 33591607990
+  },
+  "next_stage_if_passed": "exact-historical-exposure-scan-and-source-only-adaptive-modeling",
+  "protocol_id": "pokeflex-adaptive-two-probe-drop-protocol-v2",
+  "protocol_sha256": "f33b190d0391f8782b990f50a521f69085ee3df947a92e6b4d7e3be80de8d9e3",
+  "request_id": "pokeflex-adaptive-two-probe-structure-recovery-gpuserver4090-v2",
+  "roots": [
+    "/mnt/seagate10tb/florianpfaff/datasets/pokeflex",
+    "/home/github-runner/.cache/datasets/pokeflex",
+    "/home/github-runner/.cache/workflows/pokeflex"
+  ],
+  "runner_label": "gpuserver4090",
+  "schema": "causal4d/pokeflex-adaptive-two-probe-structure-recovery-request",
+  "schema_version": 1,
+  "technical_revision": 2
+}
