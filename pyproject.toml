@@ -45,7 +45,7 @@ dev = [
   "mypy>=1.11",
   "pre-commit>=3.7,<5",
   "pytest>=8",
-  "ruff>=0.15.22,<0.17",
+  "ruff>=0.15.22,<0.18",
   "twine>=5",
 ]
 phystwin = [
